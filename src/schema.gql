@@ -1,0 +1,62 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AuthModel {
+  access_token: String!
+}
+
+input CreateUserInput {
+  """Example field (placeholder)"""
+  name: String!
+
+  """Example field (placeholder)"""
+  password: String!
+
+  """Example field (placeholder)"""
+  username: String!
+}
+
+type Mutation {
+  createUser(createUserInput: CreateUserInput!): UserModel!
+  login(password: String!, username: String!): AuthModel!
+  register(input: CreateUserInput!): Boolean
+  removeUser(id: Int!): UserModel!
+  updateUser(updateUserInput: UpdateUserInput!): UserModel!
+}
+
+type PgUsers {
+  count: Int!
+  items: [UserModel!]!
+  limit: Int!
+  page: Int!
+  total: Int!
+}
+
+type Query {
+  asdf: String
+  getAllUsers: [UserModel!]!
+  user(name: String!): UserModel
+  users(limit: Int! = 10, page: Int! = 1, sort: Boolean! = false): PgUsers!
+  whoAmI: String!
+}
+
+input UpdateUserInput {
+  id: Int!
+
+  """Example field (placeholder)"""
+  name: String
+
+  """Example field (placeholder)"""
+  password: String
+
+  """Example field (placeholder)"""
+  username: String
+}
+
+type UserModel {
+  _id: ID!
+  name: String!
+  password: String!
+  username: String!
+}
