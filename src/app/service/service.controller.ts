@@ -1,0 +1,68 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Req,
+  Put,
+  Query,
+} from '@nestjs/common';
+import { ServiceService } from './service.service';
+import { ServiceDto } from './service.dto';
+import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import { Admin, System } from 'src/auth/guards/role/role.decorator';
+import { BadRequest } from 'src/common/error';
+import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
+import { Pagination } from 'src/common/decorator/pagination.decorator';
+import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { SAQ } from 'src/common/decorator/use-param.decorator';
+
+@ApiBearerAuth('access-token')
+@ApiHeader({
+  name: 'merchant-id',
+  description: 'Merchant ID',
+  required: false,
+})
+@Controller('service')
+export class ServiceController {
+  constructor(private readonly serviceService: ServiceService) {}
+
+  @Admin()
+  @Post()
+  create(@Body() dto: ServiceDto, @Req() { user }) {
+    BadRequest.merchantNotFound(user?.merchant);
+    return this.serviceService.create(dto, user.merchant.id, user.user.id);
+  }
+  @PQ(['branch_id'])
+  @Get()
+  @Public()
+  findAll(@Pagination() pg: PaginationDto) {
+    return this.serviceService.findAll(pg);
+  }
+  @PQ(['branch_id', 'status'])
+  @Get('admin')
+  @System()
+  find(@Pagination() pg: PaginationDto) {
+    return this.serviceService.findBySystem(pg);
+  }
+  @Get('admin')
+  @SAQ()
+  findOne(@Query('id') id: string) {
+    return this.serviceService.findOne(id);
+  }
+
+  @Admin()
+  @Put(':id')
+  update(@Param('id') id: string, @Body() dto: ServiceDto) {
+    return this.serviceService.update(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.serviceService.remove(id);
+  }
+}

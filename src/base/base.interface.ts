@@ -2,6 +2,6 @@ export interface Meta {
   count: number;
   total: number;
   page: number;
-  limit: number;
+  skip: number;
   items?: any[];
 }

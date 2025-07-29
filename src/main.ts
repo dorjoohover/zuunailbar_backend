@@ -1,14 +1,35 @@
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { GqlAuthGuard } from './auth/guard/roles.guard';
-import { JwtAuthGuard } from './auth/guard/jwt-auth.guard';
+import {
+  BadRequestException,
+  ValidationError,
+  ValidationPipe,
+} from '@nestjs/common';
+import { setupSwagger } from './config/swagger';
+import { useContainer } from 'class-validator';
+import { LoggingInterceptor } from './common/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    logger: console
+    logger: ['log', 'error', 'warn', 'debug', 'verbose'],
   });
-  app.useGlobalGuards(new GqlAuthGuard(new Reflector()));
-  app.useGlobalGuards(new JwtAuthGuard(new Reflector()));
+  app.setGlobalPrefix('/api/v1');
+  app.enableCors({
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      exceptionFactory: (validationErrors: ValidationError[] = []) => {
+        const message = Object.values(
+          validationErrors[0].constraints || '',
+        ).join(', ');
+        return new BadRequestException(message);
+      },
+    }),
+  );
+  useContainer(app.select(AppModule), { fallbackOnErrors: true });
+  app.useGlobalInterceptors(new LoggingInterceptor());
+  setupSwagger(app);
   await app.listen(3000);
 }
 bootstrap();

@@ -1,43 +1,39 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from 'src/app/users/users.service';
 import * as bcrypt from 'bcrypt';
-import { CreateUserInput } from 'src/app/users/dto/create-user.input';
-import { ConfigService } from '@nestjs/config';
+import { AdminUserService } from 'src/app/admin.user/admin.user.service';
+import { LoginDto } from './auth.dto';
+
 @Injectable()
 export class AuthService {
   constructor(
+    private adminUsersService: AdminUserService,
     private jwtService: JwtService,
-    private usersService: UsersService,
-    private configService: ConfigService,
   ) {}
 
-  async validateUser(username: string, password: string) {
-    const user = await this.usersService.findOne(username);
-    if (user && (await bcrypt.compare(password, user.password))) {
+  async validateAdminUser(mobile: string, pass: string): Promise<any> {
+    const user = await this.adminUsersService.getAdminUser(mobile);
+    const isMatch = await bcrypt.compare(pass, user.password);
+    if (user && isMatch == true) {
       const { password, ...result } = user;
       return result;
     }
-    return null;
+    return false;
   }
 
-  async login(user: any) {
-    const payload = {
-      username: user.username,
-      sub: user._id,
-      role: user.role,
-    };
+  async adminLogin(user: any) {
+    const result = await this.validateAdminUser(user.mobile, user.password);
+    if (!result) {
+      throw new UnauthorizedException();
+    }
     return {
-      access_token: this.jwtService.sign(payload, {
-        expiresIn: '1d',
-        secret: this.configService.get<string>('JWT_SECRET'),
+      accessToken: this.jwtService.sign({
+        ...result,
       }),
+      firstname: result.firstname,
+      role: result.role,
+      lastname: result.lastname,
+      phone: result.phone,
     };
-  }
-
-  async register(input: CreateUserInput) {
-    const hashed = await bcrypt.hash(input.password, 10);
-    this.usersService.create({ ...input, password: hashed });
-    return true;
   }
 }
