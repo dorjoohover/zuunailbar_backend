@@ -5,43 +5,35 @@ import { BaseService } from 'src/base/base.service';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { ADMINUSERS, getDefinedKeys, STATUS } from 'src/base/constants';
+import { applyDefaultStatusFilter } from 'src/utils/global.service';
 
 @ApiBearerAuth('access-token')
 @Injectable()
 export class MerchantService extends BaseService {
-  constructor(
-    private dao: MerchantDao,
-
-    // private feedService: FeedService,
-    // private sequenceService: SequenceService,
-  ) {
+  constructor(private dao: MerchantDao) {
     super();
   }
   public async create(dto: MerchantDto) {
     return await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
+      status: STATUS.Active,
     });
   }
-  async get(id: string) {
-    const merchant = await this.dao.getById(id);
-
-    return { ...merchant };
+  async findOne(id: string) {
+    return await this.dao.getById(id);
   }
 
-  public async find(pg: PaginationDto) {
-    return await this.dao.list(pg);
+  public async find(pg: PaginationDto, role: number) {
+    return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} merchant`;
+  public async update(id: string, dto: MerchantDto) {
+    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }
 
-  update(id: number, updateMerchantDto: MerchantDto) {
-    return `This action updates a #${id} merchant`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} merchant`;
+  public async remove(id: string) {
+    return await this.dao.updateStatus(id, STATUS.Hidden);
   }
 }

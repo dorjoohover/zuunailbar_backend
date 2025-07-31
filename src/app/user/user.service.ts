@@ -4,9 +4,13 @@ import { UserDao } from './user.dao';
 import { AppUtils } from 'src/core/utils/app.utils';
 import {
   ADMIN,
+  ADMINUSERS,
+  CLIENT,
   EMPLOYEE,
+  getDefinedKeys,
   MANAGER,
   saltOrRounds,
+  STATUS,
   UserStatus,
 } from 'src/base/constants';
 import { BadRequest, NoPermissionException } from 'src/common/error';
@@ -14,6 +18,8 @@ import { User } from './user.entity';
 import { MobileFormat } from 'src/common/formatter';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import * as bcrypt from 'bcrypt';
+import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { RegisterDto } from 'src/auth/auth.dto';
 @Injectable()
 export class UserService {
   constructor(private readonly dao: UserDao) {}
@@ -33,7 +39,8 @@ export class UserService {
     await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
-      status: UserStatus.Active,
+      status: STATUS.Active,
+      user_status: UserStatus.Active,
       mobile: mobile,
       merchant_id: merchant,
       password: password,
@@ -42,20 +49,40 @@ export class UserService {
       birthday: new Date(dto.birthday),
     });
   }
-
-  public async findAll(pg: PaginationDto) {
-    return await this.dao.list(pg);
+  public async register(dto: RegisterDto, merchant: string) {
+    const mobile = MobileFormat(dto.mobile);
+    const res = await this.dao.getByMobile(mobile);
+    if (res.length != 0) throw new BadRequest().registered;
+    await this.dao.add({
+      id: AppUtils.uuid4(),
+      status: STATUS.Active,
+      user_status: UserStatus.Active,
+      mobile: mobile,
+      merchant_id: merchant,
+      added_by: null,
+      branch_id: null,
+      birthday: null,
+      description: null,
+      firstname: null,
+      lastname: null,
+      password: null,
+      role: CLIENT,
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  public async findAll(pg: PaginationDto, role: number) {
+    return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
 
-  update(id: number, dto: UserDto) {
-    return `This action updates a #${id} user`;
+  public async findOne(id: string) {
+    return await this.dao.getById(id);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  public async update(id: number, dto: UserDto) {
+    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+  }
+
+  public async updateStatus(id: string) {
+    return await this.dao.updateStatus(id, STATUS.Hidden);
   }
 }

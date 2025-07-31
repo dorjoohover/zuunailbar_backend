@@ -2,16 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { isOnlyFieldPresent } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Merchant } from './merchant.entity';
+import { Brand } from './brand.entity';
 
-const tableName = 'merchants';
+const tableName = 'brands';
 
 @Injectable()
-export class MerchantDao {
+export class BrandDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Merchant) {
-    return await this._db.insert(tableName, data, ['id', 'name', 'status']);
+  async add(data: Brand) {
+    return await this._db.insert(tableName, data, [
+      'id',
+      'name',
+      'merchant_id',
+      'status',
+    ]);
   }
 
   async update(data: any, attr: string[]): Promise<number> {
@@ -27,24 +32,17 @@ export class MerchantDao {
     );
   }
 
-  async updateFee(id: string, fee: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
-      [fee, id],
-    );
-  }
-
-  async updateStatus(id: string, status: number): Promise<number> {
+  async updateStatus(id: string, status: number) {
     return await this._db._update(
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
       [status, id],
     );
   }
 
-  async getByRegisterno(registerno: string) {
+  async getByMobile(mobile: string) {
     return await this._db.select(
-      `SELECT * FROM "${tableName}" WHERE "registerno"=$1`,
-      [registerno],
+      `SELECT * FROM "${tableName}" WHERE "mobile"=$1`,
+      [mobile],
     );
   }
 
@@ -68,7 +66,6 @@ export class MerchantDao {
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
-
       .criteria();
     const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;

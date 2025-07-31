@@ -66,15 +66,9 @@ export class ServiceDao {
   }
 
   async list(query) {
-    let tagCondition = ``;
+  
 
-    if (query.tag) {
-      if (isOnlyFieldPresent(query, 'tag')) {
-        tagCondition = `WHERE '${query.tag}' = ANY("tags")`;
-      } else {
-        tagCondition = ` AND '${query.tag}' = ANY("tags")`;
-      }
-    }
+
 
     if (query.id) {
       query.id = `%${query.id}%`;
@@ -91,8 +85,8 @@ export class ServiceDao {
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria}${tagCondition} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}${tagCondition}`;
+    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

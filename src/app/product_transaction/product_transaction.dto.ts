@@ -2,15 +2,15 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class ProductTransactionDto {
   @ApiProperty()
-  productid: string;
+  product_id: string;
   @ApiProperty()
-  userid: string;
+  user_id: string;
   @ApiProperty()
-  quantity: string;
+  quantity: number;
   @ApiProperty()
-  price: string;
+  price: number;
   @ApiProperty()
-  totalAmount: string;
+  total_amount: number;
   @ApiProperty()
-  status: string;
+  transaction_status: number;
 }

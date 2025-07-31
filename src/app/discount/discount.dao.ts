@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
+import { isOnlyFieldPresent, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Discount } from './discount.entity';
@@ -18,6 +18,7 @@ export class DiscountDao {
       'end_date',
       'value',
       'name',
+      'status',
       'type',
     ]);
   }
@@ -58,7 +59,7 @@ export class DiscountDao {
 
   async getById(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "id"=$1`,
+      `SELECT * FROM "${tableName}" WHERE "id"=$1 and "status" = ${STATUS.Active}`,
       [id],
     );
   }
@@ -70,8 +71,6 @@ export class DiscountDao {
   }
 
   async list(query) {
-    let tagCondition = ``;
-
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -84,10 +83,11 @@ export class DiscountDao {
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('service_id', '=', query.service_id)
       .conditionIfNotEmpty('type', '=', query.type)
+      .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria}${tagCondition} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}${tagCondition}`;
+    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

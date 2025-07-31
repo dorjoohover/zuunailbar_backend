@@ -3,7 +3,7 @@ import { firstLetterUpper } from 'src/base/constants';
 
 export class BadRequest {
   static merchantNotFound(merchant: any) {
-    if (!merchant && !merchant.id) {
+    if (!merchant && !merchant?.id) {
       throw new HttpException('Merchant id not found', HttpStatus.BAD_REQUEST);
     }
   }

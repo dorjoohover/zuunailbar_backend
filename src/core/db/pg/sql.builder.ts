@@ -110,6 +110,29 @@ export class SqlBuilder {
 
     return this;
   }
+  conditionIfTimeBetween(startCol: string, endCol: string, time: string) {
+    if (!time) return this;
+
+    this.values.push(time);
+    const timeParamIndex = this.values.length;
+
+    const quoteStart = startCol.includes('"') ? '' : '"';
+    const quoteEnd = endCol.includes('"') ? '' : '"';
+
+    this.conditions.push(
+      `(
+      (${quoteStart}${startCol}${quoteStart} <= ${quoteEnd}${endCol}${quoteEnd}
+        AND $${timeParamIndex}::time BETWEEN ${quoteStart}${startCol}${quoteStart} AND ${quoteEnd}${endCol}${quoteEnd})
+      OR
+      (${quoteStart}${startCol}${quoteStart} > ${quoteEnd}${endCol}${quoteEnd}
+        AND ($${timeParamIndex}::time >= ${quoteStart}${startCol}${quoteStart}
+          OR $${timeParamIndex}::time <= ${quoteEnd}${endCol}${quoteEnd}))
+    )`,
+    );
+
+    return this;
+  }
+
   conditionIsNull(column: string) {
     const quote = column.indexOf(`"`) === -1 ? `"` : '';
     this.conditions.push(`${quote}${column}${quote} IS NULL`);

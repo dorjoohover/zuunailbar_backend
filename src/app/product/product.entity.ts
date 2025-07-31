@@ -7,5 +7,8 @@ export class Product {
   quantity: number;
   price: number;
   color: string;
+  size: string;
+  status: number;
+  merchant_id: string;
   created_at?: Date;
 }

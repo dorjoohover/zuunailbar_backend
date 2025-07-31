@@ -6,6 +6,7 @@ import { BadRequest } from 'src/common/error';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { getDefinedKeys, STATUS } from 'src/base/constants';
 import { DiscountService } from '../discount/discount.service';
+import { applyDefaultStatusFilter } from 'src/utils/global.service';
 
 @Injectable()
 export class ServiceService {
@@ -24,12 +25,12 @@ export class ServiceService {
     });
   }
 
-  public async findAll(pg: PaginationDto) {
+  public async findAll(pg: PaginationDto, role: number) {
     let res: { count: number; items: any[] } = {
       count: 0,
       items: [],
     };
-    const list = await this.dao.list({ ...pg, status: STATUS.Active });
+    const list = await this.dao.list(applyDefaultStatusFilter(pg, role));
     res.count = list.count;
     const items = [];
     for (const item of list.items) {
@@ -56,9 +57,6 @@ export class ServiceService {
     }
     res.items = items;
     return res;
-  }
-  public async findBySystem(pg: PaginationDto) {
-    return await this.dao.list({ ...pg });
   }
 
   public async findOne(id: string) {

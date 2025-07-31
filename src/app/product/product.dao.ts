@@ -20,6 +20,9 @@ export class ProductDao {
       'color',
       'brand_id',
       'category_id',
+      'status',
+      'size',
+      'merchant_id',
     ]);
   }
 
@@ -65,14 +68,6 @@ export class ProductDao {
   }
 
   async list(query) {
-    let tagCondition = ``;
-    if (query.tag) {
-      if (isOnlyFieldPresent(query, 'tag')) {
-        tagCondition = `WHERE '${query.tag}' = ANY("tags")`;
-      } else {
-        tagCondition = ` AND '${query.tag}' = ANY("tags")`;
-      }
-    }
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -83,25 +78,27 @@ export class ProductDao {
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('tenantId', '=', query.tenantId)
-      .conditionIfNotEmpty('userId', '=', query.userId)
+      .conditionIfNotEmpty('brand_id', '=', query.brand_id)
+      .conditionIfNotEmpty('category_id', '=', query.category_id)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
-      .orConditions([
-        new SqlCondition('name', 'LIKE', query.name),
-        new SqlCondition('namedba', 'LIKE', query.name),
-      ])
-      .conditionIfNotEmpty('city', '=', query.city)
-      .conditionIfNotEmpty('registerno', 'LIKE', query.registerno)
-      .conditionIfNotEmpty('district', '=', query.district)
-      .conditionIfNotEmpty('mcc', '=', query.mcc)
+
+      .conditionIfNotEmpty('status', '=', query.status)
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria}${tagCondition} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}${tagCondition}`;
+    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
   }
+  async count(filters?: Record<string, any>) {
+    const builder = new SqlBuilder(filters ?? {});
+    const whereClause = builder.criteria(); // → 'WHERE ...' хэлбэртэй болно
 
+    const sql = `SELECT COUNT(*) FROM "${tableName}" ${whereClause}`;
+    const result = await this._db.count(sql, builder.values);
+
+    return result;
+  }
   async search(filter: any): Promise<any[]> {
     let nameCondition = ``;
     if (filter.merchantId) {

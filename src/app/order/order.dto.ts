@@ -2,29 +2,28 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class OrderDto {
   @ApiProperty()
-  userid: string;
+  user_id: string;
+
   @ApiProperty()
-  customerid: string;
+  duration: number;
   @ApiProperty()
-  duration: string;
+  order_date: Date;
   @ApiProperty()
-  orderDate: Date;
+  start_time: Date;
   @ApiProperty()
-  startTime: Date;
+  end_time: Date;
   @ApiProperty()
-  endTime: Date;
+  order_status: number;
   @ApiProperty()
-  status: number;
+  pre_amount: number;
   @ApiProperty()
-  preAmount: number;
+  is_pre_amount_paid: boolean;
   @ApiProperty()
-  isPreAmountPaid: boolean;
+  total_amount: number;
   @ApiProperty()
-  totalAmount: number;
+  paid_amount: number;
   @ApiProperty()
-  paidAmount: number;
+  customer_desc: string;
   @ApiProperty()
-  customerDesc: string;
-  @ApiProperty()
-  userDesc: string;
+  user_desc: string;
 }

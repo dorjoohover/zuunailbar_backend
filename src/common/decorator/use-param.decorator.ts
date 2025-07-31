@@ -3,22 +3,28 @@ import { ApiParam, ApiQuery } from '@nestjs/swagger';
 import { P } from '../const/app.const';
 
 // swagger api param
-export function SAP(any?: string) {
-  return applyDecorators(
-    any
-      ? ApiParam({
-          name: any,
-        })
-      : ApiParam(P.ID),
-  );
+export function SAQ(queries?: string) {
+  const decorators = [];
+  if (queries?.length) {
+    for (const param of queries) {
+      decorators.push(ApiQuery({ name: param, required: false }));
+    }
+  } else {
+    decorators.push(ApiQuery(P.ID));
+  }
+
+  return applyDecorators(...decorators);
 }
 // swagger api query
-export function SAQ(any?: string) {
-  return applyDecorators(
-    any
-      ? ApiQuery({
-          name: any,
-        })
-      : ApiQuery(P.ID),
-  );
+export function SAP(params?: string[]) {
+  const decorators = [];
+  if (params?.length) {
+    for (const param of params) {
+      decorators.push(ApiParam({ name: param, required: false }));
+    }
+  } else {
+    decorators.push(ApiParam(P.ID));
+  }
+
+  return applyDecorators(...decorators);
 }

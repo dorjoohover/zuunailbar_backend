@@ -1,7 +1,7 @@
 export class SalaryLogDto {
-  userid: string;
-  approvedby: string;
+  user_id: string;
+  approved_by: string;
   date: Date;
   amount: number;
-  orderCount: number;
+  order_count: number;
 }

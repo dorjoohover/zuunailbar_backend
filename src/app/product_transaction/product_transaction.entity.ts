@@ -7,5 +7,7 @@ export class ProductTransaction {
   public price: number;
   public total_amount: number;
   public status: number;
+  public transaction_status: number;
+  public created_by: string;
   public created_at?: Date;
 }

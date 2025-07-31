@@ -3,11 +3,15 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AdminUserService } from 'src/app/admin.user/admin.user.service';
 import { LoginDto } from './auth.dto';
+import { MobileFormat } from 'src/common/formatter';
+import { UserService } from 'src/app/user/user.service';
+import { CLIENT } from 'src/base/constants';
 
 @Injectable()
 export class AuthService {
   constructor(
     private adminUsersService: AdminUserService,
+    private userService: UserService,
     private jwtService: JwtService,
   ) {}
 
@@ -35,5 +39,14 @@ export class AuthService {
       lastname: result.lastname,
       phone: result.phone,
     };
+  }
+
+  async register(mobile: string, merchant: string) {
+    return await this.userService.register(
+      {
+        mobile: mobile,
+      },
+      merchant,
+    );
   }
 }

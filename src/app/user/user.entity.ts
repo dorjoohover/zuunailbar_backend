@@ -9,6 +9,7 @@ export class User {
   public status: number;
   public added_by: string;
   public branch_id: string;
+  public user_status: number;
   public merchant_id: string;
   public description: string;
   public created_at?: Date;

@@ -6,36 +6,51 @@ import {
   Patch,
   Param,
   Delete,
+  Req,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { ProductDto } from './product.dto';
-
+import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import { Admin } from 'src/auth/guards/role/role.decorator';
+import { BadRequest } from 'src/common/error';
+import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
+import { Pagination } from 'src/common/decorator/pagination.decorator';
+import { PaginationDto } from 'src/common/decorator/pagination.dto';
+@ApiBearerAuth('access-token')
+@ApiHeader({
+  name: 'merchant-id',
+  description: 'Merchant ID',
+  required: false,
+})
 @Controller('product')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
-
+  @Admin()
   @Post()
-  create(@Body() dto: ProductDto) {
-    return this.productService.create(dto);
+  create(@Body() dto: ProductDto, @Req() { user }) {
+    BadRequest.merchantNotFound(user.merchant);
+    return this.productService.create(dto, user.merchant.id);
   }
 
   @Get()
-  findAll() {
-    return this.productService.findAll();
+  @PQ(['status'])
+  findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.productService.findAll(pg, user.user.role);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.productService.findOne(+id);
+    return this.productService.findOne(id);
   }
-
+  @Admin()
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: ProductDto) {
-    return this.productService.update(+id, dto);
+    return this.productService.update(id, dto);
   }
 
+  @Admin()
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.productService.remove(+id);
+    return this.productService.remove(id);
   }
 }

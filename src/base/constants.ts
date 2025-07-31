@@ -1,3 +1,5 @@
+import { User } from 'src/app/user/user.entity';
+
 export const DEFAULT_SKIP = 0;
 export const DEFAULT_LIMIT = 20;
 export const DEFAULT_SORT = false;
@@ -28,6 +30,11 @@ export function getDefinedKeys(obj: Record<string, any>): string[] {
     .filter(([_, value]) => value !== undefined && value !== null)
     .map(([key]) => key);
 }
+
+export const usernameFormatter = (user: User) => {
+  return `${firstLetterUpper(user.lastname)}.${user.firstname}`;
+};
+
 export const saltOrRounds = 1;
 
 export const firstLetterUpper = (value: string) => {
@@ -63,6 +70,7 @@ export enum ScheduleStatus {
   Excused = 20,
   Vacation = 30,
   Absent = 40,
+  Hidden = 50,
 }
 
 export enum UserProductStatus {
@@ -75,5 +83,24 @@ export enum UserProductStatus {
 
 export enum STATUS {
   Active = 10,
+  Pending = 20,
+  Hidden = 30,
+}
+export enum COST_STATUS {
+  Paid = 10,
+  Pending = 20,
+}
+
+export enum PRODUCT_STATUS {
+  Active = 10,
   Hidden = 20,
+}
+export enum SALARY_LOG_STATUS {
+  Pending = 10,
+  Paid = 20,
+}
+export enum PRODUCT_TRANSACTION_STATUS {
+  Used = 10,
+  Sold = 20,
+  Damaged = 30,
 }

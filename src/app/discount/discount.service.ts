@@ -4,22 +4,28 @@ import { DiscountDao } from './discount.dao';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import {
+  ADMINUSERS,
   DISCOUNT,
   DiscountValue,
   getDefinedKeys,
   round,
   STATUS,
 } from 'src/base/constants';
+import { applyDefaultStatusFilter } from 'src/utils/global.service';
 
 @Injectable()
 export class DiscountService {
   constructor(private readonly dao: DiscountDao) {}
   public async create(dto: DiscountDto) {
-    return await this.dao.add({ ...dto, id: AppUtils.uuid4() });
+    return await this.dao.add({
+      ...dto,
+      id: AppUtils.uuid4(),
+      status: STATUS.Active,
+    });
   }
 
-  public async findAll(dto: PaginationDto) {
-    return await this.dao.list(dto);
+  public async findAll(dto: PaginationDto, role: number) {
+    return await this.dao.list(applyDefaultStatusFilter(dto, role));
   }
 
   public async findOne(id: string) {
@@ -48,15 +54,6 @@ export class DiscountService {
           discount: value,
           discountValue: value,
           discountType: DiscountValue[DISCOUNT.Price],
-        };
-      }
-
-      if (type === DISCOUNT.Constant) {
-        return {
-          discountedAmount: value,
-          discount: amount - value,
-          discountValue: value,
-          discountType: DiscountValue[DISCOUNT.Constant],
         };
       }
 

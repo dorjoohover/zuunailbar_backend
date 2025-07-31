@@ -15,6 +15,9 @@ import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { BranchDto } from './branch.dto';
 import { Admin } from 'src/auth/guards/role/role.decorator';
 import { BadRequest } from 'src/common/error';
+import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
+import { Pagination } from 'src/common/decorator/pagination.decorator';
+import { PaginationDto } from 'src/common/decorator/pagination.dto';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'merchant-id',
@@ -22,10 +25,10 @@ import { BadRequest } from 'src/common/error';
   required: true,
 })
 @Controller('branch')
+@Admin()
 export class BranchController {
   constructor(private readonly branchService: BranchService) {}
 
-  @Admin()
   @Post()
   async create(@Body() dto: BranchDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant);
@@ -33,8 +36,9 @@ export class BranchController {
   }
 
   @Get()
-  findAll() {
-    return this.branchService.findAll();
+  @PQ(['status'])
+  findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.branchService.find(pg, user.user.role);
   }
 
   @Get(':id')

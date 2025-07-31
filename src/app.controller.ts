@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { AppService } from './app.service';
 import { Public } from './auth/guards/jwt/jwt-auth-guard';
-import { LoginDto } from './auth/auth.dto';
+import { LoginDto, RegisterDto } from './auth/auth.dto';
 import { AuthService } from './auth/auth.service';
+import { ApiHeader } from '@nestjs/swagger';
+import { BadRequest } from './common/error';
 
 @Controller()
 export class AppController {
@@ -20,5 +22,17 @@ export class AppController {
   @Post('/login')
   async login(@Body() dto: LoginDto) {
     return await this.authService.adminLogin(dto);
+  }
+  @ApiHeader({
+    name: 'merchant-id',
+    description: 'Merchant ID',
+    required: true,
+  })
+  @Public()
+  @Post('/register')
+  async register(@Body() dto: RegisterDto, @Req() req) {
+    let merchantId = req.headers['merchant-id'] as string;
+    BadRequest.merchantNotFound({ id: merchantId });
+    return await this.authService.register(dto.mobile, merchantId);
   }
 }

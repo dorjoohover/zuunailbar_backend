@@ -11,7 +11,12 @@ export class CategoryDao {
   constructor(private readonly _db: AppDB) {}
 
   async add(data: Category) {
-    return await this._db.insert(tableName, data, ['id', 'name']);
+    return await this._db.insert(tableName, data, [
+      'id',
+      'name',
+      'merchant_id',
+      'status',
+    ]);
   }
 
   async update(data: any, attr: string[]): Promise<number> {
@@ -27,14 +32,7 @@ export class CategoryDao {
     );
   }
 
-  async updateFee(id: string, fee: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
-      [fee, id],
-    );
-  }
-
-  async updateStatus(id: string, status: number): Promise<number> {
+  async updateStatus(id: string, status: number) {
     return await this._db._update(
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
       [status, id],
@@ -56,14 +54,6 @@ export class CategoryDao {
   }
 
   async list(query) {
-    let tagCondition = ``;
-    if (query.tag) {
-      if (isOnlyFieldPresent(query, 'tag')) {
-        tagCondition = `WHERE '${query.tag}' = ANY("tags")`;
-      } else {
-        tagCondition = ` AND '${query.tag}' = ANY("tags")`;
-      }
-    }
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -74,20 +64,11 @@ export class CategoryDao {
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('tenantId', '=', query.tenantId)
-      .conditionIfNotEmpty('userId', '=', query.userId)
+      .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
-      .orConditions([
-        new SqlCondition('name', 'LIKE', query.name),
-        new SqlCondition('namedba', 'LIKE', query.name),
-      ])
-      .conditionIfNotEmpty('city', '=', query.city)
-      .conditionIfNotEmpty('registerno', 'LIKE', query.registerno)
-      .conditionIfNotEmpty('district', '=', query.district)
-      .conditionIfNotEmpty('mcc', '=', query.mcc)
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria}${tagCondition} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}${tagCondition}`;
+    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

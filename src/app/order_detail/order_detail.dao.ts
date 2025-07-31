@@ -17,6 +17,7 @@ export class OrderDetailDao {
       'service_id',
       'service_name',
       'price',
+      'status',
     ]);
   }
 
@@ -62,14 +63,6 @@ export class OrderDetailDao {
   }
 
   async list(query) {
-    let tagCondition = ``;
-    if (query.tag) {
-      if (isOnlyFieldPresent(query, 'tag')) {
-        tagCondition = `WHERE '${query.tag}' = ANY("tags")`;
-      } else {
-        tagCondition = ` AND '${query.tag}' = ANY("tags")`;
-      }
-    }
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -80,20 +73,13 @@ export class OrderDetailDao {
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('tenantId', '=', query.tenantId)
-      .conditionIfNotEmpty('userId', '=', query.userId)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
-      .orConditions([
-        new SqlCondition('name', 'LIKE', query.name),
-        new SqlCondition('namedba', 'LIKE', query.name),
-      ])
-      .conditionIfNotEmpty('city', '=', query.city)
-      .conditionIfNotEmpty('registerno', 'LIKE', query.registerno)
-      .conditionIfNotEmpty('district', '=', query.district)
-      .conditionIfNotEmpty('mcc', '=', query.mcc)
+      .conditionIfNotEmpty('order_id', '=', query.order_id)
+      .conditionIfNotEmpty('service_id', '=', query.service_id)
+      .conditionIfNotEmpty('status', '=', query.status)
+
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria}${tagCondition} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}${tagCondition}`;
+    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

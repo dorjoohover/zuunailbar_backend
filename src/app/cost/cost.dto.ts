@@ -1,12 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class ScheduleDto {
+export class CostDto {
+  @ApiProperty()
+  product_id: string;
+
   @ApiProperty()
   date: Date;
   @ApiProperty()
-  start_time: Date;
+  price: number;
   @ApiProperty()
-  end_time: Date;
-  @ApiProperty()
-  status: number;
+  cost_status: number;
 }

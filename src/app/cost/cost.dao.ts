@@ -2,16 +2,27 @@ import { Injectable } from '@nestjs/common';
 import { isOnlyFieldPresent } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Brand } from './brand.entity';
+import { Cost } from './cost.entity';
 
-const tableName = 'brands';
+const tableName = 'costs';
 
 @Injectable()
-export class BrandDao {
+export class CostDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Brand) {
-    return await this._db.insert(tableName, data, ['id', 'name']);
+  async add(data: Cost) {
+    return await this._db.insert(tableName, data, [
+      'id',
+      'category_id',
+      'branch_id',
+      'branch_name',
+      'product_id',
+      'product_name',
+      'status',
+      'cost_status',
+      'date',
+      'price',
+    ]);
   }
 
   async update(data: any, attr: string[]): Promise<number> {
@@ -27,14 +38,7 @@ export class BrandDao {
     );
   }
 
-  async updateFee(id: string, fee: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
-      [fee, id],
-    );
-  }
-
-  async updateStatus(id: string, status: number): Promise<number> {
+  async updateStatus(id: string, status: number) {
     return await this._db._update(
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
       [status, id],
@@ -56,38 +60,22 @@ export class BrandDao {
   }
 
   async list(query) {
-    let tagCondition = ``;
-    if (query.tag) {
-      if (isOnlyFieldPresent(query, 'tag')) {
-        tagCondition = `WHERE '${query.tag}' = ANY("tags")`;
-      } else {
-        tagCondition = ` AND '${query.tag}' = ANY("tags")`;
-      }
-    }
     if (query.id) {
       query.id = `%${query.id}%`;
-    }
-    if (query.name) {
-      query.name = `%${query.name}%`;
     }
 
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('tenantId', '=', query.tenantId)
-      .conditionIfNotEmpty('userId', '=', query.userId)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
-      .orConditions([
-        new SqlCondition('name', 'LIKE', query.name),
-        new SqlCondition('namedba', 'LIKE', query.name),
-      ])
-      .conditionIfNotEmpty('city', '=', query.city)
-      .conditionIfNotEmpty('registerno', 'LIKE', query.registerno)
-      .conditionIfNotEmpty('district', '=', query.district)
-      .conditionIfNotEmpty('mcc', '=', query.mcc)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('cost_status', '=', query.cost_status)
+      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
+      .conditionIfNotEmpty('product_id', '=', query.product_id)
+      .conditionIfNotEmpty('category_id', '=', query.category_id)
+      .conditionIfBetween('date', query.start_date, query.end_date)
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria}${tagCondition} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}${tagCondition}`;
+    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

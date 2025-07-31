@@ -17,6 +17,7 @@ import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { SAP } from 'src/common/decorator/use-param.decorator';
 
 @ApiBearerAuth('access-token')
 @Controller('merchant')
@@ -28,26 +29,30 @@ export class MerchantController {
   create(@Body() dto: MerchantDto) {
     return this.merchantService.create(dto);
   }
+
   @Get()
-  @PQ()
-  @Public()
-  findAll(@Pagination() pg: PaginationDto) {
-    return this.merchantService.find(pg);
+  @PQ(['status'])
+  findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.merchantService.find(pg, user.user.role);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() { user }) {
-    console.log(user);
-    return this.merchantService.findOne(+id);
+  @SAP()
+  findOne(@Param('id') id: string) {
+    return this.merchantService.findOne(id);
   }
 
+  @System()
   @Patch(':id')
+  @SAP()
   update(@Param('id') id: string, @Body() updateMerchantDto: MerchantDto) {
-    return this.merchantService.update(+id, updateMerchantDto);
+    return this.merchantService.update(id, updateMerchantDto);
   }
 
   @Delete(':id')
+  @System()
+  @SAP()
   remove(@Param('id') id: string) {
-    return this.merchantService.remove(+id);
+    return this.merchantService.remove(id);
   }
 }

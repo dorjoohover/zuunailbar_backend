@@ -29,10 +29,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const merchantId = req.headers['merchant-id'] as string;
     const branchId = req.headers['branch-id'] as string;
     if (merchantId) {
-      merchant = await this.merchantService.get(merchantId);
+      merchant = await this.merchantService.findOne(merchantId);
     }
     if (branchId) {
-      branch = await this.branchService.get(branchId);
+      branch = await this.branchService.findOne(branchId);
     }
     const user = await this.adminUsersService.getAdminUserById(payload);
 

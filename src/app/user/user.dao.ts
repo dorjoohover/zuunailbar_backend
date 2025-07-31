@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
+import { isOnlyFieldPresent, UserStatus } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { User } from './user.entity';
+import { MobileFormat } from 'src/common/formatter';
 
 const tableName = 'users';
 
@@ -23,6 +24,7 @@ export class UserDao {
       'password',
       'role',
       'status',
+      'user_status',
       'description',
     ]);
   }
@@ -63,44 +65,41 @@ export class UserDao {
 
   async getById(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "id"=$1`,
+      `SELECT * FROM "${tableName}" WHERE "id"=$1 and status != ${UserStatus.Deleted} `,
       [id],
     );
   }
 
   async list(query) {
-    let tagCondition = ``;
-    if (query.tag) {
-      if (isOnlyFieldPresent(query, 'tag')) {
-        tagCondition = `WHERE '${query.tag}' = ANY("tags")`;
-      } else {
-        tagCondition = ` AND '${query.tag}' = ANY("tags")`;
-      }
-    }
     if (query.id) {
       query.id = `%${query.id}%`;
     }
-    if (query.name) {
-      query.name = `%${query.name}%`;
+    if (query.mobile) {
+      query.mobile = MobileFormat(query.mobile);
+    }
+    if (query.firstname) {
+      query.firstname = `%${query.firstname}%`;
+    }
+    if (query.lastname) {
+      query.lastname = `%${query.lastname}%`;
+    }
+    if (query.description) {
+      query.description = `%${query.description}%`;
     }
 
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('tenantId', '=', query.tenantId)
-      .conditionIfNotEmpty('userId', '=', query.userId)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
-      .orConditions([
-        new SqlCondition('name', 'LIKE', query.name),
-        new SqlCondition('namedba', 'LIKE', query.name),
-      ])
-      .conditionIfNotEmpty('city', '=', query.city)
-      .conditionIfNotEmpty('registerno', 'LIKE', query.registerno)
-      .conditionIfNotEmpty('district', '=', query.district)
-      .conditionIfNotEmpty('mcc', '=', query.mcc)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('description', 'LIKE', query.description)
+      .conditionIfNotEmpty('firstname', 'LIKE', query.firstname)
+      .conditionIfNotEmpty('lastname', 'LIKE', query.lastname)
+      .conditionIfNotEmpty('birthday', '=', query.birthday)
+      .conditionIfNotEmpty('mobile', '=', query.mobile)
+
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria}${tagCondition} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}${tagCondition}`;
+    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

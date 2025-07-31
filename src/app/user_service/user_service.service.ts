@@ -1,27 +1,62 @@
 import { Injectable } from '@nestjs/common';
 import { UserServiceDao } from './user_service.dao';
 import { UserServiceDto } from './user_service.dto';
+import { AppUtils } from 'src/core/utils/app.utils';
+import { ServiceService } from '../service/service.service';
+import { UserService } from '../user/user.service';
+import {
+  EMPLOYEE,
+  getDefinedKeys,
+  STATUS,
+  usernameFormatter,
+} from 'src/base/constants';
+import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { User } from '../user/user.entity';
 
 @Injectable()
 export class UserServiceService {
-  constructor(private readonly dao: UserServiceDao) {}
-  public async create(dto: UserServiceDto) {
-    return 'This action adds a new userService';
+  constructor(
+    private readonly dao: UserServiceDao,
+    private service: ServiceService,
+    private userService: UserService,
+  ) {}
+  public async create(dto: UserServiceDto, u: User) {
+    let user: User;
+    u.role == EMPLOYEE
+      ? (user = u)
+      : (user = await this.userService.findOne(dto.user_id));
+    const service = await this.service.findOne(dto.service_id);
+    await this.dao.add({
+      ...dto,
+      id: AppUtils.uuid4(),
+      user_name: usernameFormatter(user),
+      service_name: service.name,
+      user_id: user.id,
+      status: STATUS.Active,
+    });
   }
 
-  findAll() {
-    return `This action returns all userService`;
+  public async findAll(pg: PaginationDto, role: number) {
+    return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} userService`;
+  public async findOne(id: string) {
+    return await this.dao.getById(id);
   }
 
-  update(id: number, dto: UserServiceDto) {
-    return `This action updates a #${id} userService`;
+  public async update(id: string, dto: UserServiceDto) {
+    return await this.dao.update({ ...dto, id, updated_at: new Date() }, [
+      ...getDefinedKeys(dto),
+      'updated_at',
+    ]);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} userService`;
+  public async updateStatus(id: string, status: number) {
+    return await this.dao.update({ id, status, updated_at: new Date() }, [
+      'id',
+      'status',
+      'updated_at',
+    ]);
   }
 }

@@ -4,6 +4,7 @@ export class SalaryLog {
   approved_by: string;
   date: Date;
   amount: number;
+  salary_status: number;
   status: number;
   order_count: number;
   created_at?: Date;

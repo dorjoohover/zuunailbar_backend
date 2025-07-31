@@ -1,27 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { OrderDetailDao } from './order_detail.dao';
 import { OrderDetailDto } from './order_detail.dto';
+import { AppUtils } from 'src/core/utils/app.utils';
+import { getDefinedKeys, STATUS } from 'src/base/constants';
+import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { applyDefaultStatusFilter } from 'src/utils/global.service';
 
 @Injectable()
 export class OrderDetailService {
   constructor(private readonly dao: OrderDetailDao) {}
   public async create(dto: OrderDetailDto) {
-    return 'This action adds a new orderDetail';
+    await this.dao.add({
+      ...dto,
+      id: AppUtils.uuid4(),
+      status: STATUS.Active,
+    });
   }
 
-  findAll() {
-    return `This action returns all orderDetail`;
+  async findOne(id: string) {
+    return await this.dao.getById(id);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} orderDetail`;
+  public async find(pg: PaginationDto, role: number) {
+    return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
 
-  update(id: number, dto: OrderDetailDto) {
-    return `This action updates a #${id} orderDetail`;
+  public async update(id: string, dto: OrderDetailDto) {
+    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} orderDetail`;
+  public async remove(id: string) {
+    return await this.dao.updateStatus(id, STATUS.Hidden);
   }
 }

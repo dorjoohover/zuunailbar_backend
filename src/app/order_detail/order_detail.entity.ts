@@ -4,5 +4,6 @@ export class OrderDetail {
   public service_id: string;
   public service_name: string;
   public price: number;
+  public status: number;
   public created_at?: Date;
 }

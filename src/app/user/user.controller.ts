@@ -17,6 +17,7 @@ import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { ADMIN, MANAGER } from 'src/base/constants';
+import { SAP, SAQ } from 'src/common/decorator/use-param.decorator';
 
 @ApiBearerAuth('access-token')
 @Controller('user')
@@ -24,7 +25,7 @@ import { ADMIN, MANAGER } from 'src/base/constants';
   {
     name: 'merchant-id',
     description: 'Merchant ID',
-    required: true,
+    required: false,
   },
   {
     name: 'branch-id',
@@ -50,24 +51,26 @@ export class UserController {
   }
 
   @Get()
-  @PQ()
+  @PQ(['status'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
-    console.log(user);
-    return this.userService.findAll(pg);
+    return this.userService.findAll(pg, user.user.role);
   }
 
+  @SAP()
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
+    return this.userService.findOne(id);
   }
 
+  @SAP()
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UserDto) {
     return this.userService.update(+id, dto);
   }
 
   @Delete(':id')
+  @SAP()
   remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
+    return this.userService.updateStatus(id);
   }
 }

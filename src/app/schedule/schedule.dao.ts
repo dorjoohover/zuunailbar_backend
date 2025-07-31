@@ -18,7 +18,9 @@ export class ScheduleDao {
       'date',
       'start_time',
       'end_time',
+      'branch_id',
       'status',
+      'schedule_status',
     ]);
   }
 
@@ -64,38 +66,24 @@ export class ScheduleDao {
   }
 
   async list(query) {
-    let tagCondition = ``;
-    if (query.tag) {
-      if (isOnlyFieldPresent(query, 'tag')) {
-        tagCondition = `WHERE '${query.tag}' = ANY("tags")`;
-      } else {
-        tagCondition = ` AND '${query.tag}' = ANY("tags")`;
-      }
-    }
     if (query.id) {
       query.id = `%${query.id}%`;
     }
-    if (query.name) {
-      query.name = `%${query.name}%`;
-    }
 
     const builder = new SqlBuilder(query);
+    console.log(query)
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('tenantId', '=', query.tenantId)
-      .conditionIfNotEmpty('userId', '=', query.userId)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
-      .orConditions([
-        new SqlCondition('name', 'LIKE', query.name),
-        new SqlCondition('namedba', 'LIKE', query.name),
-      ])
-      .conditionIfNotEmpty('city', '=', query.city)
-      .conditionIfNotEmpty('registerno', 'LIKE', query.registerno)
-      .conditionIfNotEmpty('district', '=', query.district)
-      .conditionIfNotEmpty('mcc', '=', query.mcc)
+      .conditionIfNotEmpty('approved_by', '=', query.approved_by)
+      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('schedule_status', '=', query.schedule_status)
+      .conditionIfNotEmpty('user_id', '=', query.user_id)
+      .conditionIfNotEmpty('date', '=', query.date)
+      .conditionIfTimeBetween('start_time', 'end_time', query.time)
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria}${tagCondition} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}${tagCondition}`;
+    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

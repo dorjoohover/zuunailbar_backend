@@ -26,6 +26,7 @@ import { OrderDetailModule } from './app/order_detail/order_detail.module';
 import { ProductTransactionModule } from './app/product_transaction/product_transaction.module';
 import { UserServiceModule } from './app/user_service/user_service.module';
 import { UserProductModule } from './app/user_product/user_product.module';
+import { CostModule } from './app/cost/cost.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { UserProductModule } from './app/user_product/user_product.module';
     OrderDetailModule,
     ProductTransactionModule,
     UserServiceModule,
+    CostModule,
     UserProductModule,
   ],
   controllers: [AppController],

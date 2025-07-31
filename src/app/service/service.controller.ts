@@ -20,6 +20,7 @@ import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { SAQ } from 'src/common/decorator/use-param.decorator';
+import { CLIENT } from 'src/base/constants';
 
 @ApiBearerAuth('access-token')
 @ApiHeader({
@@ -41,13 +42,13 @@ export class ServiceController {
   @Get()
   @Public()
   findAll(@Pagination() pg: PaginationDto) {
-    return this.serviceService.findAll(pg);
+    return this.serviceService.findAll(pg, CLIENT);
   }
   @PQ(['branch_id', 'status'])
   @Get('admin')
   @System()
-  find(@Pagination() pg: PaginationDto) {
-    return this.serviceService.findBySystem(pg);
+  find(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.serviceService.findAll(pg, user.user.role);
   }
   @Get('admin')
   @SAQ()
@@ -56,11 +57,12 @@ export class ServiceController {
   }
 
   @Admin()
-  @Put(':id')
+  @Patch(':id')
   update(@Param('id') id: string, @Body() dto: ServiceDto) {
     return this.serviceService.update(id, dto);
   }
 
+  @Admin()
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.serviceService.remove(id);
