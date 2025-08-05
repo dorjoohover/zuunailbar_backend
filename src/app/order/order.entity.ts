@@ -13,6 +13,8 @@ export class Order {
   paid_amount: number;
   customer_desc: string;
   user_desc: string;
+  discount: number;
+  discount_type: number;
   status: number;
   created_at?: Date;
   updated_at?: Date;

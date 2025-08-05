@@ -30,6 +30,6 @@ async function bootstrap() {
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   app.useGlobalInterceptors(new LoggingInterceptor());
   setupSwagger(app);
-  await app.listen(3000);
+  await app.listen(4000);
 }
 bootstrap();

@@ -6,6 +6,7 @@ import { LoginDto } from './auth.dto';
 import { MobileFormat } from 'src/common/formatter';
 import { UserService } from 'src/app/user/user.service';
 import { CLIENT } from 'src/base/constants';
+import { FirebaseService } from 'src/base/firebase.service';
 
 @Injectable()
 export class AuthService {
@@ -38,6 +39,8 @@ export class AuthService {
       role: result.role,
       lastname: result.lastname,
       phone: result.phone,
+      merchant_id: result.merchant_id,
+      branch_id: result.branch_id,
     };
   }
 

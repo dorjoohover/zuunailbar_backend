@@ -9,4 +9,7 @@ export class LoginDto {
 export class RegisterDto {
   @ApiProperty()
   mobile: string;
+  token?: string;
+  title?: string;
+  body?: string;
 }

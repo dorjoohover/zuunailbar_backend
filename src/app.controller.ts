@@ -5,12 +5,14 @@ import { LoginDto, RegisterDto } from './auth/auth.dto';
 import { AuthService } from './auth/auth.service';
 import { ApiHeader } from '@nestjs/swagger';
 import { BadRequest } from './common/error';
+import { FirebaseService } from './base/firebase.service';
 
 @Controller()
 export class AppController {
   constructor(
     private readonly appService: AppService,
     private readonly authService: AuthService,
+    private firebase: FirebaseService,
   ) {}
 
   @Get()
@@ -31,8 +33,9 @@ export class AppController {
   @Public()
   @Post('/register')
   async register(@Body() dto: RegisterDto, @Req() req) {
-    let merchantId = req.headers['merchant-id'] as string;
-    BadRequest.merchantNotFound({ id: merchantId });
-    return await this.authService.register(dto.mobile, merchantId);
+    await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
+    // let merchantId = req.headers['merchant-id'] as string;
+    // BadRequest.merchantNotFound({ id: merchantId });
+    // return await this.authService.register(dto.mobile, merchantId);
   }
 }

@@ -15,4 +15,6 @@ export class UserDto {
   role: number;
   @ApiProperty()
   description: string;
+  @ApiProperty()
+  device: string;
 }

@@ -12,5 +12,9 @@ export class User {
   public user_status: number;
   public merchant_id: string;
   public description: string;
+  public device: string;
+  public branch_name: string;
+  // push notification d heregtei
+  public device_token?: string;
   public created_at?: Date;
 }

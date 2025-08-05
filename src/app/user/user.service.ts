@@ -20,14 +20,18 @@ import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import * as bcrypt from 'bcrypt';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { RegisterDto } from 'src/auth/auth.dto';
+import { BranchService } from '../branch/branch.service';
 @Injectable()
 export class UserService {
-  constructor(private readonly dao: UserDao) {}
+  constructor(
+    private readonly dao: UserDao,
+    private readonly branchService: BranchService,
+  ) {}
   public async create(
     dto: UserDto,
     merchant: string,
     user: User,
-    branch: string,
+    branch_id: string,
   ) {
     if (dto.role < EMPLOYEE && user.role === MANAGER)
       throw new NoPermissionException();
@@ -35,6 +39,8 @@ export class UserService {
     const mobile = MobileFormat(dto.mobile);
     const res = await this.dao.getByMobile(mobile);
     if (res.length != 0) throw new BadRequest().registered;
+    let branch;
+    if (branch_id) branch = await this.branchService.findOne(branch_id);
     const password = await bcrypt.hash(dto.password, saltOrRounds);
     await this.dao.add({
       ...dto,
@@ -45,7 +51,8 @@ export class UserService {
       merchant_id: merchant,
       password: password,
       added_by: user.id,
-      branch_id: dto.role === ADMIN ? null : branch,
+      branch_id: dto.role === ADMIN ? null : branch_id,
+      branch_name: branch_id ? branch.name : null,
       birthday: new Date(dto.birthday),
     });
   }
@@ -67,6 +74,8 @@ export class UserService {
       lastname: null,
       password: null,
       role: CLIENT,
+      device: null,
+      branch_name: null,
     });
   }
 
@@ -76,6 +85,9 @@ export class UserService {
 
   public async findOne(id: string) {
     return await this.dao.getById(id);
+  }
+  public async findDevice(id: string) {
+    return await this.dao.getByDevice(id);
   }
 
   public async update(id: number, dto: UserDto) {

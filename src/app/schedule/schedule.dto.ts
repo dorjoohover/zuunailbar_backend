@@ -6,7 +6,13 @@ export class ScheduleDto {
   @ApiProperty()
   start_time: Date;
   @ApiProperty()
+  user_id: string;
+  @ApiProperty()
   end_time: Date;
   @ApiProperty()
   status: number;
+  @ApiProperty()
+  type: number;
+  @ApiProperty({isArray: true})
+  times: string[];
 }

@@ -24,6 +24,7 @@ import { PaginationDto } from 'src/common/decorator/pagination.dto';
 })
 @Controller('product')
 export class ProductController {
+  private static spending = '6ed8d41219c1499a80c7267095461af2';
   constructor(private readonly productService: ProductService) {}
   @Admin()
   @Post()
@@ -33,9 +34,15 @@ export class ProductController {
   }
 
   @Get()
-  @PQ(['status'])
+  @PQ(['status', 'isCost'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
-    return this.productService.findAll(pg, user.user.role);
+    let p = pg;
+
+    const spending = ProductController.spending;
+    pg.isCost === 'true'
+      ? (p = { ...pg, category_id: spending })
+      : (p = { ...pg, spending: spending });
+    return this.productService.findAll(p, user.user.role);
   }
 
   @Get(':id')

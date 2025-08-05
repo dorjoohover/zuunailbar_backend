@@ -10,15 +10,19 @@ import { getDefinedKeys, ScheduleStatus, STATUS } from 'src/base/constants';
 export class ScheduleService {
   constructor(private readonly dao: ScheduleDao) {}
   public async create(dto: ScheduleDto, branch: string, user: string) {
+    let times;
+    if (dto.times.length != 0) {
+      times = dto.times.join('|');
+    }
     await this.dao.add({
       ...dto,
+      times: times,
       id: AppUtils.uuid4(),
       branch_id: branch,
       approved_by: null,
-      user_id: user,
+      user_id: dto.user_id ?? user,
       schedule_status: dto.status,
-      status: STATUS.Pending, 
-      
+      status: STATUS.Pending,
     });
   }
 

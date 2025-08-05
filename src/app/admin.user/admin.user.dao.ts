@@ -60,6 +60,12 @@ export class AdminUserDao {
       [id],
     );
   };
+  getByDevice = async (device: any) => {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "device"=$1`,
+      [device],
+    );
+  };
 
   getAdminUserInfo = async (id: any) => {
     return await this._db.selectOne(
@@ -81,7 +87,7 @@ export class AdminUserDao {
 
     return await this._db.select(
       `SELECT "id", "name", "username", "roles","isAdmin","position" FROM "${tableName}" ${criteria}
-            order by "created_at" asc limit ${query.limit} offset ${query.skip}`,
+            order by "created_at" asc limit ${query.limit} offset ${+query.skip * +query.limit}`,
       builder.values,
     );
   };

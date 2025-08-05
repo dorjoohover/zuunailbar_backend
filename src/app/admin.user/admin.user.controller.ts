@@ -26,9 +26,13 @@ export class AdminUserController {
     return this.adminUserService.findAll();
   }
 
-  @Get(':id')
+  @Get('get/:id')
   findOne(@Param('id') id: string) {
     return this.adminUserService.findOne(+id);
+  }
+  @Get('device/:id')
+  findDevice(@Param('id') id: string) {
+    return this.adminUserService.findDevice(id);
   }
 
   @Patch(':id')

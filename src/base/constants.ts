@@ -54,7 +54,15 @@ export enum UserStatus {
 export enum DISCOUNT {
   Percent = 10,
   Price = 20,
-  Constant = 30,
+}
+export enum VOUCHER {
+  Percent = 10,
+  Price = 20,
+  Service = 30,
+}
+export enum SCHEDULE_TYPE {
+  Employee = 10,
+  Branch = 20,
 }
 
 export const round = (value: number, round = 1000) => {

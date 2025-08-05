@@ -2,27 +2,23 @@ import { Injectable } from '@nestjs/common';
 import { isOnlyFieldPresent } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Schedule } from './schedule.entity';
+import { Voucher } from './voucher.entity';
 
-const tableName = 'schedules';
+const tableName = 'voucher';
 
 @Injectable()
-export class ScheduleDao {
+export class VoucherDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Schedule) {
+  async add(data: Voucher) {
     return await this._db.insert(tableName, data, [
       'id',
+      'service_id',
       'user_id',
-      'approved_by',
-      'date',
-      'start_time',
-      'end_time',
-      'branch_id',
+      'service_name',
+      'user_name',
       'status',
       'type',
-      'times',
-      'schedule_status',
     ]);
   }
 
@@ -66,6 +62,12 @@ export class ScheduleDao {
       [id],
     );
   }
+  async getByService(id: string) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "service_id"=$1`,
+      [id],
+    );
+  }
 
   async list(query) {
     if (query.id) {
@@ -73,16 +75,12 @@ export class ScheduleDao {
     }
 
     const builder = new SqlBuilder(query);
-    console.log(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('approved_by', '=', query.approved_by)
-      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
-      .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('schedule_status', '=', query.schedule_status)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
-      .conditionIfNotEmpty('date', '=', query.date)
-      .conditionIfTimeBetween('start_time', 'end_time', query.time)
+      .conditionIfNotEmpty('service_id', '=', query.service_id)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('type', '=', query.type)
       .criteria();
     const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;

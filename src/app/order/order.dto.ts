@@ -26,4 +26,8 @@ export class OrderDto {
   customer_desc: string;
   @ApiProperty()
   user_desc: string;
+  @ApiProperty()
+  discount_type: number;
+  @ApiProperty()
+  discount: number;
 }

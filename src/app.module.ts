@@ -27,12 +27,14 @@ import { ProductTransactionModule } from './app/product_transaction/product_tran
 import { UserServiceModule } from './app/user_service/user_service.module';
 import { UserProductModule } from './app/user_product/user_product.module';
 import { CostModule } from './app/cost/cost.module';
+import { FirebaseService } from './base/firebase.service';
+import { VoucherModule } from './app/voucher/voucher.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: `.env.${process.env.NODE_ENV || 'local'}`,
+      envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
       load: [configuration, databaseConfig],
     }),
 
@@ -52,12 +54,14 @@ import { CostModule } from './app/cost/cost.module';
     OrderDetailModule,
     ProductTransactionModule,
     UserServiceModule,
+    VoucherModule,
     CostModule,
     UserProductModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    FirebaseService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

@@ -67,7 +67,7 @@ export class BrandDao {
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${query.skip} `;
+    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit}} `;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

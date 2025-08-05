@@ -8,6 +8,10 @@ export class Schedule {
   public end_time: Date;
   public status: number;
   public schedule_status: number;
+  // tusdaa
+  public type: number;
+  public times: string;
+  
   public created_at?: Date;
   public updated_at?: Date;
 }

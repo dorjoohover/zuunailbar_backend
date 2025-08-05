@@ -31,12 +31,19 @@ export class AdminUserService extends BaseService {
     const res = await this.dao.getById(filter.id);
     return res;
   }
+  async getAdminUserByDevice(device: string) {
+    const res = await this.dao.getByDevice(device);
+    return res;
+  }
   findAll() {
     return `This action returns all adminUser`;
   }
 
   findOne(id: number) {
     return `This action returns a #${id} adminUser`;
+  }
+  public async findDevice(device: string) {
+    return await this.dao.getByDevice(device);
   }
 
   update(id: number, updateAdminUserDto: AdminUserDto) {

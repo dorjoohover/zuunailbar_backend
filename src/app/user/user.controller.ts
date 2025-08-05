@@ -57,9 +57,19 @@ export class UserController {
   }
 
   @SAP()
-  @Get(':id')
+  @Get('get/:id')
   findOne(@Param('id') id: string) {
     return this.userService.findOne(id);
+  }
+  @SAP()
+  @Get('me')
+  findMe(@Req() { user }) {
+    return user;
+  }
+  @SAP(['device'])
+  @Get('device/:device')
+  findDevice(@Param('device') device: string) {
+    return this.userService.findDevice(device);
   }
 
   @SAP()
