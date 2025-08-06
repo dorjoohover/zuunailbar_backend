@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Req,
+  Query,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { ProductDto } from './product.dto';
@@ -16,6 +17,7 @@ import { BadRequest } from 'src/common/error';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { SAQ } from 'src/common/decorator/use-param.decorator';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'merchant-id',
@@ -45,9 +47,20 @@ export class ProductController {
     return this.productService.findAll(p, user.user.role);
   }
 
-  @Get(':id')
+  @Get('get/:id')
   findOne(@Param('id') id: string) {
     return this.productService.findOne(id);
+  }
+  @Get('search/:id')
+  @SAQ()
+  serach(@Query('id') id: string, @Req() { user }) {
+    BadRequest.merchantNotFound(user.merchant);
+    return this.productService.search(
+      {
+        id,
+      },
+      user.merchant.id,
+    );
   }
   @Admin()
   @Patch(':id')

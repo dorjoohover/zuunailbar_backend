@@ -17,6 +17,8 @@ export class UserProductsDao {
       'branch_id',
       'user_id',
       'product_name',
+      'quantity',
+      'user_product_status',
       'user_name',
       'status',
       //   'createdAt',
@@ -75,6 +77,12 @@ export class UserProductsDao {
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('product_id', '=', query.product_id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty(
+        'user_product_status',
+        '=',
+        query.user_product_status,
+      )
 
       .criteria();
     const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit}`;

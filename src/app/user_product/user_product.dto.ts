@@ -7,5 +7,7 @@ export class UserProductDto {
   user_id: string;
 
   @ApiProperty()
-  status: number;
+  user_product_status: number;
+  @ApiProperty()
+  quantity: number;
 }

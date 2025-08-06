@@ -5,6 +5,8 @@ export class UserProduct {
   public product_id: string;
   public product_name: string;
   public user_name: string;
+  public quantity: number;
+  public user_product_status: number;
   public status: number;
   public created_at?: Date;
   public updated_at?: Date;

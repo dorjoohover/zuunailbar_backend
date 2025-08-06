@@ -7,7 +7,7 @@ import { CategoryDao } from '../category/category.dao';
 import { BrandDao } from '../brand/brand.dao';
 import { CategoryService } from '../category/category.service';
 import { BrandService } from '../brand/brand.service';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { ADMINUSERS, getDefinedKeys, PRODUCT_STATUS } from 'src/base/constants';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 
@@ -41,6 +41,10 @@ export class ProductService {
   }
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
+  }
+
+  public async search(filter: SearchDto, merchant: string) {
+    return await this.dao.search({...filter, merchant})
   }
 
   public async findOne(id: string) {

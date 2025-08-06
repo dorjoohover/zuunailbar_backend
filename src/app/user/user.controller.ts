@@ -51,7 +51,7 @@ export class UserController {
   }
 
   @Get()
-  @PQ(['status'])
+  @PQ(['role'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.userService.findAll(pg, user.user.role);
   }
@@ -61,7 +61,6 @@ export class UserController {
   findOne(@Param('id') id: string) {
     return this.userService.findOne(id);
   }
-  @SAP()
   @Get('me')
   findMe(@Req() { user }) {
     return user;

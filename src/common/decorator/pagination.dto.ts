@@ -16,3 +16,7 @@ export class PaginationDto {
     }
   }
 }
+
+export class SearchDto {
+  id: string;
+}

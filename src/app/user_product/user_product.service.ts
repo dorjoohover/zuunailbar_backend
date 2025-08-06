@@ -7,6 +7,7 @@ import { ProductService } from '../product/product.service';
 import {
   firstLetterUpper,
   getDefinedKeys,
+  STATUS,
   usernameFormatter,
 } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
@@ -22,12 +23,11 @@ export class UserProductService {
   public async create(dto: UserProductDto, branch: string) {
     const user = await this.userService.findOne(dto.user_id);
     const product = await this.productService.findOne(dto.product_id);
-    console.log(dto, branch);
     const res = await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
       branch_id: branch,
-      status: dto.status,
+      status: STATUS.Active,
       product_name: product.name,
       user_name: usernameFormatter(user),
     });

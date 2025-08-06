@@ -28,7 +28,7 @@ import { CLIENT, EMPLOYEE } from 'src/base/constants';
 })
 @Controller('user_product')
 export class UserProductController {
-  private static fields = ['user_id', 'product_id', 'status'];
+  private static fields = ['user_id', 'product_id', 'user_product_status'];
   constructor(private readonly userProductService: UserProductService) {}
 
   @Post()

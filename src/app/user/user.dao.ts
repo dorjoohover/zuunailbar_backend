@@ -104,8 +104,19 @@ export class UserDao {
       .conditionIfNotEmpty('lastname', 'LIKE', query.lastname)
       .conditionIfNotEmpty('birthday', '=', query.birthday)
       .conditionIfNotEmpty('mobile', '=', query.mobile)
+      .conditionIfNotEmpty(
+        'role',
+        query.role == 35 ? '<=' : '=',
+        query.role == 35 ? 40 : query.role,
+      )
+      .conditionIfNotEmpty(
+        'role',
+        query.role == 35 ? '>=' : '=',
+        query.role == 35 ? 30 : query.role,
+      )
 
       .criteria();
+
     const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit} `;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
