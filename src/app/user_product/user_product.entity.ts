@@ -8,6 +8,7 @@ export class UserProduct {
   public quantity: number;
   public user_product_status: number;
   public status: number;
+  public date?: Date;
   public created_at?: Date;
   public updated_at?: Date;
 }

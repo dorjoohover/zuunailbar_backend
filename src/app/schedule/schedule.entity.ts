@@ -4,14 +4,12 @@ export class Schedule {
   public approved_by: string;
   public branch_id: string;
   public date: Date;
-  public start_time: Date;
-  public end_time: Date;
+  public start_time: string;
+  public end_time: string;
   public status: number;
   public schedule_status: number;
-  // tusdaa
   public type: number;
   public times: string;
-  
   public created_at?: Date;
   public updated_at?: Date;
 }

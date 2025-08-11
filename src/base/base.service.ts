@@ -3,8 +3,6 @@ import { DEFAULT_SKIP } from './constants';
 import { Meta } from './base.interface';
 import { RolePermission } from 'src/auth/guards/role/role.decorator';
 import { DashUser } from 'src/auth/extentions';
-import * as XLSX from 'xlsx';
-import { File } from 'multer';
 
 @Injectable()
 export class BaseService {
@@ -91,13 +89,5 @@ export class BaseService {
       throw new Error('Invalid base64 format.');
     }
     return Buffer.from(base64, 'base64');
-  }
-
-  public async parseExcelFile(file: File) {
-    const buffer = this.decodeBase64File(file.base64);
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    return XLSX.utils.sheet_to_json(worksheet);
   }
 }

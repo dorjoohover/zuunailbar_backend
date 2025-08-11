@@ -22,6 +22,9 @@ export class UserDao {
       'mobile',
       'birthday',
       'password',
+      'experience',
+      'nickname',
+      'profile_img',
       'role',
       'status',
       'device',
@@ -32,9 +35,14 @@ export class UserDao {
   }
 
   async update(data: any, attr: string[]): Promise<number> {
-    return await this._db.update(tableName, data, attr, [
-      new SqlCondition('id', '=', data.id),
-    ]);
+    try {
+      return await this._db.update(tableName, data, attr, [
+        new SqlCondition('id', '=', data.id),
+      ]);
+    } catch (error) {
+      console.log(error);
+      return 0;
+    }
   }
 
   async updateTags(data: any): Promise<number> {
@@ -59,7 +67,7 @@ export class UserDao {
   }
 
   async getByMobile(mobile: string) {
-    return await this._db.select(
+    return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "mobile"=$1`,
       [mobile],
     );
@@ -83,13 +91,16 @@ export class UserDao {
       query.id = `%${query.id}%`;
     }
     if (query.mobile) {
-      query.mobile = MobileFormat(query.mobile);
+      query.mobile = `%${query.mobile}%`;
     }
     if (query.firstname) {
       query.firstname = `%${query.firstname}%`;
     }
     if (query.lastname) {
       query.lastname = `%${query.lastname}%`;
+    }
+    if (query.nickname) {
+      query.nickname = `%${query.nickname}%`;
     }
     if (query.description) {
       query.description = `%${query.description}%`;
@@ -103,7 +114,8 @@ export class UserDao {
       .conditionIfNotEmpty('firstname', 'LIKE', query.firstname)
       .conditionIfNotEmpty('lastname', 'LIKE', query.lastname)
       .conditionIfNotEmpty('birthday', '=', query.birthday)
-      .conditionIfNotEmpty('mobile', '=', query.mobile)
+      .conditionIfNotEmpty('mobile', 'LIKE', query.mobile)
+      .conditionIfNotEmpty('nickname', 'LIKE', query.nickname)
       .conditionIfNotEmpty(
         'role',
         query.role == 35 ? '<=' : '=',
@@ -117,7 +129,10 @@ export class UserDao {
 
       .criteria();
 
-    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit} `;
+    const sql =
+      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `${query.limit ? `limit ${query.limit}` : ''}` +
+      ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

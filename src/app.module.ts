@@ -23,18 +23,21 @@ import { SalaryLogModule } from './app/salary_log/salary_log.module';
 import { ProductModule } from './app/product/product.module';
 import { OrderModule } from './app/order/order.module';
 import { OrderDetailModule } from './app/order_detail/order_detail.module';
-import { ProductTransactionModule } from './app/product_transaction/product_transaction.module';
 import { UserServiceModule } from './app/user_service/user_service.module';
 import { UserProductModule } from './app/user_product/user_product.module';
 import { CostModule } from './app/cost/cost.module';
 import { FirebaseService } from './base/firebase.service';
 import { VoucherModule } from './app/voucher/voucher.module';
+import { FileService } from './file.service';
+import { ProductTransactionModule } from './app/product_transaction/product_transaction.module';
+import { ProductLogModule } from './app/product_log/product_log.module';
+import { BookingModule } from './app/booking/booking.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
+      envFilePath: `.env.${process.env.NODE_ENV || 'local'}`,
       load: [configuration, databaseConfig],
     }),
 
@@ -54,6 +57,11 @@ import { VoucherModule } from './app/voucher/voucher.module';
     OrderDetailModule,
     ProductTransactionModule,
     UserServiceModule,
+    ProductLogModule,
+    BookingModule,
+
+    // .conf
+    // timezone = 'Asia/Ulaanbaatar'
     VoucherModule,
     CostModule,
     UserProductModule,
@@ -61,6 +69,7 @@ import { VoucherModule } from './app/voucher/voucher.module';
   controllers: [AppController],
   providers: [
     AppService,
+    FileService,
     FirebaseService,
     {
       provide: APP_GUARD,

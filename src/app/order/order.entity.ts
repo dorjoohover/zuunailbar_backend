@@ -4,8 +4,8 @@ export class Order {
   customer_id: string;
   duration: number;
   order_date: Date;
-  start_time: Date;
-  end_time: Date;
+  start_time: string;
+  end_time: string;
   order_status: number;
   pre_amount: number;
   is_pre_amount_paid: boolean;

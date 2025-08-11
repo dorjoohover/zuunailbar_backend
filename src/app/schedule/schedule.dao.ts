@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
+import { isOnlyFieldPresent, ScheduleStatus, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Schedule } from './schedule.entity';
@@ -67,24 +67,66 @@ export class ScheduleDao {
     );
   }
 
+  async getAvailableTimes(date: Date) {
+    try {
+      const sql = `
+    SELECT ARRAY(
+      SELECT DISTINCT unnest(string_to_array("times",'|')::int[])
+      FROM "${tableName}"
+      WHERE "date"::date = $1::date and status=${STATUS.Active} and schedule_status=${ScheduleStatus.Active}
+    ) AS all_times
+  `;
+
+      const row = await this._db.selectOne(sql, [date]);
+      // { all_times: number[] }
+
+      return {
+        date,
+        times: (row?.all_times ?? []).map(Number).sort((a, b) => a - b),
+      };
+    } catch (error) {
+      return { date, times: [] };
+    }
+  }
+
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
+    if (query.start_time) {
+      query.start_time = `%${query.start_time}%`;
+    }
+    if (query.end_time) {
+      query.end_time = `%${query.end_time}%`;
+    }
 
     const builder = new SqlBuilder(query);
-    console.log(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('approved_by', '=', query.approved_by)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('schedule_status', '=', query.schedule_status)
+
       .conditionIfNotEmpty('user_id', '=', query.user_id)
       .conditionIfNotEmpty('date', '=', query.date)
-      .conditionIfTimeBetween('start_time', 'end_time', query.time)
+      .orConditions([
+        {
+          column: 'times',
+          cond: 'LIKE',
+          value: query.start_time,
+        },
+        {
+          column: 'times',
+          cond: 'LIKE',
+          value: query.end_time,
+        },
+      ])
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit}`;
+    const sql =
+      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `${query.limit ? `limit ${query.limit}` : ''}` +
+      ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

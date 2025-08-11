@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { UserProductService } from './user_product.service';
 import { ApiBearerAuth, ApiHeader, ApiParam } from '@nestjs/swagger';
-import { UserProductDto } from './user_product.dto';
+import { UserProductDto, UserProductsDto } from './user_product.dto';
 import { BadRequest } from 'src/common/error';
 import { Employee, Manager } from 'src/auth/guards/role/role.decorator';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
@@ -19,7 +19,7 @@ import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { SAP } from 'src/common/decorator/use-param.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
-import { CLIENT, EMPLOYEE } from 'src/base/constants';
+import { ADMIN, CLIENT, EMPLOYEE } from 'src/base/constants';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'branch-id',
@@ -33,20 +33,23 @@ export class UserProductController {
 
   @Post()
   @Manager()
-  create(@Body() dto: UserProductDto, @Req() { user }) {
-    BadRequest.branchNotFound(user.branch);
-    return this.userProductService.create(dto, user.branch.id);
+  create(@Body() dto: UserProductsDto, @Req() { user }) {
+    BadRequest.branchNotFound(user.merchant, user.user.role);
+    return this.userProductService.create(dto);
   }
   @Get()
   @PQ(UserProductController.fields)
   @Employee()
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.userProductService.findAll(
-      { ...pg, user_id: user.user.id },
+      {
+        ...pg,
+        user_id: (pg.user_id ?? user.user.role > ADMIN) ? user.user.id : null,
+      },
       user.user.role,
     );
   }
-  
+
   @Employee()
   @SAP()
   @Get(':id')
@@ -57,6 +60,7 @@ export class UserProductController {
   @SAP()
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UserProductDto) {
+    console.log(id);
     return this.userProductService.update(id, dto);
   }
 

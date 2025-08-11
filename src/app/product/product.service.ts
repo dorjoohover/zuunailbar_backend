@@ -8,27 +8,46 @@ import { BrandDao } from '../brand/brand.dao';
 import { CategoryService } from '../category/category.service';
 import { BrandService } from '../brand/brand.service';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
-import { ADMINUSERS, getDefinedKeys, PRODUCT_STATUS } from 'src/base/constants';
+import {
+  ADMINUSERS,
+  getDefinedKeys,
+  mnDate,
+  PRODUCT_STATUS,
+  STATUS,
+} from 'src/base/constants';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 
 @Injectable()
 export class ProductService {
-  constructor(private readonly dao: ProductDao) {}
+  constructor(
+    private readonly dao: ProductDao,
+    private brandService: BrandService,
+    private categoryService: CategoryService,
+  ) {}
   public async create(dto: ProductDto, merchant: string) {
     const count = await this.dao.count();
     const ref = this.generateReferenceCodeByDate(count);
+    let brand = null,
+      category = null;
+    try {
+      if (dto.brand_id)
+        brand = (await this.brandService.getById(dto.brand_id)).name;
+      if (dto.category_id)
+        category = (await this.categoryService.getById(dto.category_id)).name;
+    } catch (error) {}
     await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
       merchant_id: merchant,
       ref: ref,
       status: PRODUCT_STATUS.Active,
-      
+      brand_name: brand,
+      category_name: category,
     });
   }
 
   private generateReferenceCodeByDate(index: number): string {
-    const now = new Date();
+    const now = mnDate();
 
     const yyyy = now.getFullYear();
     const MM = String(now.getMonth() + 1).padStart(2, '0');
@@ -44,7 +63,11 @@ export class ProductService {
   }
 
   public async search(filter: SearchDto, merchant: string) {
-    return await this.dao.search({...filter, merchant})
+    return await this.dao.search({
+      ...filter,
+      merchant,
+      status: STATUS.Active,
+    });
   }
 
   public async findOne(id: string) {

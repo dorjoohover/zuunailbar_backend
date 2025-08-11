@@ -31,7 +31,7 @@ export class ProductController {
   @Admin()
   @Post()
   create(@Body() dto: ProductDto, @Req() { user }) {
-    BadRequest.merchantNotFound(user.merchant);
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.productService.create(dto, user.merchant.id);
   }
 
@@ -54,7 +54,7 @@ export class ProductController {
   @Get('search/:id')
   @SAQ()
   serach(@Query('id') id: string, @Req() { user }) {
-    BadRequest.merchantNotFound(user.merchant);
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.productService.search(
       {
         id,

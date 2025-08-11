@@ -14,14 +14,14 @@ export class ProductTransactionDao {
     return await this._db.insert(tableName, data, [
       'id',
       'product_id',
-      'user_id',
       'quantity',
       'price',
       'total_amount',
       'branch_id',
+      'user_id',
       'created_by',
       'status',
-      'transaction_status',
+      'product_transaction_status',
     ]);
   }
 
@@ -67,6 +67,7 @@ export class ProductTransactionDao {
   }
 
   async list(query) {
+    console.log(query)
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -78,10 +79,13 @@ export class ProductTransactionDao {
       .conditionIfNotEmpty('product_id', '=', query.product_id)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('transaction_status', '=', query.transaction_status)
+      .conditionIfNotEmpty('product_transaction_status', '=', query.transaction_status)
 
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit} `;
+    const sql =
+      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `${query.limit ? `limit ${query.limit}` : ''}` +
+      ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

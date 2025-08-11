@@ -27,7 +27,7 @@ export class UserServiceController {
   private static readonly employeeFields = ['service_id', 'user_id', 'status'];
   @Employee()
   @Post()
-  create(@Body() dto: UserServiceDto, @Req() {user}) {
+  create(@Body() dto: UserServiceDto, @Req() { user }) {
     return this.userServiceService.create(dto, user.user);
   }
 
@@ -35,7 +35,7 @@ export class UserServiceController {
   @Get()
   @PQ(UserServiceController.clientFields)
   findAll(@Pagination() pg: PaginationDto) {
-    return this.userServiceService.findAll(pg, CLIENT);
+    return this.userServiceService.findForClient(pg);
   }
   @Employee()
   @Get('employee')

@@ -85,7 +85,10 @@ export class ProductDao {
 
       .conditionIfNotEmpty('status', '=', query.status)
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit} `;
+    const sql =
+      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `${query.limit ? `limit ${query.limit}` : ''}` +
+      ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
@@ -103,17 +106,26 @@ export class ProductDao {
   async search(filter: any): Promise<any[]> {
     let nameCondition = ``;
     if (filter.id) {
-      filter.id = `%${filter.id}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      filter.id = `%${filter.id.toLowerCase()}%`;
+      nameCondition = ` OR LOWER("name") LIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
       .conditionIfNotEmpty('merchant_id', '=', filter.merchant)
-      .conditionIfNotEmpty('id', 'LIKE', filter.id)
+      .conditionIfNotEmpty('status', '=', filter.status)
+      .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.id)
       .criteria();
+
     return await this._db.select(
-      `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
+      `SELECT "id", 
+     CONCAT(
+       COALESCE("brand_name", ''), '__',
+       COALESCE("category_name", ''), '__',
+       COALESCE("name", '')
+     ) AS "value"
+   FROM "${tableName}" 
+   ${criteria}${nameCondition}`,
       builder.values,
     );
   }

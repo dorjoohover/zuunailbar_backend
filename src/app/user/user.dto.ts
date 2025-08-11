@@ -14,6 +14,12 @@ export class UserDto {
   @ApiProperty()
   role: number;
   @ApiProperty()
+  experience: number;
+  @ApiProperty()
+  nickname: string;
+  @ApiProperty()
+  profile_img: string;
+  @ApiProperty()
   description: string;
   @ApiProperty()
   device: string;

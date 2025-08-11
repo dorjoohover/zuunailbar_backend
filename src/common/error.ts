@@ -1,14 +1,14 @@
 import { ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
-import { firstLetterUpper } from 'src/base/constants';
+import { ADMINUSERS, firstLetterUpper } from 'src/base/constants';
 
 export class BadRequest {
-  static merchantNotFound(merchant: any) {
-    if (!merchant && !merchant?.id) {
+  static merchantNotFound(merchant: any, role: number) {
+    if (!merchant && !merchant?.id && role != ADMINUSERS) {
       throw new HttpException('Merchant id not found', HttpStatus.BAD_REQUEST);
     }
   }
-  static branchNotFound(branch: any) {
-    if (!branch && !branch?.id) {
+  static branchNotFound(branch: any, role: number) {
+    if (!branch && !branch?.id && role != ADMINUSERS) {
       throw new HttpException('Branch id not found', HttpStatus.BAD_REQUEST);
     }
   }

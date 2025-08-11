@@ -87,6 +87,19 @@ export class SqlBuilder {
 
     return this;
   }
+  conditionIfArray(column: string, value: any[]) {
+    if (!Array.isArray(value) || value.length === 0) return this;
+
+    const quote = column.includes(`"`) ? '' : '"';
+
+    // Postgres array параметр ашиглах
+    this.values.push(value);
+    this.conditions.push(
+      `${quote}${column}${quote} = ANY($${this.values.length})`,
+    );
+
+    return this;
+  }
 
   conditionIfBetween(column: string, start: any, end: any) {
     const quote = column.indexOf(`"`) === -1 ? `"` : '';
@@ -133,6 +146,34 @@ export class SqlBuilder {
     return this;
   }
 
+  private toPgDate(v: string | Date) {
+    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    throw new Error('Invalid date value');
+  }
+  conditionIfDateBetweenValues(
+    startDate?: string | Date,
+    endDate?: string | Date,
+    column?: string,
+  ) {
+    if (!column || (!startDate && !endDate)) return this;
+    const col = column.includes('"') ? column : `"${column}"`;
+
+    if (startDate && endDate) {
+      this.values.push(this.toPgDate(startDate), this.toPgDate(endDate));
+      const a = this.values.length - 1,
+        b = this.values.length;
+      this.conditions.push(`${col} BETWEEN $${a}::date AND $${b}::date`);
+    } else if (startDate) {
+      this.values.push(this.toPgDate(startDate));
+      this.conditions.push(`${col} >= $${this.values.length}::date`);
+    } else {
+      this.values.push(this.toPgDate(endDate!));
+      this.conditions.push(`${col} <= $${this.values.length}::date`);
+    }
+    return this;
+  }
   conditionIsNull(column: string) {
     const quote = column.indexOf(`"`) === -1 ? `"` : '';
     this.conditions.push(`${quote}${column}${quote} IS NULL`);

@@ -9,4 +9,6 @@ export class OrderDetailDto {
   service_name: string;
   @ApiProperty()
   price: number;
+  @ApiProperty()
+  duration: number;
 }

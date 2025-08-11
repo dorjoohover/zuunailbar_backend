@@ -30,7 +30,7 @@ export class BrandController {
   @Manager()
   @Post()
   create(@Body() dto: BrandDto, @Req() { user }) {
-    BadRequest.merchantNotFound(user.merchant);
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.brandService.create(dto, user.merchant.id);
   }
   @Manager()

@@ -20,6 +20,9 @@ export class ProductTransactionService {
       id: AppUtils.uuid4(),
       created_by: user,
       status: STATUS.Active,
+      price: dto.price ?? 0,
+      total_amount: dto.price ?? 0,
+      user_id: dto.user_id ?? null,
     });
   }
 

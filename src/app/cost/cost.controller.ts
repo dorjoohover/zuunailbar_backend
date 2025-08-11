@@ -30,7 +30,7 @@ export class CostController {
 
   @Post()
   create(@Body() dto: CostDto, @Req() { user }) {
-    BadRequest.branchNotFound(user.branch);
+    BadRequest.branchNotFound(user.branch, user.user.role);
     return this.costService.create(dto, user.branch);
   }
 

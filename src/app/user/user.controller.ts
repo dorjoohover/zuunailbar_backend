@@ -39,8 +39,9 @@ export class UserController {
   @Post()
   @Manager()
   async create(@Body() dto: UserDto, @Req() { user }) {
-    BadRequest.merchantNotFound(user?.merchant);
-    if (dto.role >= MANAGER) BadRequest.branchNotFound(user?.branch);
+    BadRequest.merchantNotFound(user?.merchant, user.user.role);
+    if (dto.role >= MANAGER)
+      BadRequest.branchNotFound(user?.branch, user.user.role);
 
     return await this.userService.create(
       dto,
@@ -74,7 +75,7 @@ export class UserController {
   @SAP()
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UserDto) {
-    return this.userService.update(+id, dto);
+    return this.userService.update(id, dto);
   }
 
   @Delete(':id')

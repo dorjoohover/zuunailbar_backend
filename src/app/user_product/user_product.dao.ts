@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
+import { isOnlyFieldPresent, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { UserProduct } from './user_product.entity';
@@ -26,9 +26,14 @@ export class UserProductsDao {
   }
 
   async update(data: any, attr: string[]): Promise<number> {
-    return await this._db.update(tableName, data, attr, [
-      new SqlCondition('id', '=', data.id),
-    ]);
+    try {
+      return await this._db.update(tableName, data, attr, [
+        new SqlCondition('id', '=', data.id),
+      ]);
+    } catch (error) {
+      console.log(error);
+      return 0;
+    }
   }
 
   async updateTags(data: any): Promise<number> {
@@ -46,10 +51,15 @@ export class UserProductsDao {
   }
 
   async updateStatus(id: string, status: number): Promise<number> {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
-      [status, id],
-    );
+    try {
+      return await this._db._update(
+        `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
+        [status, id],
+      );
+    } catch (error) {
+      console.log(error);
+      return 0;
+    }
   }
 
   async getByMobile(mobile: string) {
@@ -65,12 +75,31 @@ export class UserProductsDao {
       [id],
     );
   }
+  async getByProductId(id: string, user: string) {
+    try {
+      return await this._db.selectOne(
+        `SELECT * FROM "${tableName}" WHERE "product_id"=$1 and "user_id"=$2`,
+        [id, user],
+      );
+    } catch (error) {
+      return null;
+    }
+  }
+  async getByUser(user: string, status: STATUS) {
+    try {
+      return await this._db.select(
+        `SELECT * FROM "${tableName}" WHERE "user_id"=$1 and "status" = $2`,
+        [user, status],
+      );
+    } catch (error) {
+      return [];
+    }
+  }
 
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
-
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
@@ -85,7 +114,10 @@ export class UserProductsDao {
       )
 
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit}`;
+    const sql =
+      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `${query.limit ? `limit ${query.limit}` : ''}` +
+      ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

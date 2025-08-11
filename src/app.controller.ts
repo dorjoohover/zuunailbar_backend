@@ -1,18 +1,39 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Req,
+  Res,
+  StreamableFile,
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common';
 import { AppService } from './app.service';
 import { Public } from './auth/guards/jwt/jwt-auth-guard';
-import { LoginDto, RegisterDto } from './auth/auth.dto';
+import { LoginDto, RegisterDto, ResetPasswordDto } from './auth/auth.dto';
 import { AuthService } from './auth/auth.service';
-import { ApiHeader } from '@nestjs/swagger';
+import { ApiHeader, ApiParam } from '@nestjs/swagger';
 import { BadRequest } from './common/error';
 import { FirebaseService } from './base/firebase.service';
-
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { FileService } from './file.service';
+import { join } from 'path';
+import { createReadStream, existsSync } from 'fs';
+import * as mime from 'mime-types';
+import { Response } from 'express';
+import { CLIENT } from './base/constants';
 @Controller()
 export class AppController {
+  private readonly localPath = './uploads';
   constructor(
     private readonly appService: AppService,
     private readonly authService: AuthService,
     private firebase: FirebaseService,
+    private readonly fileService: FileService,
   ) {}
 
   @Get()
@@ -20,10 +41,20 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  @Post('upload')
+  @UseInterceptors(FilesInterceptor('files', 8, { storage: memoryStorage() }))
+  async multiFileUploadS3(@UploadedFiles() files: Express.Multer.File[]) {
+    console.log(files);
+    const urls = await this.fileService.processMultipleImages(files);
+    return { files: urls };
+  }
+
   @Public()
   @Post('/login')
   async login(@Body() dto: LoginDto) {
-    return await this.authService.adminLogin(dto);
+    return dto.password
+      ? await this.authService.adminLogin(dto)
+      : await this.authService.login(dto.mobile);
   }
   @ApiHeader({
     name: 'merchant-id',
@@ -33,9 +64,50 @@ export class AppController {
   @Public()
   @Post('/register')
   async register(@Body() dto: RegisterDto, @Req() req) {
-    await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
-    // let merchantId = req.headers['merchant-id'] as string;
-    // BadRequest.merchantNotFound({ id: merchantId });
-    // return await this.authService.register(dto.mobile, merchantId);
+    // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
+    let merchantId = req.headers['merchant-id'] as string;
+    BadRequest.merchantNotFound(merchantId, CLIENT);
+    return await this.authService.register(dto, merchantId);
+  }
+  @Public()
+  @Get('/forget/:mobile')
+  @ApiParam({ name: 'mobile' })
+  async forget(@Param('mobile') mobile: string) {
+    // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
+    // send otp
+    try {
+      await this.authService.checkMobile(mobile);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+  @Public()
+  @Post('/otp')
+  async otp(@Body() dto: ResetPasswordDto) {
+    // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
+    try {
+      await this.authService.reset(dto);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+  @Public()
+  @Get('/file/:filename')
+  @ApiParam({ name: 'filename' })
+  async getFile(@Param('filename') filename: string, @Res() res: Response) {
+    const filePath = join(this.localPath, filename);
+
+    if (!existsSync(filePath)) {
+      throw new NotFoundException('File not found');
+    }
+
+    const mimeType = mime.lookup(filename) || 'application/octet-stream';
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+
+    const stream = createReadStream(filePath);
+    stream.pipe(res);
   }
 }

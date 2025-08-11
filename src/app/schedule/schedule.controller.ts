@@ -28,12 +28,7 @@ import { SAP } from 'src/common/decorator/use-param.decorator';
 @Controller('schedule')
 export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
-  private static clientFields = [
-    'user_id',
-    'branch_id',
-    'date',
-    'time',
-  ];
+  private static clientFields = ['user_id', 'branch_id', 'date', 'time'];
   private static fields = [
     'user_id',
     'branch_id',
@@ -45,8 +40,12 @@ export class ScheduleController {
   @Employee()
   @Post()
   create(@Body() dto: ScheduleDto, @Req() { user }) {
-    BadRequest.branchNotFound(user.branch);
-    return this.scheduleService.create(dto, user.branch.id, user.user.id);
+    if (!dto.branch_id) BadRequest.branchNotFound(user.branch, user.user.role);
+    return this.scheduleService.create(
+      dto,
+      dto.branch_id ?? user.branch.id,
+      user.user.id,
+    );
   }
 
   @Get()
@@ -64,7 +63,7 @@ export class ScheduleController {
   @Get('employee')
   @PQ(ScheduleController.fields)
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
-    return this.scheduleService.findAll(pg, user.user.role);
+    return this.scheduleService.findAll(pg, user.user);
   }
 
   @SAP()

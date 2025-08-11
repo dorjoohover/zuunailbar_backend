@@ -13,6 +13,9 @@ export class User {
   public merchant_id: string;
   public description: string;
   public device: string;
+  public profile_img: string;
+  public nickname: string;
+  public experience: number;
   public branch_name: string;
   // push notification d heregtei
   public device_token?: string;

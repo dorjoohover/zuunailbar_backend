@@ -30,7 +30,7 @@ export class CategoryController {
 
   @Post()
   create(@Body() dto: CategoryDto, @Req() { user }) {
-    BadRequest.merchantNotFound(user.merchant);
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.categoryService.create(dto, user.merchant.id);
   }
 

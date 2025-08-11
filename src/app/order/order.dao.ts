@@ -11,23 +11,27 @@ export class OrdersDao {
   constructor(private readonly _db: AppDB) {}
 
   async add(data: Order) {
-    return await this._db.insert(tableName, data, [
-      'id',
-      'user_id',
-      'customer_id',
-      'duration',
-      'order_date',
-      'start_time',
-      'end_time',
-      'status',
-      'pre_amount',
-      'is_pre_amount_paid',
-      'total_amount',
-      'paid_amount',
-      'customer_desc',
-      'order_status',
-      'user_desc',
-    ]);
+    try {
+      return await this._db.insert(tableName, data, [
+        'id',
+        'user_id',
+        'customer_id',
+        'duration',
+        'order_date',
+        'start_time',
+        'end_time',
+        'status',
+        'pre_amount',
+        'is_pre_amount_paid',
+        'total_amount',
+        'paid_amount',
+        'customer_desc',
+        'order_status',
+        'user_desc',
+      ]);
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   async update(data: any, attr: string[]): Promise<number> {
@@ -85,7 +89,10 @@ export class OrdersDao {
       .conditionIfNotEmpty('order_status', '=', query.order_status)
 
       .criteria();
-    const sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} limit ${query.limit} offset ${+query.skip * +query.limit}`;
+    const sql =
+      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `${query.limit ? `limit ${query.limit}` : ''}` +
+      ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

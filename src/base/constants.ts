@@ -32,14 +32,36 @@ export function getDefinedKeys(obj: Record<string, any>): string[] {
 }
 
 export const usernameFormatter = (user: User) => {
-  return `${firstLetterUpper(user.lastname)}.${user.firstname}`;
+  return (
+    user.nickname ??
+    `${user.lastname && `${firstLetterUpper(user.lastname)}.`}${
+      user.firstname ?? ''
+    }`
+  );
 };
-
 export const saltOrRounds = 1;
-
+export function toTimeString(hour: number | string): string {
+  const h = String(hour).padStart(2, '0');
+  return `${h}:00:00`;
+}
+export function startOfISOWeek(d: Date) {
+  const date = new Date(d);
+  const isoDay = (date.getDay() + 6) % 7; // 0=Даваа, 6=Ням
+  date.setDate(date.getDate() - isoDay);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
 export const firstLetterUpper = (value: string) => {
   if (value.length == 0) return value;
   return `${value.substring(0, 1).toUpperCase()}${value.substring(1)}`;
+};
+
+export const mnDate = (): Date => {
+  const now = new Date();
+  const mongoliaTime = new Date(
+    now.toLocaleString('en-US', { timeZone: 'Asia/Ulaanbaatar' }),
+  );
+  return mongoliaTime;
 };
 
 export enum AdminUserStatus {
@@ -75,10 +97,13 @@ export const DiscountValue = {
 };
 export enum ScheduleStatus {
   Active = 10,
-  Excused = 20,
-  Vacation = 30,
-  Absent = 40,
-  Hidden = 50,
+  Pending = 20,
+
+  Hidden = 60,
+}
+export enum ScheduleType {
+  Free = 10,
+  Vacation = 20,
 }
 
 export enum UserProductStatus {
@@ -111,4 +136,9 @@ export enum PRODUCT_TRANSACTION_STATUS {
   Used = 10,
   Sold = 20,
   Damaged = 30,
+}
+export enum PRODUCT_LOG_STATUS {
+  Bought = 10,
+  Remainder = 20,
+  // Damaged = 30,
 }

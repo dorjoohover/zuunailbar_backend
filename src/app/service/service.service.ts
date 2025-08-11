@@ -7,20 +7,25 @@ import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { getDefinedKeys, STATUS } from 'src/base/constants';
 import { DiscountService } from '../discount/discount.service';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { User } from '../user/user.entity';
+import { ScheduleService } from '../schedule/schedule.service';
+import { BookingService } from '../booking/booking.service';
 
 @Injectable()
 export class ServiceService {
   constructor(
     private readonly dao: ServiceDao,
     private readonly discount: DiscountService,
+    // private readonly schedule: ScheduleService,
+    // private readonly booking: BookingService,
   ) {}
-  public async create(dto: ServiceDto, merchant: string, user: string) {
-    BadRequest.branchNotFound(dto.branch_id);
+  public async create(dto: ServiceDto, merchant: string, user: User) {
+    BadRequest.branchNotFound(dto.branch_id, user.role);
     const res = await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
       merchant_id: merchant,
-      created_by: user,
+      created_by: user.id,
       status: STATUS.Active,
     });
   }

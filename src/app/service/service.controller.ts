@@ -35,8 +35,8 @@ export class ServiceController {
   @Admin()
   @Post()
   create(@Body() dto: ServiceDto, @Req() { user }) {
-    BadRequest.merchantNotFound(user?.merchant);
-    return this.serviceService.create(dto, user.merchant.id, user.user.id);
+    BadRequest.merchantNotFound(user?.merchant, user.user.role);
+    return this.serviceService.create(dto, user.merchant.id, user.user);
   }
   @PQ(['branch_id'])
   @Get()

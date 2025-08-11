@@ -15,7 +15,7 @@ import {
 } from 'src/base/constants';
 import { BadRequest, NoPermissionException } from 'src/common/error';
 import { User } from './user.entity';
-import { MobileFormat } from 'src/common/formatter';
+import { MobileFormat, MobileParser } from 'src/common/formatter';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import * as bcrypt from 'bcrypt';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
@@ -37,11 +37,16 @@ export class UserService {
       throw new NoPermissionException();
     if (!dto.password) BadRequest.required('Password');
     const mobile = MobileFormat(dto.mobile);
-    const res = await this.dao.getByMobile(mobile);
-    if (res.length != 0) throw new BadRequest().registered;
+    let res;
+    try {
+      res = await this.dao.getByMobile(mobile);
+    } catch (error) {
+      res = null;
+    }
+    if (res != null) throw new BadRequest().registered;
     let branch;
     if (branch_id) branch = await this.branchService.findOne(branch_id);
-    const password = await bcrypt.hash(dto.password, saltOrRounds);
+    const password = await this.hash(dto.password);
     await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
@@ -56,10 +61,14 @@ export class UserService {
       birthday: new Date(dto.birthday),
     });
   }
+  private async hash(password: string) {
+    return await bcrypt.hash(password, saltOrRounds);
+  }
   public async register(dto: RegisterDto, merchant: string) {
     const mobile = MobileFormat(dto.mobile);
     const res = await this.dao.getByMobile(mobile);
     if (res.length != 0) throw new BadRequest().registered;
+    const password = await this.hash(dto.password);
     await this.dao.add({
       id: AppUtils.uuid4(),
       status: STATUS.Active,
@@ -70,9 +79,12 @@ export class UserService {
       branch_id: null,
       birthday: null,
       description: null,
+      profile_img: null,
+      experience: null,
+      nickname: null,
       firstname: null,
       lastname: null,
-      password: null,
+      password,
       role: CLIENT,
       device: null,
       branch_name: null,
@@ -80,18 +92,48 @@ export class UserService {
   }
 
   public async findAll(pg: PaginationDto, role: number) {
-    return await this.dao.list(applyDefaultStatusFilter(pg, role));
+    const data = await this.dao.list(applyDefaultStatusFilter(pg, role));
+
+    const items = data.items.map(({ password, ...rest }) => {
+      const mobile = MobileParser(rest.mobile);
+      return {
+        ...rest,
+        mobile,
+      };
+    });
+
+    return {
+      ...data,
+      items,
+    };
   }
 
+  public async findMobile(mobile: string) {
+    return await this.dao.getByMobile(MobileFormat(mobile));
+  }
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }
   public async findDevice(id: string) {
     return await this.dao.getByDevice(id);
   }
+  public async resetPassword(mobile: string, password: string) {
+    const user = await this.dao.getByMobile(mobile);
+    if (!user) return;
+    const pass = await this.hash(password);
+    const body = { id: user.id, password: pass };
+    await this.dao.update(body, getDefinedKeys(body));
+  }
+  public async update(id: string, dto: UserDto) {
+    let password;
+    if (dto.password) {
+      password = await bcrypt.hash(dto.password, saltOrRounds);
+    }
 
-  public async update(id: number, dto: UserDto) {
-    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+    return await this.dao.update(
+      dto.password ? { ...dto, id, password } : { ...dto, id },
+      getDefinedKeys(dto),
+    );
   }
 
   public async updateStatus(id: string) {

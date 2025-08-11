@@ -5,7 +5,13 @@ export function applyDefaultStatusFilter(
   pg: PaginationDto,
   role: number,
 ): PaginationDto {
-  let p = pg;
+  let p;
+  if (pg.limit == -1) {
+    const { limit, ...body } = pg;
+    p = body;
+  } else {
+    p = pg;
+  }
   if (role === ADMINUSERS) return pg;
   if (role === EMPLOYEE && pg.user_id) {
     p = { ...p, user_id: pg.user_id };

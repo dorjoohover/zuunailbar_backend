@@ -3,21 +3,84 @@ import { OrderDto } from './order.dto';
 import { OrdersDao } from './order.dao';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
-import { DISCOUNT, getDefinedKeys, STATUS } from 'src/base/constants';
+import {
+  DISCOUNT,
+  getDefinedKeys,
+  STATUS,
+  toTimeString,
+} from 'src/base/constants';
 import { AppUtils } from 'src/core/utils/app.utils';
+import { OrderDetailService } from '../order_detail/order_detail.service';
+import { ServiceService } from '../service/service.service';
+import { start } from 'repl';
+import { Order } from './order.entity';
 
 @Injectable()
 export class OrderService {
-  constructor(private readonly dao: OrdersDao) {}
-  public async create(dto: OrderDto, user: string) {
-    // zasna
+  constructor(
+    private readonly dao: OrdersDao,
+    private readonly orderDetail: OrderDetailService,
+    private readonly service: ServiceService,
+  ) {}
+  private addDays(d: Date, days: number) {
+    const x = new Date(d);
+    x.setDate(x.getDate() + days);
+    return x;
+  }
+  public async create(dto: OrderDto, customerId: string) {
+    const totalMinutes = (dto.details ?? []).reduce(
+      (sum, it) => sum + (it.duration ?? 0),
+      0,
+    );
+    const durationHours = Math.ceil(totalMinutes / 60);
 
-    await this.dao.add({
-      ...dto,
-      customer_id: user,
+    const startHour = dto.start_time;
+    const endHourRaw = startHour + durationHours;
+
+    const dayShift = Math.floor(endHourRaw / 24); // хэдэн өдөр давсан бэ
+    const endHour = endHourRaw % 24; // тухайн өдрийн цаг
+
+    const orderDate = new Date(dto.order_date);
+    const effectiveOrderDate = dayShift
+      ? this.addDays(orderDate, dayShift)
+      : orderDate;
+
+    // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
+    const payload: Order = {
       id: AppUtils.uuid4(),
+      customer_id: customerId,
+      user_id: dto.user_id,
+      order_date: effectiveOrderDate, // Date (өдөр давсан бол +1, +2 ...)
+      start_time: toTimeString(startHour),
+      end_time: toTimeString(endHour),
+      duration: durationHours,
+      customer_desc: dto.customer_desc ?? null,
+      discount_type: dto.discount_type ?? null,
+      discount: dto.discount ?? null,
+      total_amount: dto.total_amount ?? null,
+      paid_amount: dto.paid_amount ?? null,
+      pre_amount: 10000,
+      is_pre_amount_paid: true,
+      order_status: STATUS.Active,
       status: STATUS.Active,
-    });
+      user_desc: null,
+    } as const;
+
+    const order = await this.dao.add(payload);
+    // 5) details-ийг зэрэг үүсгэнэ
+    await Promise.all(
+      (dto.details ?? []).map((d) =>
+        this.orderDetail.create({
+          order_id: order,
+          service_id: d.service_id,
+          service_name: d.service_name,
+          price: d.price,
+          duration: d.duration, // минут чигээр нь хадгалж болно
+        }),
+      ),
+    );
+
+    // return { id: order.id };
   }
 
   async findOne(id: string) {

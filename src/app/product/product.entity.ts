@@ -1,6 +1,8 @@
 export class Product {
   id: string;
   brand_id: string;
+  brand_name: string;
+  category_name: string;
   category_id: string;
   name: string;
   ref: string;

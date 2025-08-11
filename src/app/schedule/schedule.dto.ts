@@ -1,18 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ScheduleType } from 'src/base/constants';
 
 export class ScheduleDto {
   @ApiProperty()
   date: Date;
-  @ApiProperty()
-  start_time: Date;
+
   @ApiProperty()
   user_id: string;
+
   @ApiProperty()
-  end_time: Date;
+  branch_id: string;
   @ApiProperty()
-  status: number;
-  @ApiProperty()
-  type: number;
-  @ApiProperty({isArray: true})
+  type: ScheduleType;
+
+  @ApiProperty({ isArray: true })
   times: string[];
 }

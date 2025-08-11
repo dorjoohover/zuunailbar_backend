@@ -6,6 +6,7 @@ import {
   transports,
   LoggerOptions,
 } from 'winston';
+import { mnDate } from './constants';
 const { printf } = format;
 const { Console } = transports;
 const path = require('path');
@@ -83,7 +84,7 @@ export class AppLogger {
       // const calleeStrHl = highlight(calleeStr);
       // console.log(calleeStrHl);
       return {
-        timestamp: new Date(),
+        timestamp: mnDate(),
         line: calleeStr,
         email: options.client?.email,
         // merchant: options.terminalUser?.client?.name,

@@ -8,15 +8,15 @@ import {
   Delete,
   Req,
 } from '@nestjs/common';
-import { ProductTransactionService } from './product_transaction.service';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
-import { ProductTransactionDto } from './product_transaction.dto';
 import { Admin, Employee, Manager } from 'src/auth/guards/role/role.decorator';
 import { BadRequest } from 'src/common/error';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { PRODUCT_TRANSACTION_STATUS } from 'src/base/constants';
+import { ProductTransactionService } from './product_transaction.service';
+import { ProductTransactionDto } from './product_transaction.dto';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'branch-id',
@@ -32,7 +32,7 @@ export class ProductTransactionController {
   @Manager()
   @Post()
   create(@Body() dto: ProductTransactionDto, @Req() { user }) {
-    BadRequest.branchNotFound(user.branch);
+    BadRequest.branchNotFound(user.branch, user.user.role);
     return this.productTransactionService.create(
       dto,
       user.branch.id,
