@@ -4,7 +4,7 @@ import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Voucher } from './voucher.entity';
 
-const tableName = 'voucher';
+const tableName = 'vouchers';
 
 @Injectable()
 export class VoucherDao {
@@ -70,26 +70,30 @@ export class VoucherDao {
   }
 
   async list(query) {
-    if (query.id) {
-      query.id = `%${query.id}%`;
-    }
+    try {
+      if (query.id) {
+        query.id = `%${query.id}%`;
+      }
 
-    const builder = new SqlBuilder(query);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('user_id', '=', query.user_id)
-      .conditionIfNotEmpty('service_id', '=', query.service_id)
-      .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('type', '=', query.type)
-      .criteria();
-    const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
-      `${query.limit ? `limit ${query.limit}` : ''}` +
-      ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
-    const count = await this._db.count(countSql, builder.values);
-    const items = await this._db.select(sql, builder.values);
-    return { count, items };
+      const builder = new SqlBuilder(query);
+      const criteria = builder
+        .conditionIfNotEmpty('id', 'LIKE', query.id)
+        .conditionIfNotEmpty('user_id', '=', query.user_id)
+        .conditionIfNotEmpty('service_id', '=', query.service_id)
+        .conditionIfNotEmpty('status', '=', query.status)
+        .conditionIfNotEmpty('type', '=', query.type)
+        .criteria();
+      const sql =
+        `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+        `${query.limit ? `limit ${query.limit}` : ''}` +
+        ` offset ${+query.skip * +(query.limit ?? 0)}`;
+      const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+      const count = await this._db.count(countSql, builder.values);
+      const items = await this._db.select(sql, builder.values);
+      return { count, items };
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   async search(filter: any): Promise<any[]> {

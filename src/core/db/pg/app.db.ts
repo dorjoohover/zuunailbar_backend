@@ -129,7 +129,7 @@ export class AppDB {
         const result = await client.query(query);
         return result.rows[0][0];
       } catch (err: any) {
-        console.warn('Count error!', `[${sql}], [${params}]`);
+        console.warn('Count error!', err, `[${sql}], [${params}]`);
         throw err;
       }
     });
