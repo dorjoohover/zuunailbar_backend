@@ -1,21 +1,19 @@
-import { Injectable } from '@nestjs/common';
-import { transliterate } from 'transliteration';
+import { HttpException, Injectable } from '@nestjs/common';
 import { ProductDao } from './product.dao';
 import { ProductDto } from './product.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
-import { CategoryDao } from '../category/category.dao';
-import { BrandDao } from '../brand/brand.dao';
 import { CategoryService } from '../category/category.service';
 import { BrandService } from '../brand/brand.service';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import {
-  ADMINUSERS,
+  CategoryType,
   getDefinedKeys,
   mnDate,
   PRODUCT_STATUS,
   STATUS,
 } from 'src/base/constants';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { BadRequest } from 'src/common/error';
 
 @Injectable()
 export class ProductService {
@@ -34,15 +32,21 @@ export class ProductService {
         brand = (await this.brandService.getById(dto.brand_id)).name;
       if (dto.category_id)
         category = (await this.categoryService.getById(dto.category_id)).name;
-    } catch (error) {}
+    } catch (error) {
+      console.log(error);
+    }
     await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
       merchant_id: merchant,
+      brand_id: dto.brand_id ?? null,
       ref: ref,
       status: PRODUCT_STATUS.Active,
       brand_name: brand,
+      price: 0,
+      quantity: 0,
       category_name: category,
+      type: category?.type ?? CategoryType.DEFAULT,
     });
   }
 
@@ -76,6 +80,15 @@ export class ProductService {
 
   public async update(id: string, dto: ProductDto) {
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+  }
+  public async updateQuantity(id: string, qty: number) {
+    const { quantity } = await this.findOne(id);
+    if (quantity + qty < 0) new BadRequest().STOCK_INSUFFICIENT;
+    const body = {
+      id,
+      quantity: quantity + qty,
+    };
+    return await this.dao.update(body, getDefinedKeys(body));
   }
 
   public async remove(id: string) {

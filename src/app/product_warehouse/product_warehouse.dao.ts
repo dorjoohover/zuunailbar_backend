@@ -1,26 +1,26 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent, STATUS } from 'src/base/constants';
+import { isOnlyFieldPresent } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Discount } from './discount.entity';
+import { ProductWarehouse } from './product_warehouse.entity';
 
-const tableName = 'discounts';
+const tableName = 'product_warehouses';
 
 @Injectable()
-export class DiscountDao {
+export class ProductWarehouseDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Discount) {
+  async add(data: ProductWarehouse) {
     return await this._db.insert(tableName, data, [
       'id',
-      'service_id',
-      'branch_id',
-      'start_date',
-      'end_date',
-      'value',
-      'name',
+      'product_id',
+      'warehouse_id',
+      'product_name',
+      'warehouse_name',
+      'quantity',
+      'date',
+      'created_by',
       'status',
-      'type',
     ]);
   }
 
@@ -60,32 +60,24 @@ export class DiscountDao {
 
   async getById(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "id"=$1 and "status" = ${STATUS.Active}`,
-      [id],
-    );
-  }
-  async getByService(id: string) {
-    return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "service_id"=$1`,
+      `SELECT * FROM "${tableName}" WHERE "id"=$1`,
       [id],
     );
   }
 
   async list(query) {
+    console.log(query);
     if (query.id) {
       query.id = `%${query.id}%`;
-    }
-    if (query.name) {
-      query.name = `%${query.name}%`;
     }
 
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('service_id', '=', query.service_id)
-      .conditionIfNotEmpty('type', '=', query.type)
+      .conditionIfNotEmpty('warehouse_id', '=', query.warehouse_id)
+      .conditionIfNotEmpty('product_id', '=', query.product_id)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
+
       .criteria();
     const sql =
       `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +

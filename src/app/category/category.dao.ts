@@ -15,6 +15,7 @@ export class CategoryDao {
       'id',
       'name',
       'merchant_id',
+      'type',
       'status',
     ]);
   }
@@ -65,6 +66,7 @@ export class CategoryDao {
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('type', '=', query.type)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
       .criteria();
     const sql =

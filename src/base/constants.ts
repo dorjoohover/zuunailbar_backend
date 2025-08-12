@@ -68,9 +68,17 @@ export enum AdminUserStatus {
   Active = 10,
   Deleted = 20,
 }
+export enum CategoryType {
+  DEFAULT = 10,
+  COST = 20,
+}
 export enum UserStatus {
   Active = 10,
   Deleted = 20,
+}
+export enum CostStatus {
+  Paid = 10,
+  Remainder = 20,
 }
 
 export enum DISCOUNT {

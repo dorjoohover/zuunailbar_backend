@@ -159,13 +159,17 @@ export class AppDB {
   }
 
   async insert(tableName: string, data: any, columns: string[]) {
-    const builder = new SqlBuilder(data, columns);
-    const { cols, indexes } = builder.create();
+    try {
+      const builder = new SqlBuilder(data, columns);
+      const { cols, indexes } = builder.create();
 
-    const sql = `INSERT INTO "${tableName}" (${cols}) VALUES (${indexes}) RETURNING id`;
+      const sql = `INSERT INTO "${tableName}" (${cols}) VALUES (${indexes}) RETURNING id`;
 
-    const row = await this.selectOne(sql, builder.values); // { id: '...' }
-    return row.id;
+      const row = await this.selectOne(sql, builder.values);
+      return row.id;
+    } catch (error) {
+      console.log(error);
+    }
   }
   async insertMany(
     tableName: string,

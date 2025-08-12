@@ -36,14 +36,10 @@ export class ProductController {
   }
 
   @Get()
-  @PQ(['status', 'isCost'])
+  @PQ(['status'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     let p = pg;
 
-    const spending = ProductController.spending;
-    pg.isCost === 'true'
-      ? (p = { ...pg, category_id: spending })
-      : (p = { ...pg, spending: spending });
     return this.productService.findAll(p, user.user.role);
   }
 

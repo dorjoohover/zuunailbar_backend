@@ -32,6 +32,8 @@ import { FileService } from './file.service';
 import { ProductTransactionModule } from './app/product_transaction/product_transaction.module';
 import { ProductLogModule } from './app/product_log/product_log.module';
 import { BookingModule } from './app/booking/booking.module';
+import { WarehouseModule } from './app/warehouse/warehouse.module';
+import { ProductWarehouseModule } from './app/product_warehouse/product_warehouse.module';
 
 @Module({
   imports: [
@@ -59,6 +61,8 @@ import { BookingModule } from './app/booking/booking.module';
     UserServiceModule,
     ProductLogModule,
     BookingModule,
+    WarehouseModule,
+    ProductWarehouseModule,
 
     // .conf
     // timezone = 'Asia/Ulaanbaatar'

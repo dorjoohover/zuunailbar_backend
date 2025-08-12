@@ -5,11 +5,16 @@ import { AppUtils } from 'src/core/utils/app.utils';
 import { getDefinedKeys, STATUS } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { ProductService } from '../product/product.service';
 
 @Injectable()
 export class ProductLogService {
-  constructor(private readonly dao: ProductLogDao) {}
+  constructor(
+    private readonly dao: ProductLogDao,
+    private readonly product: ProductService,
+  ) {}
   public async create(dto: ProductLogDto, merchant: string, user: string) {
+    await this.product.updateQuantity(dto.product_id, dto.quantity);
     await this.dao.add({
       ...dto,
       merchant_id: merchant,
@@ -19,6 +24,8 @@ export class ProductLogService {
       // total_amount: dto.total_amount ?? +dto.price * +dto.quantity,
       total_amount: dto.total_amount ?? 0,
       price: dto.price ?? 0,
+      currency: dto.currency ?? 'CNY',
+      currency_amount: 500,
     });
   }
 

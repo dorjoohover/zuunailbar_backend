@@ -1,3 +1,5 @@
+import { CategoryType } from 'src/base/constants';
+
 export class Product {
   id: string;
   brand_id: string;
@@ -7,6 +9,7 @@ export class Product {
   name: string;
   ref: string;
   quantity: number;
+  type: CategoryType;
   price: number;
   color: string;
   size: string;

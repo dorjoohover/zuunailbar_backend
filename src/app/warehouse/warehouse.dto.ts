@@ -1,9 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CategoryType } from 'src/base/constants';
 
-export class CategoryDto {
+export class WarehouseDto {
   @ApiProperty()
   name: string;
   @ApiProperty()
-  type: CategoryType;
+  address: string;
 }

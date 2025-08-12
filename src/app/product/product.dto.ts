@@ -7,11 +7,8 @@ export class ProductDto {
   category_id: string;
   @ApiProperty()
   name: string;
-
   @ApiProperty()
   quantity: number;
-  @ApiProperty()
-  price: number;
   @ApiProperty()
   color: string;
   @ApiProperty()

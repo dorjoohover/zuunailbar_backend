@@ -5,15 +5,20 @@ import { AppUtils } from 'src/core/utils/app.utils';
 import { getDefinedKeys, PRODUCT_STATUS, STATUS } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { ProductService } from '../product/product.service';
 
 @Injectable()
 export class ProductTransactionService {
-  constructor(private readonly dao: ProductTransactionDao) {}
+  constructor(
+    private readonly dao: ProductTransactionDao,
+    private product: ProductService,
+  ) {}
   public async create(
     dto: ProductTransactionDto,
     branch: string,
     user: string,
   ) {
+    await this.product.updateQuantity(dto.product_id, -dto.quantity);
     await this.dao.add({
       ...dto,
       branch_id: branch,
@@ -35,6 +40,13 @@ export class ProductTransactionService {
   }
 
   public async update(id: string, dto: ProductTransactionDto) {
+    if (dto.quantity) {
+      const transaction = await this.dao.getById(id);
+      const diff = Math.abs(+dto.quantity - +transaction.quantity);
+      if (diff != 0) {
+        await this.product.updateQuantity(dto.product_id, -diff);
+      }
+    }
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }
 

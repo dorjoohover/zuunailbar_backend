@@ -16,6 +16,9 @@ export class BadRequest {
   get registered() {
     throw new HttpException('Already registered', HttpStatus.BAD_REQUEST);
   }
+  get STOCK_INSUFFICIENT() {
+    throw new HttpException('Үлдэгдэл хүрэлцэхгүй', HttpStatus.BAD_REQUEST);
+  }
   static required(message: string) {
     throw new HttpException(
       `${firstLetterUpper(message)} is required`,

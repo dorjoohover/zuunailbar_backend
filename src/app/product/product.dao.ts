@@ -20,7 +20,10 @@ export class ProductDao {
       'color',
       'brand_id',
       'category_id',
+      'category_name',
+      'brand_name',
       'status',
+      'type',
       'size',
       'merchant_id',
     ]);
@@ -82,6 +85,7 @@ export class ProductDao {
       .conditionIfNotEmpty('category_id', '=', query.category_id)
       .conditionIfNotEmpty('category_id', '!=', query.spending)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
+      .conditionIfNotEmpty('type', '=', query.type)
 
       .conditionIfNotEmpty('status', '=', query.status)
       .criteria();
@@ -122,7 +126,8 @@ export class ProductDao {
      CONCAT(
        COALESCE("brand_name", ''), '__',
        COALESCE("category_name", ''), '__',
-       COALESCE("name", '')
+       COALESCE("name", ''), '__',
+       COALESCE("quantity", 0)
      ) AS "value"
    FROM "${tableName}" 
    ${criteria}${nameCondition}`,

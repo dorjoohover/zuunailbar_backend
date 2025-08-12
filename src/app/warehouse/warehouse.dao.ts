@@ -1,26 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent, STATUS } from 'src/base/constants';
+import { isOnlyFieldPresent } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Discount } from './discount.entity';
+import { Warehouse } from './warehouse.entity';
 
-const tableName = 'discounts';
+const tableName = 'warehouses';
 
 @Injectable()
-export class DiscountDao {
+export class WarehouseDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Discount) {
+  async add(data: Warehouse) {
     return await this._db.insert(tableName, data, [
       'id',
-      'service_id',
-      'branch_id',
-      'start_date',
-      'end_date',
-      'value',
       'name',
+      'merchant_id',
+      'address',
       'status',
-      'type',
     ]);
   }
 
@@ -37,14 +33,7 @@ export class DiscountDao {
     );
   }
 
-  async updateFee(id: string, fee: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
-      [fee, id],
-    );
-  }
-
-  async updateStatus(id: string, status: number): Promise<number> {
+  async updateStatus(id: string, status: number) {
     return await this._db._update(
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
       [status, id],
@@ -60,13 +49,7 @@ export class DiscountDao {
 
   async getById(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "id"=$1 and "status" = ${STATUS.Active}`,
-      [id],
-    );
-  }
-  async getByService(id: string) {
-    return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "service_id"=$1`,
+      `SELECT * FROM "${tableName}" WHERE "id"=$1`,
       [id],
     );
   }
@@ -82,8 +65,6 @@ export class DiscountDao {
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('service_id', '=', query.service_id)
-      .conditionIfNotEmpty('type', '=', query.type)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
       .criteria();
