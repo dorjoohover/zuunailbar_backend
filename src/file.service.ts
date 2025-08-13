@@ -43,7 +43,6 @@ export class FileService {
     ct?: string,
   ): Promise<string[]> {
     try {
-      console.log('uploading', files);
       const results: string[] = [];
       if (files.length == 0) {
         const buffer = await this.streamToBuffer(pt);
@@ -56,7 +55,6 @@ export class FileService {
 
         results.push(fileUrl);
       }
-      console.log(results);
       return results;
     } catch (error) {
       console.log(error);
@@ -66,7 +64,6 @@ export class FileService {
   async getFile(filename: string): Promise<StreamableFile> {
     try {
       const filePath = join(this.localPath, filename);
-      console.log(filename);
 
       if (!existsSync(filePath)) {
         throw new NotFoundException('File not found in S3');

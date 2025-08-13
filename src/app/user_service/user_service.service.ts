@@ -32,6 +32,7 @@ export class UserServiceService {
     await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
+      branch_id: dto.branch_id ?? user.branch_id,
       user_name: usernameFormatter(user),
       service_name: service.name,
       user_id: user.id,
@@ -42,6 +43,7 @@ export class UserServiceService {
     const { count, items } = await this.dao.list(
       applyDefaultStatusFilter(pg, CLIENT),
     );
+    console.log(items);
     const res = await Promise.all(
       items.map(async (item) => {
         const user = await this.userService.findOne(item.user_id);
@@ -65,7 +67,7 @@ export class UserServiceService {
   }
 
   public async update(id: string, dto: UserServiceDto) {
-    return await this.dao.update({ ...dto, id, updated_at: mnDate()}, [
+    return await this.dao.update({ ...dto, id, updated_at: mnDate() }, [
       ...getDefinedKeys(dto),
       'updated_at',
     ]);

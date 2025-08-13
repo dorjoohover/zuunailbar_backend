@@ -27,10 +27,11 @@ export const isAnyFieldPresent = (query) => {
 
 export function getDefinedKeys(obj: Record<string, any>): string[] {
   return Object.entries(obj)
+
     .filter(([_, value]) => value !== undefined && value !== null)
     .map(([key]) => key);
 }
-
+export const MN_TZ = 'Asia/Ulaanbaatar' as const;
 export const usernameFormatter = (user: User) => {
   return (
     user.nickname ??
@@ -39,6 +40,12 @@ export const usernameFormatter = (user: User) => {
     }`
   );
 };
+export function mnDayRange(d = new Date()) {
+  const { y, m, day, ymd } = getMnParts(d);
+  const start = new Date(Date.UTC(y, m - 1, day, 0, 0, 0)); // UB 00:00 → UTC instant
+  const end = new Date(Date.UTC(y, m - 1, day + 1, 0, 0, 0)); // дараагийн UB 00:00
+  return { start, end, ymd };
+}
 export const saltOrRounds = 1;
 export function toTimeString(hour: number | string): string {
   const h = String(hour).padStart(2, '0');
@@ -56,14 +63,35 @@ export const firstLetterUpper = (value: string) => {
   return `${value.substring(0, 1).toUpperCase()}${value.substring(1)}`;
 };
 
-export const mnDate = (): Date => {
-  const now = new Date();
+export const mnDate = (d = new Date()): Date => {
+  const now = new Date(d);
   const mongoliaTime = new Date(
     now.toLocaleString('en-US', { timeZone: 'Asia/Ulaanbaatar' }),
   );
   return mongoliaTime;
 };
-
+export function getMnParts(d = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: MN_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const pick = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const y = pick('year'),
+    m = pick('month'),
+    day = pick('day');
+  return {
+    y,
+    m,
+    day,
+    ymd: `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+  };
+}
 export enum AdminUserStatus {
   Active = 10,
   Deleted = 20,

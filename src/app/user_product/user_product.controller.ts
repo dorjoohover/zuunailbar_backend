@@ -60,7 +60,6 @@ export class UserProductController {
   @SAP()
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UserProductDto) {
-    console.log(id);
     return this.userProductService.update(id, dto);
   }
 

@@ -67,7 +67,6 @@ export class ProductTransactionDao {
   }
 
   async list(query) {
-    console.log(query)
     if (query.id) {
       query.id = `%${query.id}%`;
     }

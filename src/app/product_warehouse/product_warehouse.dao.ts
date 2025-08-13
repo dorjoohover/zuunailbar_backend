@@ -66,7 +66,6 @@ export class ProductWarehouseDao {
   }
 
   async list(query) {
-    console.log(query);
     if (query.id) {
       query.id = `%${query.id}%`;
     }

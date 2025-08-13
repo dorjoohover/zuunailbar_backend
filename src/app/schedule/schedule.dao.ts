@@ -67,26 +67,24 @@ export class ScheduleDao {
     );
   }
 
-  async getAvailableTimes(date: Date) {
-    try {
-      const sql = `
-    SELECT ARRAY(
-      SELECT DISTINCT unnest(string_to_array("times",'|')::int[])
-      FROM "${tableName}"
-      WHERE "date"::date = $1::date and status=${STATUS.Active} and schedule_status=${ScheduleStatus.Active}
-    ) AS all_times
+  async getAvailableTimes(d: Date) {
+    const day = new Date(d).toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    const sql = `
+  WITH s AS (
+    SELECT user_id, unnest(string_to_array("times",'|')::int[]) AS h
+    FROM "${tableName}"
+    WHERE "date"::date = $1::date
+      AND status = ${STATUS.Active}
+      AND schedule_status = ${ScheduleStatus.Active}
+  )
+  SELECT user_id, array_to_string(array_agg(DISTINCT h ORDER BY h), '|') AS times
+  FROM s
+  GROUP BY user_id
+  ORDER BY user_id;
   `;
-
-      const row = await this._db.selectOne(sql, [date]);
-      // { all_times: number[] }
-
-      return {
-        date,
-        times: (row?.all_times ?? []).map(Number).sort((a, b) => a - b),
-      };
-    } catch (error) {
-      return { date, times: [] };
-    }
+    const rows = await this._db.select(sql, [day]);
+    // rows: [{ user_id: 'id', times: '10|20|21' }, { user_id: 'id1', times: '9|13|14' }]
+    return rows as Array<{ user_id: string; times: string }>;
   }
 
   async list(query) {

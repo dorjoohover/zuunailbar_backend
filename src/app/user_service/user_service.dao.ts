@@ -75,7 +75,7 @@ export class UserServiceDao {
       .conditionIfNotEmpty('service_id', '=', query.service_id)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfArray('service_id', query.services)
+      .conditionIfArray('service_id', query.services?.split(','))
       .criteria();
     const sql =
       `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +

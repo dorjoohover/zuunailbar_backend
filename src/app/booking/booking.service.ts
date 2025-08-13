@@ -5,6 +5,7 @@ import { AppUtils } from 'src/core/utils/app.utils';
 import {
   CLIENT,
   getDefinedKeys,
+  mnDate,
   ScheduleStatus,
   startOfISOWeek,
   STATUS,
@@ -63,11 +64,12 @@ export class BookingService {
   }
 
   public async findClient(pg: PaginationDto) {
-    const res = await this.dao.list(applyDefaultStatusFilter(pg, CLIENT));
+    const res = await this.dao.list(
+      applyDefaultStatusFilter({ ...pg, start_date: mnDate() }, CLIENT),
+    );
     if (!res.items?.length) {
       return { count: 0, items: [] };
     }
-
     // N мөрийг зэрэг шалгах
     const checked = await Promise.all(
       res.items.map(async (r) => {
@@ -76,7 +78,6 @@ export class BookingService {
         return overlap.length > 0 ? { ...r, overlap } : null;
       }),
     );
-
     const items = checked.filter((x): x is NonNullable<typeof x> => x !== null);
     return {
       count: items.length,
