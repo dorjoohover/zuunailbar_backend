@@ -16,8 +16,9 @@ import { BadRequest } from 'src/common/error';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
-import { ADMIN, MANAGER } from 'src/base/constants';
+import { ADMIN, CLIENT, MANAGER } from 'src/base/constants';
 import { SAP, SAQ } from 'src/common/decorator/use-param.decorator';
+import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 
 @ApiBearerAuth('access-token')
 @Controller('user')
@@ -55,6 +56,18 @@ export class UserController {
   @PQ(['role'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.userService.findAll(pg, user.user.role);
+  }
+  @Public()
+  @Get('client')
+  @PQ(['role'])
+  findUser(@Pagination() pg: PaginationDto) {
+    return this.userService.findAll(
+      {
+        role: 35,
+        ...pg,
+      },
+      CLIENT,
+    );
   }
 
   @SAP()

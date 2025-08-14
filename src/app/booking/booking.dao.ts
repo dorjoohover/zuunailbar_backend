@@ -72,46 +72,46 @@ export class BookingDao {
   }
 
   async list(query) {
-    if (query.id) {
-      query.id = `%${query.id}%`;
-    }
-    if (query.start_time) {
-      query.start_time = `%${query.start_time}%`;
-    }
-    if (query.end_time) {
-      query.end_time = `%${query.end_time}%`;
-    }
+    try {
+      if (query.id) {
+        query.id = `%${query.id}%`;
+      }
 
-    const builder = new SqlBuilder(query);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('approved_by', '=', query.approved_by)
-      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
-      .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('booking_status', '=', query.booking_status)
-      .conditionIfNotEmpty('date', '=', query.date)
-      .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date')
-      .orConditions([
-        {
-          column: 'times',
-          cond: 'LIKE',
-          value: query.start_time,
-        },
-        {
-          column: 'times',
-          cond: 'LIKE',
-          value: query.end_time,
-        },
-      ])
-      .criteria();
-    const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
-      `${query.limit ? `limit ${query.limit}` : ''}` +
-      ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
-    const count = await this._db.count(countSql, builder.values);
-    const items = await this._db.select(sql, builder.values);
-    return { count, items };
+      if (query.start_time) {
+        query.start_time = `%${query.start_time}%`;
+      }
+      if (query.end_time) {
+        query.end_time = `%${query.end_time}%`;
+      }
+
+      const builder = new SqlBuilder(query);
+      const start_date = query.start_date
+        ? query.start_date.toISOString().slice(0, 10)
+        : query.start_date;
+      const end_date = query.end_date
+        ? query.end_date.toISOString().slice(0, 10)
+        : query.end_date;
+      const criteria = builder
+        .conditionIfNotEmpty('id', 'LIKE', query.id)
+        .conditionIfNotEmpty('approved_by', '=', query.approved_by)
+        .conditionIfNotEmpty('branch_id', '=', query.branch_id)
+        .conditionIfNotEmpty('status', '=', query.status)
+        .conditionIfNotEmpty('booking_status', '=', query.booking_status)
+        .conditionIfNotEmpty('date', '=', query.date)
+        .conditionIfDateBetweenValues(start_date, end_date, 'date')
+        .conditionIsNotNull('times')
+        .criteria();
+      const sql =
+        `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+        `${query.limit ? `limit ${query.limit}` : ''}` +
+        ` offset ${+query.skip * +(query.limit ?? 0)}`;
+      const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+      const count = await this._db.count(countSql, builder.values);
+      const items = await this._db.select(sql, builder.values);
+      return { count, items };
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   async search(filter: any): Promise<any[]> {

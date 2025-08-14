@@ -67,68 +67,66 @@ export class ScheduleDao {
     );
   }
 
-  async getAvailableTimes(d: Date) {
-    const day = new Date(d).toISOString().slice(0, 10); // 'YYYY-MM-DD'
-    const sql = `
-  WITH s AS (
-    SELECT user_id, unnest(string_to_array("times",'|')::int[]) AS h
-    FROM "${tableName}"
-    WHERE "date"::date = $1::date
-      AND status = ${STATUS.Active}
-      AND schedule_status = ${ScheduleStatus.Active}
-  )
-  SELECT user_id, array_to_string(array_agg(DISTINCT h ORDER BY h), '|') AS times
-  FROM s
-  GROUP BY user_id
-  ORDER BY user_id;
-  `;
-    const rows = await this._db.select(sql, [day]);
-    // rows: [{ user_id: 'id', times: '10|20|21' }, { user_id: 'id1', times: '9|13|14' }]
-    return rows as Array<{ user_id: string; times: string }>;
-  }
+  // async getAvailableTimes(d: Date) {
+  //   const day = new Date(d).toISOString().slice(0, 10); // 'YYYY-MM-DD'
+  //   const sql = `
+  // WITH s AS (
+  //   SELECT user_id, unnest(string_to_array("times",'|')::int[]) AS h
+  //   FROM "${tableName}"
+  //   WHERE "date"::date = $1::date
+  //     AND status = ${STATUS.Active}
+  //     AND schedule_status = ${ScheduleStatus.Active}
+  // )
+  // SELECT user_id, array_to_string(array_agg(DISTINCT h ORDER BY h), '|') AS times
+  // FROM s
+  // GROUP BY user_id
+  // ORDER BY user_id;
+  // `;
+  //   const rows = await this._db.select(sql, [day]);
+  //   // rows: [{ user_id: 'id', times: '10|20|21' }, { user_id: 'id1', times: '9|13|14' }]
+  //   return rows as Array<{ user_id: string; times: string }>;
+  // }
 
   async list(query) {
-    if (query.id) {
-      query.id = `%${query.id}%`;
+    try {
+      if (query.id) {
+        query.id = `%${query.id}%`;
+      }
+      if (query.start_time) {
+        query.start_time = `%${query.start_time}%`;
+      }
+      if (query.end_time) {
+        query.end_time = `%${query.end_time}%`;
+      }
+      const start_date = query.start_date
+        ? query.start_date.toISOString().slice(0, 10)
+        : query.start_date;
+      const end_date = query.end_date
+        ? query.end_date.toISOString().slice(0, 10)
+        : query.end_date;
+      const builder = new SqlBuilder(query);
+      const criteria = builder
+        .conditionIfNotEmpty('id', 'LIKE', query.id)
+        .conditionIfNotEmpty('approved_by', '=', query.approved_by)
+        .conditionIfNotEmpty('branch_id', '=', query.branch_id)
+        .conditionIfNotEmpty('status', '=', query.status)
+        .conditionIfNotEmpty('schedule_status', '=', query.schedule_status)
+        .conditionIfNotEmpty('date', '=', query.date)
+        .conditionIfNotEmpty('user_id', '=', query.user_id)
+        .conditionIfDateBetweenValues(start_date, end_date, 'date')
+        .conditionIsNotNull('times')
+        .criteria();
+      const sql =
+        `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+        `${query.limit ? `limit ${query.limit}` : ''}` +
+        ` offset ${+query.skip * +(query.limit ?? 0)}`;
+      const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+      const count = await this._db.count(countSql, builder.values);
+      const items = await this._db.select(sql, builder.values);
+      return { count, items };
+    } catch (error) {
+      console.log(error);
     }
-    if (query.start_time) {
-      query.start_time = `%${query.start_time}%`;
-    }
-    if (query.end_time) {
-      query.end_time = `%${query.end_time}%`;
-    }
-
-    const builder = new SqlBuilder(query);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('approved_by', '=', query.approved_by)
-      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
-      .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('schedule_status', '=', query.schedule_status)
-
-      .conditionIfNotEmpty('user_id', '=', query.user_id)
-      .conditionIfNotEmpty('date', '=', query.date)
-      .orConditions([
-        {
-          column: 'times',
-          cond: 'LIKE',
-          value: query.start_time,
-        },
-        {
-          column: 'times',
-          cond: 'LIKE',
-          value: query.end_time,
-        },
-      ])
-      .criteria();
-    const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
-      `${query.limit ? `limit ${query.limit}` : ''}` +
-      ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
-    const count = await this._db.count(countSql, builder.values);
-    const items = await this._db.select(sql, builder.values);
-    return { count, items };
   }
 
   async search(filter: any): Promise<any[]> {

@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class UserServiceDto {
   @ApiProperty()
-  service_id: string;
+  services: string[];
   @ApiProperty()
   branch_id: string;
   @ApiProperty()

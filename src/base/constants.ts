@@ -40,12 +40,23 @@ export const usernameFormatter = (user: User) => {
     }`
   );
 };
-export function mnDayRange(d = new Date()) {
-  const { y, m, day, ymd } = getMnParts(d);
-  const start = new Date(Date.UTC(y, m - 1, day, 0, 0, 0)); // UB 00:00 → UTC instant
-  const end = new Date(Date.UTC(y, m - 1, day + 1, 0, 0, 0)); // дараагийн UB 00:00
-  return { start, end, ymd };
+export function mnDayRange(d: Date) {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ulaanbaatar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d);
+  const pick = (t: string) => Number(p.find((x) => x.type === t)?.value);
+  const y = pick('year'),
+    m = pick('month'),
+    day = pick('day');
+  return {
+    start: new Date(Date.UTC(y, m - 1, day, 0, 0, 0)),
+    end: new Date(Date.UTC(y, m - 1, day + 1, 0, 0, 0)),
+  };
 }
+
 export const saltOrRounds = 1;
 export function toTimeString(hour: number | string): string {
   const h = String(hour).padStart(2, '0');

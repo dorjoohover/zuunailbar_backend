@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
+import {
+  isOnlyFieldPresent,
+  mnDayRange,
+  ScheduleStatus,
+  STATUS,
+} from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Order } from './order.entity';
@@ -74,6 +79,42 @@ export class OrdersDao {
       [id],
     );
   }
+  async checkTimes(filter: {
+    user_id: string;
+    times: number[];
+    start_date: Date;
+  }) {
+    if (!Array.isArray(filter.times) || filter.times.length === 0) {
+      return { taken_hours: [] as number[] };
+    }
+
+    const { start, end } = mnDayRange(filter.start_date);
+
+    const sql = `
+    SELECT ARRAY(
+      SELECT DISTINCT EXTRACT(HOUR FROM "start_time")::int
+      FROM "${tableName}"
+      WHERE "order_date" >= $1 AND "order_date" < $2
+        AND EXTRACT(HOUR FROM "start_time")::int = ANY($3::int[])
+        AND status = $4
+        AND order_status = $5
+        AND user_id = $6
+    ) AS taken_hours
+  `;
+
+    const row = await this._db.selectOne(sql, [
+      start,
+      end,
+      filter.times.map(Number),
+      STATUS.Active,
+      STATUS.Active,
+      filter.user_id,
+    ]);
+    return Array.isArray(row?.taken_hours)
+      ? row.taken_hours.map(Number).filter(Number.isFinite)
+      : [];
+  }
+
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;
@@ -87,6 +128,8 @@ export class OrdersDao {
       .conditionIfNotEmpty('costumer_id', '=', query.costumer_id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('order_status', '=', query.order_status)
+      .conditionIfNotEmpty('start_time', '=', query.times)
+      .conditionIfNotEmpty('order_date', '=', query.date)
 
       .criteria();
     const sql =

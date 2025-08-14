@@ -4,8 +4,10 @@ import { OrdersDao } from './order.dao';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
+  CLIENT,
   DISCOUNT,
   getDefinedKeys,
+  mnDate,
   STATUS,
   toTimeString,
 } from 'src/base/constants';
@@ -34,11 +36,11 @@ export class OrderService {
     );
     const durationHours = Math.ceil(totalMinutes / 60);
 
-    const startHour = dto.start_time;
-    const endHourRaw = startHour + durationHours;
+    const startHour = +dto.start_time;
+    const endHourRaw = +startHour + durationHours;
 
     const dayShift = Math.floor(endHourRaw / 24); // хэдэн өдөр давсан бэ
-    const endHour = endHourRaw % 24; // тухайн өдрийн цаг
+    const endHour = +endHourRaw;
 
     const orderDate = new Date(dto.order_date);
     const effectiveOrderDate = dayShift
@@ -65,7 +67,7 @@ export class OrderService {
       status: STATUS.Active,
       user_desc: null,
     } as const;
-
+    console.log(payload);
     const order = await this.dao.add(payload);
     // 5) details-ийг зэрэг үүсгэнэ
     await Promise.all(
@@ -80,7 +82,7 @@ export class OrderService {
       ),
     );
 
-    // return { id: order.id };
+    return { id: order.id };
   }
 
   async findOne(id: string) {
@@ -89,6 +91,30 @@ export class OrderService {
 
   public async find(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
+  }
+  public async findByUserDateTime(
+    user_id: string,
+    date: string,
+    times: number[],
+  ) {
+    const takenHours = await this.dao.checkTimes({
+      user_id,
+      start_date: mnDate(new Date(date)),
+      times,
+    });
+    if (takenHours.length === 0) {
+      // авсан зүйл алга → бүх хүссэн цаг боломжтой
+      return times.sort((a, b) => a - b);
+    }
+
+    // 4) times - takenHours  (авсан цагийг ХАСНА)
+    const takenLookup: Record<number, 1> = {};
+    for (let i = 0; i < takenHours.length; i++) takenLookup[takenHours[i]] = 1;
+
+    const remaining = times
+      .filter((h) => !takenLookup[h])
+      .sort((a, b) => a - b);
+    return remaining;
   }
 
   public async update(id: string, dto: OrderDto) {

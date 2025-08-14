@@ -5,20 +5,23 @@ import { AppUtils } from 'src/core/utils/app.utils';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
+  CLIENT,
   getDefinedKeys,
-  MANAGER,
   mnDate,
-  mnDayRange,
   ScheduleStatus,
   startOfISOWeek,
   STATUS,
   toTimeString,
 } from 'src/base/constants';
 import { User } from '../user/user.entity';
+import { OrderService } from '../order/order.service';
 
 @Injectable()
 export class ScheduleService {
-  constructor(private readonly dao: ScheduleDao) {}
+  constructor(
+    private readonly dao: ScheduleDao,
+    private readonly order: OrderService,
+  ) {}
   public async create(dto: ScheduleDto, branch: string, user: User) {
     const base = startOfISOWeek(new Date(dto.date)); // Энэ 7 хоногийн Даваа
 
@@ -47,7 +50,7 @@ export class ScheduleService {
           schedule_status: ScheduleStatus.Active,
           status: STATUS.Active,
           date: targetDate,
-          times: parts.length ? parts.join('|') : '', // "" хадгална
+          times: parts.length ? parts.join('|') : null, // "" хадгална
           start_time: parts.length ? toTimeString(start) : null,
           end_time: parts.length ? toTimeString(end) : null,
         });
@@ -58,90 +61,67 @@ export class ScheduleService {
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
-  private normalizeTimes(times: string[], date: Date): number[] {
-    const tz = 'Asia/Ulaanbaatar';
 
-    // '9|10|13' эсвэл ['9','10','13']
-    const flat =
-      times.length === 1 &&
-      typeof times[0] === 'string' &&
-      times[0].includes('|')
-        ? times[0].split('|')
-        : times;
-
-    const parsed = flat
-      .map((s) => Number(String(s).trim()))
-      .filter((n) => Number.isFinite(n))
-      .map((n) => Math.floor(n))
-      .filter((n) => n >= 0 && n <= 23);
-
-    const unique = Array.from(new Set(parsed)).sort((a, b) => a - b);
-
-    // --- Өдөр харьцуулах түлхүүр функцууд ---
-    const dayKey = (y: number, m: number, d: number) => y * 10000 + m * 100 + d;
-
-    // NOW: УБ-ийн өнөөдөр/одоо цаг
-    const nowParts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: tz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      hour12: false,
-    }).formatToParts(new Date());
-    const pickNow = (t: string) =>
-      Number(nowParts.find((p) => p.type === t)?.value);
-    const nowKey = dayKey(pickNow('year'), pickNow('month'), pickNow('day'));
-    const nowHour = pickNow('hour');
-
-    // SCHEDULE: UTC өдрийн бүртгэл (YYYY-MM-DD) – time-ийг үл тооцно
-    const schUtcParts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'UTC',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(date);
-    const pickSch = (t: string) =>
-      Number(schUtcParts.find((p) => p.type === t)?.value);
-    const schKey = dayKey(pickSch('year'), pickSch('month'), pickSch('day'));
-
-    // Логик
-    if (schKey < nowKey) return []; // өнгөрсөн өдөр → хоосон
-    if (schKey > nowKey) return unique; // ирээдүй өдөр → бүх цаг OK
-    return unique.filter((n) => n > nowHour); // өнөөдөр → одоогийн цагаас хойш
-  }
-  public async checkSchedule(date: Date, times: string[]) {
-    // 1) Өнөөдөр бол одоогоос хойшихоор шүүсэн хүсэлттэй цагууд
-    const want: number[] = this.normalizeTimes(times, date);
-    const { ymd } = mnDayRange(date);
-    if (want.length === 0) return { date: ymd, overlap: [] };
-    console.log(want, date);
-    const wantSet = new Set(want);
-
-    // 2) Тухайн өдрийн (user_id, "h|h|h") жагсаалт
-    // Ж: [{ user_id: 'u1', times: '8|9' }, { user_id: 'u2', times: '10|11' }]
-    const rows: Array<{ user_id: string; times: string }> =
-      await this.dao.getAvailableTimes(date);
-
-    // 3) User бүрийн times ∩ want = хоосон биш бол л overlap-д нэмнэ
-    const overlap = rows.reduce<
-      Array<{ user_id: string; times: string; date: string }>
-    >((acc, r) => {
-      if (!r?.user_id || !r?.times) return acc;
-
-      const inter = r.times
-        .split('|')
-        .map((s) => Number(s.trim()))
-        .filter((n) => Number.isFinite(n) && wantSet.has(n));
-
-      if (inter.length > 0) {
-        const uniq = Array.from(new Set(inter)).sort((a, b) => a - b);
-        acc.push({ user_id: r.user_id, times: uniq.join('|'), date: ymd });
+  public async checkSchedule(items: Record<string, number[]>[]) {
+    // 1) wants → date -> { hour:1 } lookup болгоно
+    const wantByDate: Record<string, Record<number, 1>> = {};
+    for (let i = 0; i < items.length; i++) {
+      const obj = items[i] || {};
+      for (const key in obj) {
+        if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+        const hours = obj[key] || [];
+        const map: Record<number, 1> = (wantByDate[key] ??= {});
+        for (let j = 0; j < hours.length; j++) {
+          const n = Number(hours[j]);
+          if (Number.isFinite(n)) map[n] = 1;
+        }
       }
-      return acc;
-    }, []);
+    }
 
-    return { overlap };
+    // 2) УБ YMD formatter (DB-ийн date-ийг өдрөөр тааруулахад)
+    const ymdUB = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ulaanbaatar',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+
+    // 3) DB-ээс мөрүүдээ авна (танай findAll логикаар)
+    const rows = await this.findAll(
+      { limit: -1, skip: 0, sort: false, start_date: mnDate() },
+      CLIENT,
+    );
+
+    // 4) user_id -> [{ date: 'YYYY-MM-DD', times: number[] }, ...]
+    const byUser: Record<string, { date: string; times: number[] }[]> = {};
+
+    for (let i = 0; i < rows.items.length; i++) {
+      const r = rows.items[i];
+      if (!r?.user_id) continue;
+      const day = ymdUB(new Date(r.date));
+      const wantHours = wantByDate[day];
+      if (!wantHours) continue; // зөвхөн хүссэн өдрүүд дээр ажиллана
+
+      // r.times: '8|9|10' → [8,9,10], дараа нь wantHours-тай огтлолцол
+      const seen: Record<number, 1> = {};
+      const parts = String(r.times || '')
+        .split('|')
+        .map((s) => Number(String(s).trim()))
+        .filter((n) => Number.isFinite(n) && wantHours[n]);
+
+      for (let k = 0; k < parts.length; k++) seen[parts[k]] = 1;
+      const inter = Object.keys(seen)
+        .map(Number)
+        .sort((a, b) => a - b);
+      const orders = await this.order.findByUserDateTime(r.user_id, day, inter);
+
+      if (orders.length) {
+        (byUser[r.user_id] ??= []).push({ date: day, times: orders });
+      }
+    }
+
+    return { overlap: byUser };
   }
   public async findOne(id: string) {
     return await this.dao.getById(id);

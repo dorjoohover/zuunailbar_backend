@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OrderDetailDao } from './order_detail.dao';
 import { OrderDetailDto } from './order_detail.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
-import { getDefinedKeys, STATUS } from 'src/base/constants';
+import { CLIENT, getDefinedKeys, STATUS } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 

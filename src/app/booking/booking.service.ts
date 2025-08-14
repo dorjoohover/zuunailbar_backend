@@ -52,7 +52,7 @@ export class BookingService {
           status: STATUS.Active,
 
           date: targetDate,
-          times: parts.length ? parts.join('|') : '', // "" хадгална
+          times: parts.length ? parts.join('|') : null,
           start_time: parts.length ? toTimeString(start) : null,
           end_time: parts.length ? toTimeString(end) : null,
         });
@@ -64,24 +64,43 @@ export class BookingService {
   }
 
   public async findClient(pg: PaginationDto) {
+    const date = mnDate();
     const res = await this.dao.list(
-      applyDefaultStatusFilter({ ...pg, start_date: mnDate() }, CLIENT),
+      applyDefaultStatusFilter({ ...pg, start_date: date, times: -1 }, CLIENT),
     );
     if (!res.items?.length) {
       return { count: 0, items: [] };
     }
     // N мөрийг зэрэг шалгах
-    const checked = await Promise.all(
-      res.items.map(async (r) => {
-        const want = r.times ? r.times.split('|') : [];
-        const { overlap } = await this.schedule.checkSchedule(r.date, want);
-        return overlap.length > 0 ? { ...r, overlap } : null;
+    const items: Record<string, number[]>[] = await Promise.all(
+      res.items.map((r) => {
+        const d = new Date(r.date);
+
+        // 2) нэг өдөр нэмье (UTC-ээр найдвартай)
+        const date = new Date(d);
+        date.setUTCDate(date.getUTCDate() + 1);
+        const key = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Ulaanbaatar',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(date);
+        const times: number[] = (r.times ?? '')
+          .split('|')
+          .map((s) => s.trim())
+          .filter((s) => s !== '')
+          .map((s) => Number(s))
+          .filter((n) => Number.isFinite(n));
+
+        return { [key]: times };
       }),
     );
-    const items = checked.filter((x): x is NonNullable<typeof x> => x !== null);
+
+    const { overlap } = await this.schedule.checkSchedule(items);
+
     return {
       count: items.length,
-      items,
+      items: [{ overlap }],
     };
   }
 

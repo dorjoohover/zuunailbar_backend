@@ -22,6 +22,21 @@ export class UserServiceDao {
     ]);
   }
 
+  async addMany(data: UserService[]) {
+    // Нэг ч мөр байхгүй бол шууд
+    if (!data?.length) return [];
+
+    return await this._db.insertMany(tableName, data, [
+      'id',
+      'service_id',
+      'user_id',
+      'service_name',
+      'user_name',
+      'branch_id',
+      'status',
+    ]);
+  }
+
   async update(data: any, attr: string[]): Promise<number> {
     return await this._db.update(tableName, data, attr, [
       new SqlCondition('id', '=', data.id),
@@ -59,6 +74,12 @@ export class UserServiceDao {
   async getById(id: string) {
     return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "id"=$1`,
+      [id],
+    );
+  }
+  async getByUserId(id: string) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "user_id"=$1`,
       [id],
     );
   }
