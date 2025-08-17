@@ -11,6 +11,7 @@ import { HomeService } from './home.service';
 import { FeatureDto, FeaturesDto, HomeDto, HomesDto } from './home.dto';
 import { ApiParam } from '@nestjs/swagger';
 import { SAP } from 'src/common/decorator/use-param.decorator';
+import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 
 @Controller('home')
 export class HomeController {
@@ -24,7 +25,7 @@ export class HomeController {
   createFeature(@Body() dto: FeaturesDto) {
     return this.homeService.createFeature(dto);
   }
-
+  @Public()
   @Get('web/:route')
   @ApiParam({ name: 'route' })
   findAll(@Param('route') route: string) {
