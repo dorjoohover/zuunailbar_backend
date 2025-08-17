@@ -10,6 +10,7 @@ export class RegisterDto {
   @ApiProperty()
   mobile: string;
   token?: string;
+  otp?: string;
   @ApiProperty()
   password: string;
   title?: string;
@@ -23,4 +24,8 @@ export class ResetPasswordDto {
   mobile: string;
   @ApiProperty()
   otp: string;
+}
+export class OtpDto {
+  @ApiProperty()
+  mobile: string;
 }

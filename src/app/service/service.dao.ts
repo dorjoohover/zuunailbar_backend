@@ -16,6 +16,8 @@ export class ServiceDao {
       'merchant_id',
       'name',
       'min_price',
+      'image',
+      'icon',
       'max_price',
       'duration',
       'description',

@@ -1,6 +1,5 @@
-import { MiddlewareConsumer, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './config/configuration';
 import databaseConfig from './config/database.config';
@@ -34,6 +33,7 @@ import { ProductLogModule } from './app/product_log/product_log.module';
 import { BookingModule } from './app/booking/booking.module';
 import { WarehouseModule } from './app/warehouse/warehouse.module';
 import { ProductWarehouseModule } from './app/product_warehouse/product_warehouse.module';
+import { HomeModule } from './app/home/home.module';
 
 @Module({
   imports: [
@@ -63,7 +63,7 @@ import { ProductWarehouseModule } from './app/product_warehouse/product_warehous
     BookingModule,
     WarehouseModule,
     ProductWarehouseModule,
-
+    HomeModule,
     // .conf
     // timezone = 'Asia/Ulaanbaatar'
     VoucherModule,
@@ -72,7 +72,6 @@ import { ProductWarehouseModule } from './app/product_warehouse/product_warehous
   ],
   controllers: [AppController],
   providers: [
-    AppService,
     FileService,
     FirebaseService,
     {

@@ -14,7 +14,16 @@ export class BadRequest {
   }
 
   get registered() {
-    throw new HttpException('Already registered', HttpStatus.BAD_REQUEST);
+    throw new HttpException(
+      'Бүртгэлтэй хэрэглэгч байна',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+  get OTP_INVALID() {
+    throw new HttpException(
+      'Нэг удаагийн нууц үг буруу байна',
+      HttpStatus.BAD_REQUEST,
+    );
   }
   get STOCK_INSUFFICIENT() {
     throw new HttpException('Үлдэгдэл хүрэлцэхгүй', HttpStatus.BAD_REQUEST);

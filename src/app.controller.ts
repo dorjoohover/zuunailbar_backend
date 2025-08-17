@@ -7,13 +7,16 @@ import {
   Post,
   Req,
   Res,
-  StreamableFile,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { AppService } from './app.service';
 import { Public } from './auth/guards/jwt/jwt-auth-guard';
-import { LoginDto, RegisterDto, ResetPasswordDto } from './auth/auth.dto';
+import {
+  LoginDto,
+  OtpDto,
+  RegisterDto,
+  ResetPasswordDto,
+} from './auth/auth.dto';
 import { AuthService } from './auth/auth.service';
 import { ApiHeader, ApiParam } from '@nestjs/swagger';
 import { BadRequest } from './common/error';
@@ -26,20 +29,15 @@ import { createReadStream, existsSync } from 'fs';
 import * as mime from 'mime-types';
 import { Response } from 'express';
 import { CLIENT } from './base/constants';
+
 @Controller()
 export class AppController {
   private readonly localPath = './uploads';
   constructor(
-    private readonly appService: AppService,
     private readonly authService: AuthService,
     private firebase: FirebaseService,
     private readonly fileService: FileService,
   ) {}
-
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
-  }
 
   @Post('upload')
   @UseInterceptors(FilesInterceptor('files', 8, { storage: memoryStorage() }))
@@ -66,7 +64,9 @@ export class AppController {
     // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
     let merchantId = req.headers['merchant-id'] as string;
     BadRequest.merchantNotFound(merchantId, CLIENT);
-    return await this.authService.register(dto, merchantId);
+    const res = await this.authService.checkOtp(dto.otp);
+    if (res) return await this.authService.register(dto, merchantId);
+    throw new BadRequest().OTP_INVALID;
   }
   @Public()
   @Get('/forget/:mobile')
@@ -81,6 +81,7 @@ export class AppController {
       return false;
     }
   }
+
   @Public()
   @Post('/otp')
   async otp(@Body() dto: ResetPasswordDto) {
@@ -91,6 +92,17 @@ export class AppController {
     } catch (error) {
       return false;
     }
+  }
+  @Public()
+  @Post('/send/otp')
+  async sendOtp(@Body() dto: OtpDto) {
+    // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
+    let user = null;
+    try {
+      user = await this.authService.checkMobile(dto.mobile);
+    } catch (error) {}
+    if (user) throw new BadRequest().registered;
+    return true;
   }
   @Public()
   @Get('/file/:filename')

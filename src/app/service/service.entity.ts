@@ -6,6 +6,9 @@ export class Service {
   public max_price: number;
   public min_price: number;
   public duration: number;
+  public image: string;
+  public icon: string;
+  public description: string;
   public status: number;
   public created_by: string;
   public created_at?: Date;

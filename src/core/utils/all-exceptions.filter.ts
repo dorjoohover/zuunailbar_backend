@@ -19,10 +19,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   catch(exception: Error, host: ArgumentsHost): void {
     const { httpAdapter } = this.httpAdapterHost;
-
     const ctx = host.switchToHttp();
     try {
       const request = ctx.getRequest<Request>();
+      console.log(request);
       if (exception instanceof UnauthorizedException) {
       } else {
         logger.error({

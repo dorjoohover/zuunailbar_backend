@@ -24,6 +24,7 @@ export class ServiceService {
     const res = await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
+
       merchant_id: merchant,
       created_by: user.id,
       status: STATUS.Active,

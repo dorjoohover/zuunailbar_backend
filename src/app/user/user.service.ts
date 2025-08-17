@@ -64,31 +64,47 @@ export class UserService {
   private async hash(password: string) {
     return await bcrypt.hash(password, saltOrRounds);
   }
-  public async register(dto: RegisterDto, merchant: string) {
-    const mobile = MobileFormat(dto.mobile);
-    const res = await this.dao.getByMobile(mobile);
-    if (res.length != 0) throw new BadRequest().registered;
-    const password = await this.hash(dto.password);
-    await this.dao.add({
-      id: AppUtils.uuid4(),
-      status: STATUS.Active,
-      user_status: UserStatus.Active,
-      mobile: mobile,
-      merchant_id: merchant,
-      added_by: null,
-      branch_id: null,
-      birthday: null,
-      description: null,
-      profile_img: null,
-      experience: null,
-      nickname: null,
-      firstname: null,
-      lastname: null,
-      password,
-      role: CLIENT,
-      device: null,
-      branch_name: null,
-    });
+  public async register(
+    dto: RegisterDto,
+    merchant: string,
+  ): Promise<{ id: string; mobile: string }> {
+    try {
+      const mobile = MobileFormat(dto.mobile);
+      let res;
+      try {
+        res = await this.dao.getByMobile(mobile);
+      } catch (error) {
+        res = null;
+      }
+      if (res) throw new BadRequest().registered;
+      const password = await this.hash(dto.password);
+      const id = await this.dao.add({
+        id: AppUtils.uuid4(),
+        status: STATUS.Active,
+        user_status: UserStatus.Active,
+        mobile: mobile,
+        merchant_id: merchant,
+        added_by: null,
+        branch_id: null,
+        birthday: null,
+        description: null,
+        profile_img: null,
+        experience: null,
+        nickname: null,
+        firstname: null,
+        lastname: null,
+        password,
+        role: CLIENT,
+        device: null,
+        branch_name: null,
+      });
+      return {
+        id,
+        mobile,
+      };
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   public async findAll(pg: PaginationDto, role: number) {

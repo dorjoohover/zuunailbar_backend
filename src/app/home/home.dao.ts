@@ -1,53 +1,44 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent, UserStatus } from 'src/base/constants';
+import { isOnlyFieldPresent } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { User } from './user.entity';
-import { MobileFormat } from 'src/common/formatter';
+import { Feature, Home } from './home.entity';
 
-const tableName = 'users';
-
+const tableName = 'homes';
+const feature = 'features';
 @Injectable()
-export class UserDao {
+export class HomeDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: User) {
-    try {
-      const res = await this._db.insert(tableName, data, [
-        'id',
-        'merchant_id',
-        'branch_id',
-        'firstname',
-        'added_by',
-        'lastname',
-        'mobile',
-        'birthday',
-        'password',
-        'experience',
-        'nickname',
-        'profile_img',
-        'role',
-        'status',
-        'device',
-        'user_status',
-        'description',
-        'branch_name',
-      ]);
-      return res;
-    } catch (error) {
-      console.log(error);
-    }
+  async add(data: Home) {
+    return await this._db.insert(tableName, data, [
+      'id',
+      'artist_name',
+      'image',
+      'name',
+      'index',
+      'status',
+    ]);
+  }
+  async addFeature(data: Feature) {
+    return await this._db.insert(feature, data, [
+      'id',
+      'title',
+      'description',
+      'icon',
+      'status',
+    ]);
   }
 
   async update(data: any, attr: string[]): Promise<number> {
-    try {
-      return await this._db.update(tableName, data, attr, [
-        new SqlCondition('id', '=', data.id),
-      ]);
-    } catch (error) {
-      console.log(error);
-      return 0;
-    }
+    return await this._db.update(tableName, data, attr, [
+      new SqlCondition('id', '=', data.id),
+    ]);
+  }
+  async updateFeature(data: any, attr: string[]): Promise<number> {
+    return await this._db.update(feature, data, attr, [
+      new SqlCondition('id', '=', data.id),
+    ]);
   }
 
   async updateTags(data: any): Promise<number> {
@@ -57,36 +48,29 @@ export class UserDao {
     );
   }
 
-  async updateFee(id: string, fee: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
-      [fee, id],
-    );
-  }
-
-  async updateStatus(id: string, status: number): Promise<number> {
+  async updateStatus(id: string, status: number) {
     return await this._db._update(
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
       [status, id],
     );
   }
-
-  async getByMobile(mobile: string) {
-    return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "mobile"=$1`,
-      [mobile],
+  async updateStatusFeature(id: string, status: number) {
+    return await this._db._update(
+      `UPDATE "${feature}" SET "status"=$1 WHERE "id"=$2`,
+      [status, id],
     );
   }
-  async getByDevice(device: string) {
-    return await this._db.select(
-      `SELECT * FROM "${tableName}" WHERE "device"=$1`,
-      [device],
+
+  async getHomeByIndex(index: number) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "index"=$1`,
+      [index],
     );
   }
 
   async getById(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "id"=$1 and status != ${UserStatus.Deleted} `,
+      `SELECT * FROM "${tableName}" WHERE "id"=$1`,
       [id],
     );
   }
@@ -95,45 +79,32 @@ export class UserDao {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
-    if (query.mobile) {
-      query.mobile = `%${query.mobile}%`;
-    }
-    if (query.firstname) {
-      query.firstname = `%${query.firstname}%`;
-    }
-    if (query.lastname) {
-      query.lastname = `%${query.lastname}%`;
-    }
-    if (query.nickname) {
-      query.nickname = `%${query.nickname}%`;
-    }
-    if (query.description) {
-      query.description = `%${query.description}%`;
+
+    const builder = new SqlBuilder(query);
+    const criteria = builder
+      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('LOWER(artist_name)', '=', query.artist_name)
+      .criteria();
+    const sql =
+      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `${query.limit ? `limit ${query.limit}` : ''}` +
+      ` offset ${+query.skip * +(query.limit ?? 0)}`;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+    const count = await this._db.count(countSql, builder.values);
+    const items = await this._db.select(sql, builder.values);
+    return { count, items };
+  }
+  async listFeature(query) {
+    if (query.id) {
+      query.id = `%${query.id}%`;
     }
 
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('description', 'LIKE', query.description)
-      .conditionIfNotEmpty('firstname', 'LIKE', query.firstname)
-      .conditionIfNotEmpty('lastname', 'LIKE', query.lastname)
-      .conditionIfNotEmpty('birthday', '=', query.birthday)
-      .conditionIfNotEmpty('mobile', 'LIKE', query.mobile)
-      .conditionIfNotEmpty('nickname', 'LIKE', query.nickname)
-      .conditionIfNotEmpty(
-        'role',
-        query.role == 35 ? '<=' : '=',
-        query.role == 35 ? 40 : query.role,
-      )
-      .conditionIfNotEmpty(
-        'role',
-        query.role == 35 ? '>=' : '=',
-        query.role == 35 ? 30 : query.role,
-      )
-
       .criteria();
-
     const sql =
       `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +

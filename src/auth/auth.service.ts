@@ -64,7 +64,26 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto, merchant: string) {
-    return await this.userService.register(dto, merchant);
+    const { id, mobile } = await this.userService.register(dto, merchant);
+    const res = {
+      accessToken: this.jwtService.sign({
+        firstname: null,
+        role: CLIENT,
+        lastname: null,
+        phone: mobile,
+        merchant_id: merchant,
+        branch_id: null,
+        id: id,
+      }),
+      firstname: null,
+      role: CLIENT,
+      lastname: null,
+      phone: mobile,
+      merchant_id: merchant,
+      branch_id: null,
+    };
+    console.log(res);
+    return res;
   }
 
   async checkMobile(mobile: string) {
