@@ -31,6 +31,7 @@ export class UserDao {
         'device',
         'user_status',
         'description',
+        'color',
         'branch_name',
       ]);
       return res;
@@ -115,6 +116,8 @@ export class UserDao {
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
+      .conditionIfNotEmpty('user_status', '=', query.user_status)
       .conditionIfNotEmpty('description', 'LIKE', query.description)
       .conditionIfNotEmpty('firstname', 'LIKE', query.firstname)
       .conditionIfNotEmpty('lastname', 'LIKE', query.lastname)

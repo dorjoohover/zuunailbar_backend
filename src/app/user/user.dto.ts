@@ -14,6 +14,8 @@ export class UserDto {
   @ApiProperty()
   role: number;
   @ApiProperty()
+  color: number;
+  @ApiProperty()
   experience: number;
   @ApiProperty()
   nickname: string;

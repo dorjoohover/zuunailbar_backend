@@ -20,4 +20,5 @@ export class User {
   // push notification d heregtei
   public device_token?: string;
   public created_at?: Date;
+  public color: number;
 }

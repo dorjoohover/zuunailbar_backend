@@ -90,7 +90,23 @@ export class OrderService {
   }
 
   public async find(pg: PaginationDto, role: number) {
-    return await this.dao.list(applyDefaultStatusFilter(pg, role));
+    const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
+    const items = await Promise.all(
+      res.items.map(async (item) => {
+        const detail = await this.orderDetail.find(
+          { ...pg, order_id: item.id },
+          role,
+        );
+        return {
+          ...item,
+          details: detail.items,
+        };
+      }),
+    );
+    return {
+      items,
+      count: res.count,
+    };
   }
   public async findByUserDateTime(
     user_id: string,

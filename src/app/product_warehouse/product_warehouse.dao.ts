@@ -76,7 +76,7 @@ export class ProductWarehouseDao {
       .conditionIfNotEmpty('warehouse_id', '=', query.warehouse_id)
       .conditionIfNotEmpty('product_id', '=', query.product_id)
       .conditionIfNotEmpty('status', '=', query.status)
-
+      .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date')
       .criteria();
     const sql =
       `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +

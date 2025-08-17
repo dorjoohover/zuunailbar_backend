@@ -77,7 +77,6 @@ export class ProductLogDao {
       if (query.id) {
         query.id = `%${query.id}%`;
       }
-
       const builder = new SqlBuilder(query);
       const criteria = builder
         .conditionIfNotEmpty('id', 'LIKE', query.id)
@@ -89,7 +88,7 @@ export class ProductLogDao {
         .conditionIfNotEmpty(
           'product_log_status',
           '=',
-          query.transaction_status,
+          query.product_log_status,
         )
         .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date')
         .criteria();

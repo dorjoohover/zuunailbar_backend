@@ -59,6 +59,7 @@ export class UserService {
       branch_id: dto.role === ADMIN ? null : branch_id,
       branch_name: branch_id ? branch.name : null,
       birthday: new Date(dto.birthday),
+      color: dto.color,
     });
   }
   private async hash(password: string) {
@@ -97,6 +98,7 @@ export class UserService {
         role: CLIENT,
         device: null,
         branch_name: null,
+        color: null,
       });
       return {
         id,
