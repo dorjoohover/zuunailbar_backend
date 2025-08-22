@@ -7,14 +7,16 @@ import {
   Param,
   Delete,
   Req,
+  Query,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
-import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiParam } from '@nestjs/swagger';
 import { OrderDto } from './order.dto';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { Admin, Employee } from 'src/auth/guards/role/role.decorator';
+import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'merchant-id',
@@ -42,9 +44,27 @@ export class OrderController {
   }
 
   @Employee()
-  @Patch(':id')
+  @Patch('/update/:id')
   update(@Param('id') id: string, @Body() dto: OrderDto) {
     return this.orderService.update(id, dto);
+  }
+
+  @Public()
+  @Get('callback/:order/:user')
+  @ApiParam({ name: 'order' })
+  async handleCallback(
+    @Query('qpay_payment_id') id: string,
+    @Param('order') order: string,
+    @Param('user') user: string,
+  ): Promise<any> {
+    const res = await this.orderService.checkCallback(user, id, order);
+
+    return res;
+  }
+  @Employee()
+  @Patch('status/:id/:status')
+  updateStatus(@Param('id') id: string, @Param('status') status: string) {
+    return this.orderService.updateStatus(id, +status);
   }
   @Admin()
   @Delete(':id')

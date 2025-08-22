@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import {
   isOnlyFieldPresent,
+  mnDate,
   mnDayRange,
+  OrderStatus,
   ScheduleStatus,
   STATUS,
+  ubDateAt00,
 } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
@@ -59,6 +62,18 @@ export class OrdersDao {
     );
   }
 
+  async updateOrderStatus(id: string, status: number): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "order_status"=$1 WHERE "id"=$2`,
+      [status, id],
+    );
+  }
+  async updatePrePaid(id: string, paid: boolean): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "is_pre_amount_paid"=$1 WHERE "id"=$2`,
+      [paid, id],
+    );
+  }
   async updateStatus(id: string, status: number): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
@@ -79,42 +94,86 @@ export class OrdersDao {
       [id],
     );
   }
+  async getOrders(userId: string) {
+    const today = ubDateAt00(); // moment эсвэл өөр date util
+    const year = today.getUTCFullYear();
+    const month = today.getUTCMonth();
+    const day = today.getUTCDate();
+
+    // Хэрэв өнөөдөр 1-15 бол эхлэл нь 15, эсвэл 16-31 бол эхлэл нь 30
+    let startDate: Date;
+    if (day <= 15) {
+      // тухайн сарын 15
+      startDate = new Date(year, month, 15);
+    } else {
+      // тухайн сарын 30
+      startDate = new Date(year, month, 30);
+    }
+
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 15);
+
+    const sql = `
+    SELECT *
+    FROM ${tableName}
+    WHERE order_status = $1
+      AND user_id = $2
+      AND order_date >= $3
+      AND order_date < $4
+  `;
+
+    return this._db.select(sql, [
+      OrderStatus.Finished,
+      userId,
+      startDate.toISOString().slice(0, 10),
+      endDate.toISOString().slice(0, 10),
+    ]);
+  }
   async checkTimes(filter: {
     user_id: string;
     times: number[];
-    start_date: Date;
-  }) {
-    if (!Array.isArray(filter.times) || filter.times.length === 0) {
-      return { taken_hours: [] as number[] };
-    }
-
-    const { start, end } = mnDayRange(filter.start_date);
+    start_date: string; // 'YYYY-MM-DD'
+  }): Promise<number[]> {
+    const wanted = Array.from(
+      new Set((filter.times ?? []).map(Number).filter(Number.isFinite)),
+    ).sort((a, b) => a - b);
+    if (wanted.length === 0) return [];
 
     const sql = `
-    SELECT ARRAY(
-      SELECT DISTINCT EXTRACT(HOUR FROM "start_time")::int
-      FROM "${tableName}"
-      WHERE "order_date" >= $1 AND "order_date" < $2
-        AND EXTRACT(HOUR FROM "start_time")::int = ANY($3::int[])
-        AND status = $4
-        AND order_status = $5
-        AND user_id = $6
-    ) AS taken_hours
+    WITH wanted AS (
+      SELECT unnest($2::int[]) AS h
+    )
+    SELECT COALESCE(array_agg(DISTINCT w.h ORDER BY w.h), '{}'::int[]) AS taken_hours
+    FROM wanted w
+    JOIN "${tableName}" o
+      ON  o.user_id = $5
+      AND o.order_date = $1::date
+      AND o.status = $3
+      AND o.order_status <= $4
+      -- [start, end) завсарт багтсан цагийг барина
+      AND (
+        (
+          o.end_time IS NOT NULL
+          AND EXTRACT(HOUR FROM o.start_time)::int <= w.h
+          AND w.h < EXTRACT(HOUR FROM o.end_time)::int
+        )
+        OR (
+          o.end_time IS NULL
+          AND EXTRACT(HOUR FROM o.start_time)::int = w.h
+        )
+      )
   `;
 
     const row = await this._db.selectOne(sql, [
-      start,
-      end,
-      filter.times.map(Number),
-      STATUS.Active,
-      STATUS.Active,
-      filter.user_id,
+      filter.start_date, // $1 ::date
+      wanted, // $2 ::int[]
+      STATUS.Active, // $3
+      OrderStatus.Started, // $4  <-- өмнө нь энд Active явж байсан (алдаа)
+      filter.user_id, // $5
     ]);
-    return Array.isArray(row?.taken_hours)
-      ? row.taken_hours.map(Number).filter(Number.isFinite)
-      : [];
-  }
 
+    return row?.taken_hours ?? [];
+  }
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;

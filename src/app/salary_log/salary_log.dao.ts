@@ -64,6 +64,17 @@ export class SalaryLogDao {
     );
   }
 
+  async getByDate(userId: string, date: string) {
+    const sql = `
+      SELECT *
+      FROM ${tableName}
+      WHERE user_id = $1
+        AND date >= $2
+    `;
+
+    return this._db.select(sql, [userId, date]);
+  }
+
   async list(query) {
     //  nemne
     if (query.id) {

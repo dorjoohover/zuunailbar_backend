@@ -85,12 +85,10 @@ export class BookingDao {
       }
 
       const builder = new SqlBuilder(query);
-      const start_date = query.start_date
-        ? query.start_date.toISOString().slice(0, 10)
-        : query.start_date;
-      const end_date = query.end_date
-        ? query.end_date.toISOString().slice(0, 10)
-        : query.end_date;
+      const start_date = query.start_date;
+
+      const end_date = query.end_date;
+
       const criteria = builder
         .conditionIfNotEmpty('id', 'LIKE', query.id)
         .conditionIfNotEmpty('approved_by', '=', query.approved_by)
@@ -99,7 +97,7 @@ export class BookingDao {
         .conditionIfNotEmpty('booking_status', '=', query.booking_status)
         .conditionIfNotEmpty('date', '=', query.date)
         .conditionIfDateBetweenValues(start_date, end_date, 'date')
-        .conditionIsNotNull('times')
+        // .conditionIsNotNull('times')
         .criteria();
       const sql =
         `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +

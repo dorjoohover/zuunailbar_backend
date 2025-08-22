@@ -73,12 +73,6 @@ export class ScheduleController {
   }
 
   @SAP()
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: ScheduleDto) {
-    return this.scheduleService.update(id, dto);
-  }
-
-  @SAP()
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.scheduleService.remove(id);

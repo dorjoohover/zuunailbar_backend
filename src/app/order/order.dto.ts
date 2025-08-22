@@ -17,6 +17,8 @@ export class OrderDto {
   @ApiProperty()
   customer_desc: string;
   @ApiProperty()
+  branch_name: string;
+  @ApiProperty()
   discount_type: number;
   @ApiProperty()
   discount: number;

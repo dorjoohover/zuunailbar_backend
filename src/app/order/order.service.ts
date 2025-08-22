@@ -8,6 +8,7 @@ import {
   DISCOUNT,
   getDefinedKeys,
   mnDate,
+  OrderStatus,
   STATUS,
   toTimeString,
 } from 'src/base/constants';
@@ -16,6 +17,7 @@ import { OrderDetailService } from '../order_detail/order_detail.service';
 import { ServiceService } from '../service/service.service';
 import { start } from 'repl';
 import { Order } from './order.entity';
+import { QpayService } from './qpay.service';
 
 @Injectable()
 export class OrderService {
@@ -23,6 +25,7 @@ export class OrderService {
     private readonly dao: OrdersDao,
     private readonly orderDetail: OrderDetailService,
     private readonly service: ServiceService,
+    private qpay: QpayService,
   ) {}
   private addDays(d: Date, days: number) {
     const x = new Date(d);
@@ -63,7 +66,7 @@ export class OrderService {
       paid_amount: dto.paid_amount ?? null,
       pre_amount: 10000,
       is_pre_amount_paid: true,
-      order_status: STATUS.Active,
+      order_status: OrderStatus.Pending,
       status: STATUS.Active,
       user_desc: null,
     } as const;
@@ -81,8 +84,13 @@ export class OrderService {
         }),
       ),
     );
-
-    return { id: order.id };
+    const invoice = await this.qpay.createInvoice(
+      10000,
+      order.id,
+      customerId,
+      dto.branch_name,
+    );
+    return { id: order.id, invoice };
   }
 
   async findOne(id: string) {
@@ -108,6 +116,12 @@ export class OrderService {
       count: res.count,
     };
   }
+
+  public async getOrders(user: string) {
+    const res = await this.dao.getOrders(user);
+    return res;
+  }
+
   public async findByUserDateTime(
     user_id: string,
     date: string,
@@ -115,7 +129,7 @@ export class OrderService {
   ) {
     const takenHours = await this.dao.checkTimes({
       user_id,
-      start_date: mnDate(new Date(date)),
+      start_date: date,
       times,
     });
     if (takenHours.length === 0) {
@@ -136,8 +150,27 @@ export class OrderService {
   public async update(id: string, dto: OrderDto) {
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }
+  public async updateStatus(id: string, status: OrderStatus) {
+    return await this.dao.updateOrderStatus(id, status);
+  }
+  public async updatePrePaid(id: string, paid: boolean) {
+    return await this.dao.updatePrePaid(id, paid);
+  }
 
   public async remove(id: string) {
     return await this.dao.updateStatus(id, STATUS.Hidden);
+  }
+
+  public async checkCallback(user: string, id: string, order_id: string) {
+    const res = await this.qpay.getInvoice(id);
+
+    if (res.status === 'PAID') {
+      try {
+        await this.dao.getById(order_id);
+        await this.updateStatus(order_id, OrderStatus.Active);
+      } catch (error) {
+        throw error;
+      }
+    }
   }
 }

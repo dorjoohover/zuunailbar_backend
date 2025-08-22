@@ -12,17 +12,43 @@ import {
   AppDBTooManyResultException,
 } from '../db/app.db.exceptions';
 import { logger } from './logger';
+import { Request } from 'express';
+import { FileErrorLogService } from 'src/error-log.service';
 
 @Catch(Error)
 export class AllExceptionsFilter implements ExceptionFilter {
-  constructor(private readonly httpAdapterHost: HttpAdapterHost) {}
+  constructor(
+    private readonly httpAdapterHost: HttpAdapterHost,
+    private readonly fileLog: FileErrorLogService,
+  ) {}
 
-  catch(exception: Error, host: ArgumentsHost): void {
+  async catch(exception: Error, host: ArgumentsHost) {
     const { httpAdapter } = this.httpAdapterHost;
     const ctx = host.switchToHttp();
     try {
       const request = ctx.getRequest<Request>();
-      console.log(request);
+      let status = 500;
+      let message = 'Internal server error';
+
+      if (exception instanceof HttpException) {
+        status = exception.getStatus();
+        message = exception.message as string;
+      } else if (exception instanceof Error) {
+        message = exception.message;
+      }
+      if (message != 'Forbidden resource' && status != 404 && status != 400) {
+        await this.fileLog.log({
+          ts: new Date().toISOString(),
+          status,
+          message,
+          name: exception.name,
+          stack: exception.stack,
+          method: (request as any)?.method,
+          url: (request as any)?.url,
+          ip: (request as any)?.ip ?? '',
+          user: (request as any)?.user ?? undefined,
+        });
+      }
       if (exception instanceof UnauthorizedException) {
       } else {
         logger.error({

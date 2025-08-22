@@ -18,6 +18,8 @@ import { BadRequest } from 'src/common/error';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { CLIENT } from 'src/base/constants';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'merchant-id',
@@ -34,11 +36,11 @@ export class BranchController {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
     return await this.branchService.create(dto, user.merchant.id);
   }
-
+  @Public()
   @Get()
   @PQ(['status'])
-  findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
-    return this.branchService.find(pg, user.user.role);
+  findAll(@Pagination() pg: PaginationDto) {
+    return this.branchService.find(pg, CLIENT);
   }
 
   @Get(':id')

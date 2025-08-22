@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ScheduleDao } from './schedule.dao';
-import { ScheduleDto } from './schedule.dto';
+import { ScheduleDto, UpdateScheduleDto } from './schedule.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
@@ -23,8 +23,6 @@ export class ScheduleService {
     private readonly order: OrderService,
   ) {}
   public async create(dto: ScheduleDto, branch: string, user: User) {
-    const base = startOfISOWeek(new Date(dto.date)); // Энэ 7 хоногийн Даваа
-
     const weekTimes = Array.from({ length: 7 }, (_, i) => dto.times?.[i] ?? '');
 
     await Promise.all(
@@ -35,25 +33,37 @@ export class ScheduleService {
           .map(Number)
           .filter((n) => Number.isFinite(n))
           .sort((a, b) => a - b);
+        const schedules = await this.dao.getByUser(
+          dto.user_id,
 
+          idx,
+        );
         const start = parts[0];
         const end = parts[parts.length - 1];
-
-        const targetDate = new Date(base);
-        targetDate.setDate(base.getDate() + idx); // 0=Даваа, 1=Мягмар, ...
-
-        await this.dao.add({
-          ...dto,
-          id: AppUtils.uuid4(),
-          branch_id: branch,
-          approved_by: user.id,
-          schedule_status: ScheduleStatus.Active,
-          status: STATUS.Active,
-          date: targetDate,
-          times: parts.length ? parts.join('|') : null, // "" хадгална
-          start_time: parts.length ? toTimeString(start) : null,
-          end_time: parts.length ? toTimeString(end) : null,
-        });
+        if (schedules.length > 0) {
+          await this.update(schedules?.[0].id, {
+            ...dto,
+            branch_id: branch,
+            approved_by: user.id,
+            index: idx,
+            times: parts.length ? parts.join('|') : null, // "" хадгална
+            start_time: parts.length ? toTimeString(start) : null,
+            end_time: parts.length ? toTimeString(end) : null,
+          });
+        } else {
+          await this.dao.add({
+            ...dto,
+            id: AppUtils.uuid4(),
+            branch_id: branch,
+            approved_by: user.id,
+            schedule_status: ScheduleStatus.Active,
+            status: STATUS.Active,
+            index: idx,
+            times: parts.length ? parts.join('|') : null, // "" хадгална
+            start_time: parts.length ? toTimeString(start) : null,
+            end_time: parts.length ? toTimeString(end) : null,
+          });
+        }
       }),
     );
   }
@@ -62,72 +72,102 @@ export class ScheduleService {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
 
-  public async checkSchedule(items: Record<string, number[]>[]) {
-    // 1) wants → date -> { hour:1 } lookup болгоно
-    const wantByDate: Record<string, Record<number, 1>> = {};
-    for (let i = 0; i < items.length; i++) {
-      const obj = items[i] || {};
-      for (const key in obj) {
-        if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
-        const hours = obj[key] || [];
-        const map: Record<number, 1> = (wantByDate[key] ??= {});
-        for (let j = 0; j < hours.length; j++) {
-          const n = Number(hours[j]);
-          if (Number.isFinite(n)) map[n] = 1;
-        }
+  public async checkSchedule(
+    items: Record<string, string | number[] | number>[],
+  ): Promise<
+    Record<string, { date: string; times: number[]; index: number }[]>
+  > {
+    console.log(items);
+    const wantByDay = new Map<number, { date: string; hours: Set<number> }>();
+
+    for (const obj of items) {
+      for (const k in obj) {
+        if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+        const [dateStr, dayStr] = String(k).split('|');
+        const day = Number(dayStr);
+        if (!Number.isFinite(day)) continue;
+
+        const raw = obj[k] as unknown;
+        let hours: number[] = [];
+        if (Array.isArray(raw)) hours = raw.map(Number);
+        else if (typeof raw === 'string')
+          hours = raw.split('|').map((s) => Number(s.trim()));
+        else if (typeof raw === 'number') hours = [raw];
+
+        // Бохир утгуудыг шүүх
+        hours = hours
+          .filter((n) => Number.isFinite(n))
+          .map((n) => Math.trunc(n));
+
+        const entry = wantByDay.get(day) ?? {
+          date: dateStr,
+          hours: new Set<number>(),
+        };
+        for (const h of hours) entry.hours.add(h);
+        // date нь зөвхөн буцаахад хэрэглэгдэнэ (хамгийн сүүлийн/эхнийхийг хадгалж болно)
+        entry.date = dateStr || entry.date;
+        wantByDay.set(day, entry);
       }
     }
 
-    // 2) УБ YMD formatter (DB-ийн date-ийг өдрөөр тааруулахад)
-    const ymdUB = (d: Date) =>
-      new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Ulaanbaatar',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(d);
+    // 2) Буцаах бүтэц
+    const byUser: Record<
+      string,
+      { date: string; times: number[]; index: number }[]
+    > = {};
 
-    // 3) DB-ээс мөрүүдээ авна (танай findAll логикаар)
-    const rows = await this.findAll(
-      { limit: -1, skip: 0, sort: false, start_date: mnDate() },
-      CLIENT,
-    );
+    // 3) Өдөр бүр artist-уудын ээлжийг аваад, хүссэн цагтай огтлолцуулах
+    for (const [day, info] of wantByDay) {
+      // Тухайн "day" индексийн бүх мөрийг нэг дор авна (N+1-ийг багасгана)
+      const rows = await this.findAll(
+        { limit: -1, skip: 0, sort: false, index: day },
+        CLIENT,
+      );
+      const artists = Array.isArray(rows?.items) ? rows.items : [];
 
-    // 4) user_id -> [{ date: 'YYYY-MM-DD', times: number[] }, ...]
-    const byUser: Record<string, { date: string; times: number[] }[]> = {};
+      // — Artist бүрийн боломжит цагийг олж, захиалгатай давхардлыг хасах ажлыг зэрэгцээ гүйцэтгэнэ
+      await Promise.all(
+        artists.map(async (r: any) => {
+          const userId = r?.user_id;
+          if (!userId) return;
 
-    for (let i = 0; i < rows.items.length; i++) {
-      const r = rows.items[i];
-      if (!r?.user_id) continue;
-      const day = ymdUB(new Date(r.date));
-      const wantHours = wantByDate[day];
-      if (!wantHours) continue; // зөвхөн хүссэн өдрүүд дээр ажиллана
+          // Artist-ийн ажиллах цагууд: '8|9|10' → [8,9,10]
+          const artistHours = String(r?.times ?? '')
+            .split('|')
+            .map((s: string) => Number(String(s).trim()))
+            .filter((n: number) => Number.isFinite(n));
+          // Хүссэн цаг (want) ∩ Artist цаг (shift)
+          const artistSet = new Set<number>(artistHours);
+          const candidate = [...info.hours].filter((h) => artistSet.has(h));
+          if (candidate.length === 0) return;
+          candidate.sort((a, b) => a - b);
 
-      // r.times: '8|9|10' → [8,9,10], дараа нь wantHours-тай огтлолцол
-      const seen: Record<number, 1> = {};
-      const parts = String(r.times || '')
-        .split('|')
-        .map((s) => Number(String(s).trim()))
-        .filter((n) => Number.isFinite(n) && wantHours[n]);
+          // Захиалгатай (booked) цагуудыг олж, candidate-оос хасна
+          // findByUserDateTime(userId, day, times[]) нь тухайн user-ийн тухайн өдөр захиалгатай цагуудыг буцаана гэж үзэж байна
+          const booked: number[] = await this.order.findByUserDateTime(
+            userId,
+            info.date,
+            candidate,
+          );
+          const bookedSet = new Set<number>((booked ?? []).map(Number));
 
-      for (let k = 0; k < parts.length; k++) seen[parts[k]] = 1;
-      const inter = Object.keys(seen)
-        .map(Number)
-        .sort((a, b) => a - b);
-      const orders = await this.order.findByUserDateTime(r.user_id, day, inter);
-
-      if (orders.length) {
-        (byUser[r.user_id] ??= []).push({ date: day, times: orders });
-      }
+          const available = candidate.filter((h) => bookedSet.has(h));
+          if (available.length === 0) return;
+          (byUser[userId] ??= []).push({
+            date: info.date, // date нь зөвхөн мэдээллийн зорилгоор
+            times: available, // зөвхөн боломжтой цагууд
+            index: day, // тухайн өдрийн индекс
+          });
+        }),
+      );
     }
-
-    return { overlap: byUser };
+    return byUser;
   }
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }
 
-  public async update(id: string, dto: ScheduleDto) {
+  public async update(id: string, dto: UpdateScheduleDto) {
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }
 

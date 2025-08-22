@@ -15,6 +15,7 @@ export class RegisterDto {
   password: string;
   title?: string;
   body?: string;
+  percent?: number;
 }
 
 export class ResetPasswordDto {

@@ -65,9 +65,11 @@ export class BookingService {
 
   public async findClient(pg: PaginationDto) {
     const date = mnDate();
+    console.log(date)
     const res = await this.dao.list(
       applyDefaultStatusFilter({ ...pg, start_date: date, times: -1 }, CLIENT),
     );
+    console.log(res);
     if (!res.items?.length) {
       return { count: 0, items: [] };
     }
@@ -75,16 +77,15 @@ export class BookingService {
     const items: Record<string, number[]>[] = await Promise.all(
       res.items.map((r) => {
         const d = new Date(r.date);
-
-        // 2) нэг өдөр нэмье (UTC-ээр найдвартай)
+        if (r.times == null) return;
         const date = new Date(d);
-        date.setUTCDate(date.getUTCDate() + 1);
         const key = new Intl.DateTimeFormat('en-CA', {
           timeZone: 'Asia/Ulaanbaatar',
           year: 'numeric',
           month: '2-digit',
           day: '2-digit',
         }).format(date);
+        const day = date.getUTCDay();
         const times: number[] = (r.times ?? '')
           .split('|')
           .map((s) => s.trim())
@@ -92,11 +93,11 @@ export class BookingService {
           .map((s) => Number(s))
           .filter((n) => Number.isFinite(n));
 
-        return { [key]: times };
+        return { [`${key}|${day}`]: times };
       }),
     );
 
-    const { overlap } = await this.schedule.checkSchedule(items);
+    const overlap = await this.schedule.checkSchedule(items);
 
     return {
       count: items.length,

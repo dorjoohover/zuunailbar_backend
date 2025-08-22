@@ -34,6 +34,9 @@ import { BookingModule } from './app/booking/booking.module';
 import { WarehouseModule } from './app/warehouse/warehouse.module';
 import { ProductWarehouseModule } from './app/product_warehouse/product_warehouse.module';
 import { HomeModule } from './app/home/home.module';
+import { ScheduleModule as CronModule } from '@nestjs/schedule';
+import { TasksService } from './task.service';
+import { FileErrorLogService } from './error-log.service';
 
 @Module({
   imports: [
@@ -42,7 +45,7 @@ import { HomeModule } from './app/home/home.module';
       envFilePath: `.env.${process.env.NODE_ENV || 'local'}`,
       load: [configuration, databaseConfig],
     }),
-
+    CronModule.forRoot(),
     AppDbModule,
     AuthModule,
     AdminUserModule,
@@ -74,6 +77,8 @@ import { HomeModule } from './app/home/home.module';
   providers: [
     FileService,
     FirebaseService,
+    FileErrorLogService,
+    TasksService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

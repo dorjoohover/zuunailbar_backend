@@ -16,6 +16,7 @@ export class User {
   public profile_img: string;
   public nickname: string;
   public experience: number;
+  public percent: number;
   public branch_name: string;
   // push notification d heregtei
   public device_token?: string;

@@ -13,6 +13,7 @@ import {
   getDefinedKeys,
   mnDate,
   STATUS,
+  ubDateAt00,
   usernameFormatter,
 } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
@@ -68,7 +69,7 @@ export class UserProductService {
           branch_id: user.branch_id,
           status: STATUS.Active,
           product_name: product.name,
-          date: dto.date ?? mnDate(),
+          date: dto.date ?? ubDateAt00(),
           user_name: usernameFormatter(user),
         });
       }),

@@ -60,6 +60,7 @@ export class UserService {
       branch_name: branch_id ? branch.name : null,
       birthday: new Date(dto.birthday),
       color: dto.color,
+      percent: null,
     });
   }
   private async hash(password: string) {
@@ -99,6 +100,7 @@ export class UserService {
         device: null,
         branch_name: null,
         color: null,
+        percent: dto.percent ?? 30,
       });
       return {
         id,
@@ -156,5 +158,8 @@ export class UserService {
 
   public async updateStatus(id: string) {
     return await this.dao.updateStatus(id, STATUS.Hidden);
+  }
+  public async updatePercent(id: string, percent: number) {
+    return await this.dao.updatePercent(id, percent);
   }
 }

@@ -30,6 +30,9 @@ export class SalaryLogService {
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }
+  public async findDate(id: string, date: string) {
+    return await this.dao.getByDate(id, date);
+  }
 
   public async update(id: string, dto: SalaryLogDto) {
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));

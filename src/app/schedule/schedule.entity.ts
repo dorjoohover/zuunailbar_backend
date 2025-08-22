@@ -3,7 +3,7 @@ export class Schedule {
   public user_id: string;
   public approved_by: string;
   public branch_id: string;
-  public date: Date;
+  public index: number;
   public start_time: string;
   public end_time: string;
   public status: number;

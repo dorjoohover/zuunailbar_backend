@@ -15,7 +15,7 @@ export class ScheduleDao {
       'id',
       'user_id',
       'approved_by',
-      'date',
+      'index',
       'start_time',
       'end_time',
       'branch_id',
@@ -53,10 +53,10 @@ export class ScheduleDao {
     );
   }
 
-  async getByMobile(mobile: string) {
+  async getByUser(user_id: string, date: number) {
     return await this._db.select(
-      `SELECT * FROM "${tableName}" WHERE "mobile"=$1`,
-      [mobile],
+      `SELECT * FROM "${tableName}" WHERE "user_id"=$1 and "index"=$2`,
+      [user_id, date],
     );
   }
 
@@ -98,12 +98,7 @@ export class ScheduleDao {
       if (query.end_time) {
         query.end_time = `%${query.end_time}%`;
       }
-      const start_date = query.start_date
-        ? query.start_date.toISOString().slice(0, 10)
-        : query.start_date;
-      const end_date = query.end_date
-        ? query.end_date.toISOString().slice(0, 10)
-        : query.end_date;
+
       const builder = new SqlBuilder(query);
       const criteria = builder
         .conditionIfNotEmpty('id', 'LIKE', query.id)
@@ -113,7 +108,7 @@ export class ScheduleDao {
         .conditionIfNotEmpty('schedule_status', '=', query.schedule_status)
         .conditionIfNotEmpty('date', '=', query.date)
         .conditionIfNotEmpty('user_id', '=', query.user_id)
-        .conditionIfDateBetweenValues(start_date, end_date, 'date')
+        .conditionIfNotEmpty('index', '=', query.index)
         .conditionIsNotNull('times')
         .criteria();
       const sql =

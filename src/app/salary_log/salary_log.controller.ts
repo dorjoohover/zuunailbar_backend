@@ -15,13 +15,14 @@ import { Admin, Employee } from 'src/auth/guards/role/role.decorator';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { Cron } from '@nestjs/schedule';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'merchant-id',
   description: 'Merchant ID',
   required: true,
 })
-@Controller('salary-log')
+@Controller('salary_log')
 export class SalaryLogController {
   constructor(private readonly salaryLogService: SalaryLogService) {}
   @Admin()

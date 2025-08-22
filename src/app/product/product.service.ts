@@ -11,6 +11,7 @@ import {
   mnDate,
   PRODUCT_STATUS,
   STATUS,
+  ubDateAt00,
 } from 'src/base/constants';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { BadRequest } from 'src/common/error';
@@ -51,7 +52,7 @@ export class ProductService {
   }
 
   private generateReferenceCodeByDate(index: number): string {
-    const now = mnDate();
+    const now = ubDateAt00();
 
     const yyyy = now.getFullYear();
     const MM = String(now.getMonth() + 1).padStart(2, '0');

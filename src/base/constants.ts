@@ -74,13 +74,47 @@ export const firstLetterUpper = (value: string) => {
   return `${value.substring(0, 1).toUpperCase()}${value.substring(1)}`;
 };
 
-export const mnDate = (d = new Date()): Date => {
-  const now = new Date(d);
-  const mongoliaTime = new Date(
-    now.toLocaleString('en-US', { timeZone: 'Asia/Ulaanbaatar' }),
-  );
-  return mongoliaTime;
-};
+const fmtUB = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Ulaanbaatar',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+function getUBOffsetMinutes(d: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ulaanbaatar',
+    timeZoneName: 'shortOffset',
+    hour: '2-digit',
+  }).formatToParts(d);
+  const name =
+    parts.find((p) => p.type === 'timeZoneName')?.value || 'UTC+08:00';
+  const m = name.match(/([+-]\d{1,2})(?::?(\d{2}))?/); // +8, +08:00, -09:30 гэх мэт
+  if (!m) return 8 * 60;
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2] || '0', 10);
+  return hh * 60 + Math.sign(hh) * mm;
+}
+export function mnDate(d: Date | string | number = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ulaanbaatar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(d));
+}
+export function ubDateAt00(d: Date | string | number = new Date()): Date {
+  const ymd = mnDate(d);
+  const [Y, M, D] = ymd.split('-').map(Number);
+  // Тухайн өдрийн UB оффсет (DST тооцно)
+  const offsetMin = getUBOffsetMinutes(new Date(Date.UTC(Y, M - 1, D, 12)));
+  // UB 00:00 → UTC millis
+  const utcMs = Date.UTC(Y, M - 1, D, 0, 0, 0) - offsetMin * 60_000;
+  return new Date(utcMs);
+}
 export function getMnParts(d = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: MN_TZ,
@@ -165,6 +199,18 @@ export enum STATUS {
   Active = 10,
   Pending = 20,
   Hidden = 30,
+}
+export enum OrderStatus {
+  // uridchilgaa toloogui
+  Pending = 10,
+  // uridchilgaa tolson
+  Active = 20,
+  // uilchilgee ehelsen
+  Started = 30,
+  // duussan
+  Finished = 40,
+  // tsutsalsan
+  Cancelled = 50,
 }
 export enum COST_STATUS {
   Paid = 10,

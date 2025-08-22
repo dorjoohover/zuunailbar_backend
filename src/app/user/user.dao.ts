@@ -71,6 +71,12 @@ export class UserDao {
       [status, id],
     );
   }
+  async updatePercent(id: string, percent: number): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "percent"=$1 WHERE "id"=$2`,
+      [percent, id],
+    );
+  }
 
   async getByMobile(mobile: string) {
     return await this._db.selectOne(
@@ -111,7 +117,7 @@ export class UserDao {
     if (query.description) {
       query.description = `%${query.description}%`;
     }
-
+    query.limit == -1 ? query.limit = undefined : query.limit
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
