@@ -111,7 +111,10 @@ export class ProductDao {
     let nameCondition = ``;
     if (filter.id) {
       filter.id = `%${filter.id.toLowerCase()}%`;
-      nameCondition = ` OR LOWER("name") LIKE $1`;
+    }
+    if (filter.name) {
+      nameCondition = ` LOWER("name") LIKE $1`;
+      filter.name = `%${filter.name.toLowerCase()}%`;
     }
 
     const builder = new SqlBuilder(filter);
@@ -119,6 +122,7 @@ export class ProductDao {
       .conditionIfNotEmpty('merchant_id', '=', filter.merchant)
       .conditionIfNotEmpty('status', '=', filter.status)
       .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.id)
+      .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.name)
       .criteria();
 
     return await this._db.select(

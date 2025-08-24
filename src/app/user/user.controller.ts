@@ -19,6 +19,7 @@ import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { ADMIN, CLIENT, MANAGER } from 'src/base/constants';
 import { SAP, SAQ } from 'src/common/decorator/use-param.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { RegisterDto } from 'src/auth/auth.dto';
 
 @ApiBearerAuth('access-token')
 @Controller('user')
@@ -41,7 +42,7 @@ export class UserController {
   @Manager()
   async create(@Body() dto: UserDto, @Req() { user }) {
     BadRequest.merchantNotFound(user?.merchant, user.user.role);
-    if (dto.role >= MANAGER)
+    if (dto.role >= MANAGER && dto.role < CLIENT)
       BadRequest.branchNotFound(user?.branch, user.user.role);
 
     return await this.userService.create(
