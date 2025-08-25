@@ -41,7 +41,7 @@ export class UserController {
   @Manager()
   async create(@Body() dto: UserDto, @Req() { user }) {
     BadRequest.merchantNotFound(user?.merchant, user.user.role);
-    if (dto.role >= MANAGER)
+    if (dto.role >= MANAGER && dto.role < CLIENT)
       BadRequest.branchNotFound(user?.branch, user.user.role);
 
     return await this.userService.create(
