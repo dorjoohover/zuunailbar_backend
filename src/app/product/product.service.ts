@@ -23,43 +23,32 @@ export class ProductService {
     private brandService: BrandService,
     private categoryService: CategoryService,
   ) {}
-  public async create(dto: ProductDto, merchant: string) {
-    await Promise.all(
-      Array.from({ length: +dto.quantity - +dto.color }, (_, i) => i).map(
-        async (l, i) => {
-          const start = +dto.color + i;
-
-          const count = await this.dao.count();
-          const ref = this.generateReferenceCodeByDate(count);
-          let brand = null,
-            category = null;
-          try {
-            if (dto.brand_id)
-              brand = (await this.brandService.getById(dto.brand_id)).name;
-            if (dto.category_id)
-              category = (await this.categoryService.getById(dto.category_id))
-                .name;
-          } catch (error) {
-            console.log(error);
-          }
-          await this.dao.add({
-            ...dto,
-            id: AppUtils.uuid4(),
-            merchant_id: merchant,
-            brand_id: dto.brand_id ?? null,
-            ref: ref,
-            status: PRODUCT_STATUS.Active,
-            brand_name: brand,
-            price: 0,
-            quantity: 0,
-            name: `${dto.name} ${start}`,
-            category_name: category,
-            color: null,
-            type: category?.type ?? CategoryType.DEFAULT,
-          });
-        },
-      ),
-    );
+   public async create(dto: ProductDto, merchant: string) {
+    const count = await this.dao.count();
+    const ref = this.generateReferenceCodeByDate(count);
+    let brand = null,
+      category = null;
+    try {
+      if (dto.brand_id)
+        brand = (await this.brandService.getById(dto.brand_id)).name;
+      if (dto.category_id)
+        category = (await this.categoryService.getById(dto.category_id)).name;
+    } catch (error) {
+      console.log(error);
+    }
+    await this.dao.add({
+      ...dto,
+      id: AppUtils.uuid4(),
+      merchant_id: merchant,
+      brand_id: dto.brand_id ?? null,
+      ref: ref,
+      status: PRODUCT_STATUS.Active,
+      brand_name: brand,
+      price: 0,
+      quantity: 0,
+      category_name: category,
+      type: category?.type ?? CategoryType.DEFAULT,
+    });
   }
 
   private generateReferenceCodeByDate(index: number): string {
