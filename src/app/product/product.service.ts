@@ -23,7 +23,7 @@ export class ProductService {
     private brandService: BrandService,
     private categoryService: CategoryService,
   ) {}
-  public async create(dto: ProductDto, merchant: string) {
+   public async create(dto: ProductDto, merchant: string) {
     const count = await this.dao.count();
     const ref = this.generateReferenceCodeByDate(count);
     let brand = null,
