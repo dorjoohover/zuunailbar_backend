@@ -11,6 +11,10 @@ export class UserDto {
   birthday: string;
   @ApiProperty()
   password: string;
+  id: string;
+  @ApiProperty()
+  branch_id: string;
+  branch_name?: string;
   @ApiProperty()
   role: number;
   @ApiProperty()

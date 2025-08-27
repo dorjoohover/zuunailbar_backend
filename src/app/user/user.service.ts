@@ -21,6 +21,7 @@ import * as bcrypt from 'bcrypt';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { RegisterDto } from 'src/auth/auth.dto';
 import { BranchService } from '../branch/branch.service';
+import { P } from 'src/common/const/app.const';
 @Injectable()
 export class UserService {
   constructor(
@@ -46,6 +47,7 @@ export class UserService {
     if (res != null) throw new BadRequest().registered;
     let branch;
     if (branch_id) branch = await this.branchService.findOne(branch_id);
+    if (dto.branch_id) branch = await this.branchService.findOne(dto.branch_id);
     const password = await this.hash(dto.password);
     await this.dao.add({
       ...dto,
@@ -145,15 +147,19 @@ export class UserService {
     await this.dao.update(body, getDefinedKeys(body));
   }
   public async update(id: string, dto: UserDto) {
-    let password;
-    if (dto.password) {
-      password = await bcrypt.hash(dto.password, saltOrRounds);
+    let body = dto;
+    body.id = id;
+    if (body.password) {
+      body.password = await bcrypt.hash(dto.password, saltOrRounds);
     }
-
-    return await this.dao.update(
-      dto.password ? { ...dto, id, password } : { ...dto, id },
-      getDefinedKeys(dto),
-    );
+    if (body.branch_id) {
+      try {
+        body.branch_name = (
+          await this.branchService.findOne(body.branch_id)
+        ).name;
+      } catch (error) {}
+    }
+    return await this.dao.update(body, getDefinedKeys(body));
   }
 
   public async updateStatus(id: string) {
