@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderDetailDto } from '../order_detail/order_detail.dto';
+import { IsDateString, IsEnum, IsOptional } from 'class-validator';
 
 export class OrderDto {
   @ApiProperty()
@@ -24,4 +25,28 @@ export class OrderDto {
   discount: number;
   @ApiProperty({ isArray: true })
   details: OrderDetailDto[];
+}
+
+
+export enum ReportFormat {
+  XLSX = 'xlsx',
+  CSV = 'csv',
+}
+export class PaymentReportQueryDto {
+  @ApiProperty({ example: '2025-08-01', description: 'Эхлэх огноо (YYYY-MM-DD)' })
+  @IsDateString()
+  from!: string;
+
+  @ApiProperty({ example: '2025-08-29', description: 'Дуусах огноо (YYYY-MM-DD)' })
+  @IsDateString()
+  to!: string;
+
+  @ApiPropertyOptional({ example: 'card', description: 'Төлбөрийн арга (шүүлтүүр)' })
+  @IsOptional()
+  method?: string;
+
+  @ApiPropertyOptional({ enum: ReportFormat, default: ReportFormat.XLSX })
+  @IsOptional()
+  @IsEnum(ReportFormat)
+  format?: ReportFormat = ReportFormat.XLSX;
 }

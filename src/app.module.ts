@@ -37,6 +37,7 @@ import { HomeModule } from './app/home/home.module';
 import { ScheduleModule as CronModule } from '@nestjs/schedule';
 import { TasksService } from './task.service';
 import { FileErrorLogService } from './error-log.service';
+import { ReportService } from './report.service';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { FileErrorLogService } from './error-log.service';
     FirebaseService,
     FileErrorLogService,
     TasksService,
+    ReportService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

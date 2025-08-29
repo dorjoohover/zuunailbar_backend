@@ -8,6 +8,7 @@ import {
 import { setupSwagger } from './config/swagger';
 import { useContainer } from 'class-validator';
 import { LoggingInterceptor } from './common/logging.interceptor';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -17,6 +18,8 @@ async function bootstrap() {
   app.enableCors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   });
+  app.use(json({ limit: '20mb' }));
+  app.use(urlencoded({ extended: true, limit: '20mb' }));
   app.useGlobalPipes(
     new ValidationPipe({
       exceptionFactory: (validationErrors: ValidationError[] = []) => {
