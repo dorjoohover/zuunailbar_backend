@@ -40,7 +40,12 @@ export class AppController {
   ) {}
 
   @Post('upload')
-  @UseInterceptors(FilesInterceptor('files', 8, { storage: memoryStorage() }))
+  @UseInterceptors(
+    FilesInterceptor('files', 8, {
+      storage: memoryStorage(),
+      limits: { fileSize: 200 * 1024 * 1024, files: 8 },
+    }),
+  )
   async multiFileUploadS3(@UploadedFiles() files: Express.Multer.File[]) {
     const urls = await this.fileService.processMultipleImages(files);
     return { files: urls };
