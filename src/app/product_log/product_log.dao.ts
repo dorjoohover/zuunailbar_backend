@@ -15,6 +15,7 @@ export class ProductLogDao {
       return await this._db.insert(tableName, data, [
         'id',
         'product_id',
+      'paid_amount',
         'quantity',
         'price',
         'total_amount',

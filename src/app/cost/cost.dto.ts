@@ -9,5 +9,7 @@ export class CostDto {
   @ApiProperty()
   price: number;
   @ApiProperty()
+  paid_amount: number;
+  @ApiProperty()
   cost_status: number;
 }

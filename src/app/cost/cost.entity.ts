@@ -7,6 +7,7 @@ export class Cost {
   public product_name: string;
   public date: Date;
   public price: number;
+  public paid_amount: number;
   public status: number;
   public cost_status: number;
   public created_at?: Date;

@@ -10,6 +10,8 @@ export class ProductLogDto {
   @ApiProperty()
   total_amount: number;
   @ApiProperty()
+  paid_amount: number;
+  @ApiProperty()
   currency: string;
   @ApiProperty()
   currency_amount: number;

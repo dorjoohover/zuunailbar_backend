@@ -4,7 +4,7 @@ import { CostDao } from './cost.dao';
 import { Branch } from '../branch/branch.entity';
 import { ProductService } from '../product/product.service';
 import { AppUtils } from 'src/core/utils/app.utils';
-import { getDefinedKeys, STATUS } from 'src/base/constants';
+import { CostStatus, getDefinedKeys, STATUS } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 
@@ -16,12 +16,15 @@ export class CostService {
   ) {}
   public async create(dto: CostDto, branch: Branch) {
     const product = await this.productService.findOne(dto.product_id);
+    const price = dto.price ?? 0;
+    const paid = dto.paid_amount ?? 0;
     await this.dao.add({
       ...dto,
       branch_id: branch.id,
       branch_name: branch.name,
       category_id: product.category_id,
       id: AppUtils.uuid4(),
+      cost_status: price - paid != 0 ? CostStatus.Remainder : CostStatus.Paid,
       product_name: product.name,
       status: STATUS.Active,
     });

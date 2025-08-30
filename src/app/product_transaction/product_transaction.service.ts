@@ -26,7 +26,7 @@ export class ProductTransactionService {
       created_by: user,
       status: STATUS.Active,
       price: dto.price ?? 0,
-      total_amount: dto.price ?? 0,
+      total_amount: dto.total_amount ?? 0,
       user_id: dto.user_id ?? null,
     });
   }

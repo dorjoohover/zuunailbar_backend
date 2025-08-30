@@ -16,6 +16,7 @@ export class CostDao {
       'category_id',
       'branch_id',
       'branch_name',
+      'paid_amount',
       'product_id',
       'product_name',
       'status',

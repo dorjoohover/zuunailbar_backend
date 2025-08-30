@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ProductLogDao } from './product_log.dao';
 import { ProductLogDto } from './product_log.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
-import { getDefinedKeys, STATUS } from 'src/base/constants';
+import { getDefinedKeys, PRODUCT_LOG_STATUS, STATUS } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { ProductService } from '../product/product.service';
@@ -15,6 +15,8 @@ export class ProductLogService {
   ) {}
   public async create(dto: ProductLogDto, merchant: string, user: string) {
     await this.product.updateQuantity(dto.product_id, dto.quantity);
+    const total_amount = dto.total_amount ?? 0;
+    const paid_amount = dto.paid_amount ?? 0;
     await this.dao.add({
       ...dto,
       merchant_id: merchant,
@@ -22,7 +24,12 @@ export class ProductLogService {
       created_by: user,
       status: STATUS.Active,
       // total_amount: dto.total_amount ?? +dto.price * +dto.quantity,
-      total_amount: dto.total_amount ?? 0,
+      total_amount: total_amount,
+      paid_amount: paid_amount,
+      product_log_status:
+        total_amount - paid_amount == 0
+          ? PRODUCT_LOG_STATUS.Bought
+          : PRODUCT_LOG_STATUS.Remainder,
       price: dto.price ?? 0,
       currency: dto.currency ?? 'CNY',
       currency_amount: 500,

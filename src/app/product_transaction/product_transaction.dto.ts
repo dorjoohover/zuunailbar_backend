@@ -12,5 +12,7 @@ export class ProductTransactionDto {
   @ApiProperty()
   total_amount: number;
   @ApiProperty()
+  paid_amount: number;
+  @ApiProperty()
   product_transaction_status: number;
 }

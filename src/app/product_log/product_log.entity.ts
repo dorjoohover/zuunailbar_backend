@@ -9,6 +9,7 @@ export class ProductLog {
   public currency: string;
   public currency_amount: number;
   public total_amount: number;
+  public paid_amount: number;
   public date: Date;
   public status: STATUS;
   public product_log_status: PRODUCT_LOG_STATUS;

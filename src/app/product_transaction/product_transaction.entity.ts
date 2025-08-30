@@ -6,6 +6,7 @@ export class ProductTransaction {
   public quantity: number;
   public price: number;
   public total_amount: number;
+  public paid_amount: number;
   public status: number;
   public product_transaction_status: number;
   public created_by: string;
