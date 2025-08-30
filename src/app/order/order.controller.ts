@@ -27,8 +27,9 @@ import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { Admin, Employee } from 'src/auth/guards/role/role.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
-import { ReportService } from 'src/report.service';
+import { ExcelService } from 'src/excel.service';
 import { Response } from 'express';
+import { CLIENT } from 'src/base/constants';
 
 const COLS: any[] = [
   { header: 'Date', key: 'date', width: 14 },
@@ -46,7 +47,7 @@ const COLS: any[] = [
 export class OrderController {
   constructor(
     private readonly orderService: OrderService,
-    private report: ReportService,
+    private excel: ExcelService,
   ) {}
 
   @Post()
@@ -64,60 +65,37 @@ export class OrderController {
   findOne(@Param('id') id: string) {
     return this.orderService.findOne(id);
   }
-  private async *reportRows(q: {
-    from: Date;
-    to: Date;
-    method?: string;
-  }): AsyncGenerator {
-    // ↓ Энд бодит aggregation / query-гээ хийнэ
-    // for await (const r of stream) yield mapToPaymentRow(r);
+  // private async *reportRows(q: {
+  //   from: Date;
+  //   to: Date;
+  //   method?: string;
+  // }): AsyncGenerator {
+  //   // ↓ Энд бодит aggregation / query-гээ хийнэ
+  //   // for await (const r of stream) yield mapToPaymentRow(r);
 
-    yield {
-      date: '2025-08-01',
-      method: q.method ?? 'card',
-      orders: 12,
-      amount: 1_500_000,
-    };
-    yield {
-      date: '2025-08-02',
-      method: q.method ?? 'card',
-      orders: 18,
-      amount: 2_100_000,
-    };
-  }
+  //   yield {
+  //     date: '2025-08-01',
+  //     method: q.method ?? 'card',
+  //     orders: 12,
+  //     amount: 1_500_000,
+  //   };
+  //   yield {
+  //     date: '2025-08-02',
+  //     method: q.method ?? 'card',
+  //     orders: 18,
+  //     amount: 2_100_000,
+  //   };
+  // }
 
   @Public()
   @Get('report')
-  @ApiOperation({ summary: 'Payments report татах (CSV/XLSX)' })
-  @ApiProduces(
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/csv',
-  )
-  @ApiOkResponse({
-    description: 'File download (CSV/XLSX)',
-    // Swagger UI-д “Download file” товч гаргахаар binary schema заана.
-    schema: { type: 'string', format: 'binary' },
-  })
-  @ApiBadRequestResponse({ description: 'from/to дутуу' })
-  async reports(@Query() q: PaymentReportQueryDto, @Res() res: Response) {
-    if (!q.from || !q.to) {
-      return res.status(HttpStatus.BAD_REQUEST).send('from/to заавал');
-    }
-
-    const rows = this.reportRows({
-      from: new Date(q.from),
-      to: new Date(q.to),
-      method: q.method,
-    });
-
-    const fname = `payments_${q.from}_${q.to}.${q.format ?? ReportFormat.XLSX}`;
-    if (q.format === ReportFormat.CSV) {
-      return this.report.csvFromIterable(res, fname, COLS, rows);
-    }
-    return this.report.xlsxFromIterable(res, fname, COLS, rows, {
-      sheetName: 'Payments',
-      moneyKeys: ['amount'],
-    });
+  @PQ()
+  async reports(
+    @Pagination() pg: PaginationDto,
+    @Req() { user },
+    @Res() res: Response,
+  ) {
+    return await this.orderService.report(pg, CLIENT, res);
   }
 
   @Employee()

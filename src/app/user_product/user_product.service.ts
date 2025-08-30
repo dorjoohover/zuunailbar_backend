@@ -31,38 +31,12 @@ export class UserProductService {
 
     const userId = dto.items[0].user_id;
 
-    // 🔍 Нэг удаа хэрэглэгч болон түүний авсан бүтээгдэхүүнүүдийг авна
     const user = await this.userService.findOne(userId);
-    const userProducts = await this.dao.getByUser(userId, STATUS.Active);
 
-    // ✅ Тухайн хэрэглэгчид ирж буй шинэ DTO жагсаалтаас ID-ууд
-    const dtoProductIds = new Set(dto.items.map((i) => i.product_id));
-
-    // 🧹 DTO-д байхгүй бүх хуучин бүтээгдэхүүнийг нуух
-    const removedProducts = userProducts.filter(
-      (up) => !dtoProductIds.has(up.product_id),
-    );
-    await Promise.all(
-      removedProducts.map((rp) => this.updateStatus(rp.id, STATUS.Hidden)),
-    );
-
-    // 🔁 Бүх шинэ болон хуучин бүтээгдэхүүнийг боловсруулж update эсвэл add хийх
     const results = await Promise.all(
       dto.items.map(async (item) => {
         const product = await this.productService.findOne(item.product_id);
 
-        const existing = userProducts.find(
-          (up) => up.product_id === item.product_id,
-        );
-
-        if (existing) {
-          return this.update(existing.id, {
-            quantity: item.quantity,
-            user_product_status: item.user_product_status,
-          });
-        }
-
-        // 🆕 Add
         return this.dao.add({
           ...item,
           id: AppUtils.uuid4(),
@@ -74,12 +48,12 @@ export class UserProductService {
         });
       }),
     );
-
     return results;
   }
 
   public async findAll(pg: PaginationDto, role: number) {
-    return await this.dao.list(applyDefaultStatusFilter(pg, role));
+    const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
+    return res
   }
 
   public async findOne(id: string) {
@@ -87,7 +61,6 @@ export class UserProductService {
   }
 
   public async update(id: string, dto: UpdateUserProductDto) {
-    console.log(id);
     return await this.dao.update({ ...dto, id, updated_at: mnDate() }, [
       ...getDefinedKeys(dto),
       'updated_at',

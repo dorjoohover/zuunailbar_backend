@@ -174,7 +174,7 @@ export class OrdersDao {
 
     return row?.taken_hours ?? [];
   }
-  async list(query) {
+  async list(query, columns?: string) {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -192,7 +192,7 @@ export class OrdersDao {
 
       .criteria();
     const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${columns ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
@@ -200,6 +200,7 @@ export class OrdersDao {
     const items = await this._db.select(sql, builder.values);
     return { count, items };
   }
+  
 
   async search(filter: any): Promise<any[]> {
     let nameCondition = ``;

@@ -53,7 +53,7 @@ export class UserProductsDao {
   async updateStatus(id: string, status: number): Promise<number> {
     try {
       return await this._db._update(
-        `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
+        `UPDATE "${tableName}" SET "user_product_status"=$1 WHERE "id"=$2`,
         [status, id],
       );
     } catch (error) {

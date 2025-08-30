@@ -225,6 +225,11 @@ export enum SALARY_LOG_STATUS {
   Pending = 10,
   Paid = 20,
 }
+
+export const SalaryLogValue = {
+  [SALARY_LOG_STATUS.Pending] : 'Өгөөгүй',
+  [SALARY_LOG_STATUS.Paid] : 'Өгсөн',
+}
 export enum PRODUCT_TRANSACTION_STATUS {
   Used = 10,
   Sold = 20,

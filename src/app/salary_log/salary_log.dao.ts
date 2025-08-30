@@ -75,7 +75,7 @@ export class SalaryLogDao {
     return this._db.select(sql, [userId, date]);
   }
 
-  async list(query) {
+  async list(query, cols?: string) {
     //  nemne
     if (query.id) {
       query.id = `%${query.id}%`;
@@ -90,7 +90,7 @@ export class SalaryLogDao {
 
       .criteria();
     const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;

@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Req,
+  Res,
 } from '@nestjs/common';
 import { SalaryLogService } from './salary_log.service';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
@@ -16,6 +17,9 @@ import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { Cron } from '@nestjs/schedule';
+import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { CLIENT } from 'src/base/constants';
+import { Response } from 'express';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'merchant-id',
@@ -37,9 +41,19 @@ export class SalaryLogController {
     return this.salaryLogService.findAll(pg, user.user.role);
   }
   @Employee()
-  @Get(':id')
+  @Get('get/:id')
   findOne(@Param('id') id: string) {
     return this.salaryLogService.findOne(id);
+  }
+  @Public()
+  @Get('report')
+  @PQ()
+  async reports(
+    @Pagination() pg: PaginationDto,
+    @Req() { user },
+    @Res() res: Response,
+  ) {
+    return await this.salaryLogService.report(pg, CLIENT, res);
   }
 
   @Admin()

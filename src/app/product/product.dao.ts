@@ -70,7 +70,7 @@ export class ProductDao {
     );
   }
 
-  async list(query) {
+  async list(query, cols?: string) {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -90,7 +90,7 @@ export class ProductDao {
       .conditionIfNotEmpty('status', '=', query.status)
       .criteria();
     const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by GREATEST("quantity", 0) DESC NULLS LAST, LOWER("name") ASC,   created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
@@ -118,12 +118,18 @@ export class ProductDao {
     }
 
     const builder = new SqlBuilder(filter);
-    const criteria = builder
+    builder
       .conditionIfNotEmpty('merchant_id', '=', filter.merchant)
       .conditionIfNotEmpty('status', '=', filter.status)
-      .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.id)
-      .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.name)
-      .criteria();
+      .orConditions([
+        new SqlCondition('LOWER("name")', 'LIKE', filter.name),
+        new SqlCondition('LOWER("name")', 'LIKE', filter.id),
+        new SqlCondition('LOWER("brand_name")', 'LIKE', filter.name),
+        new SqlCondition('LOWER("brand_name")', 'LIKE', filter.id),
+        new SqlCondition('LOWER("category_name")', 'LIKE', filter.name),
+        new SqlCondition('LOWER("category_name")', 'LIKE', filter.id),
+      ]);
+    const criteria = builder.criteria();
 
     return await this._db.select(
       `SELECT "id", 

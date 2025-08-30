@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Req,
+  Res,
 } from '@nestjs/common';
 import { ProductWarehouseService } from './product_warehouse.service';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
@@ -18,6 +19,9 @@ import { Admin, Employee, Manager } from 'src/auth/guards/role/role.decorator';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { Response } from 'express';
+import { CLIENT } from 'src/base/constants';
 @ApiBearerAuth('access-token')
 @Controller('product_warehouse')
 export class ProductWarehouseController {
@@ -37,9 +41,19 @@ export class ProductWarehouseController {
     return this.productWarehouseService.findAll({ ...pg }, user.user.role);
   }
   @Employee()
-  @Get(':id')
+  @Get('get/:id')
   findOne(@Param('id') id: string) {
     return this.productWarehouseService.findOne(id);
+  }
+  @Public()
+  @Get('report')
+  @PQ()
+  async reports(
+    @Pagination() pg: PaginationDto,
+    @Req() { user },
+    @Res() res: Response,
+  ) {
+    return await this.productWarehouseService.report(pg, CLIENT, res);
   }
 
   @Manager()

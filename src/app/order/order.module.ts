@@ -8,7 +8,8 @@ import { OrderDetailModule } from '../order_detail/order_detail.module';
 import { ServiceModule } from '../service/service.module';
 import { QpayService } from './qpay.service';
 import { HttpModule } from '@nestjs/axios';
-import { ReportService } from 'src/report.service';
+import { ExcelService } from 'src/excel.service';
+import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
@@ -17,9 +18,10 @@ import { ReportService } from 'src/report.service';
     OrderDetailModule,
     ServiceModule,
     HttpModule,
+    UserModule,
   ],
   controllers: [OrderController],
-  providers: [OrderService, OrdersDao, QpayService, ReportService],
+  providers: [OrderService, OrdersDao, QpayService, ExcelService],
   exports: [OrderService],
 })
 export class OrderModule {}

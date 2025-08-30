@@ -37,13 +37,13 @@ import { HomeModule } from './app/home/home.module';
 import { ScheduleModule as CronModule } from '@nestjs/schedule';
 import { TasksService } from './task.service';
 import { FileErrorLogService } from './error-log.service';
-import { ReportService } from './report.service';
+import { ExcelService } from './excel.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: `.env.${process.env.NODE_ENV || 'local'}`,
+      envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
       load: [configuration, databaseConfig],
     }),
     CronModule.forRoot(),
@@ -80,7 +80,7 @@ import { ReportService } from './report.service';
     FirebaseService,
     FileErrorLogService,
     TasksService,
-    ReportService,
+    ExcelService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

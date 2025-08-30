@@ -44,7 +44,7 @@ export class UserProductController {
     return this.userProductService.findAll(
       {
         ...pg,
-        user_id: (pg.user_id ?? user.user.role > ADMIN) ? user.user.id : null,
+        user_id: pg.user_id ?? (user.user.role > ADMIN ? user.user.id : null),
       },
       user.user.role,
     );

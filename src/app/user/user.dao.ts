@@ -117,9 +117,9 @@ export class UserDao {
     if (query.description) {
       query.description = `%${query.description}%`;
     }
-    query.limit == -1 ? query.limit = undefined : query.limit
+    query.limit == -1 ? (query.limit = undefined) : query.limit;
     const builder = new SqlBuilder(query);
-    const criteria = builder
+    builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
@@ -128,8 +128,8 @@ export class UserDao {
       .conditionIfNotEmpty('firstname', 'LIKE', query.firstname)
       .conditionIfNotEmpty('lastname', 'LIKE', query.lastname)
       .conditionIfNotEmpty('birthday', '=', query.birthday)
-      .conditionIfNotEmpty('mobile', 'LIKE', query.mobile)
-      .conditionIfNotEmpty('nickname', 'LIKE', query.nickname)
+      // .conditionIfNotEmpty('mobile', 'LIKE', query.mobile)
+      // .conditionIfNotEmpty('nickname', 'LIKE', query.nickname)
       .conditionIfNotEmpty(
         'role',
         query.role == 35 ? '<=' : '=',
@@ -139,9 +139,14 @@ export class UserDao {
         'role',
         query.role == 35 ? '>=' : '=',
         query.role == 35 ? 30 : query.role,
-      )
-
-      .criteria();
+      );
+    if (query.mobile) {
+      builder.orConditions([
+        new SqlCondition('mobile', 'LIKE', query.mobile),
+        new SqlCondition('nickname', 'LIKE', query.mobile),
+      ]);
+    }
+    const criteria = builder.criteria();
 
     const sql =
       `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +

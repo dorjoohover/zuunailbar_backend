@@ -8,6 +8,7 @@ import {
   Delete,
   Req,
   Query,
+  Res,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { ProductDto } from './product.dto';
@@ -18,6 +19,9 @@ import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { SAQ } from 'src/common/decorator/use-param.decorator';
+import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { Response } from 'express';
+import { CLIENT } from 'src/base/constants';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'merchant-id',
@@ -57,6 +61,16 @@ export class ProductController {
       },
       user.merchant.id,
     );
+  }
+  @Public()
+  @Get('report')
+  @PQ()
+  async reports(
+    @Pagination() pg: PaginationDto,
+    @Req() { user },
+    @Res() res: Response,
+  ) {
+    return await this.productService.report(pg, CLIENT, res);
   }
   @Admin()
   @Patch(':id')

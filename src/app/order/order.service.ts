@@ -6,11 +6,13 @@ import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
   CLIENT,
   DISCOUNT,
+  firstLetterUpper,
   getDefinedKeys,
   mnDate,
   OrderStatus,
   STATUS,
   toTimeString,
+  usernameFormatter,
 } from 'src/base/constants';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { OrderDetailService } from '../order_detail/order_detail.service';
@@ -18,6 +20,10 @@ import { ServiceService } from '../service/service.service';
 import { start } from 'repl';
 import { Order } from './order.entity';
 import { QpayService } from './qpay.service';
+import { ExcelService } from 'src/excel.service';
+import { Response } from 'express';
+import { UserService } from '../user/user.service';
+import { MobileParser } from 'src/common/formatter';
 
 @Injectable()
 export class OrderService {
@@ -25,6 +31,8 @@ export class OrderService {
     private readonly dao: OrdersDao,
     private readonly orderDetail: OrderDetailService,
     private readonly service: ServiceService,
+    private readonly user: UserService,
+    private excel: ExcelService,
     private qpay: QpayService,
   ) {}
   private addDays(d: Date, days: number) {
@@ -122,6 +130,95 @@ export class OrderService {
     return res;
   }
 
+  public async report(pg: PaginationDto, role: number, res: Response) {
+    const selectCols = [
+      'id',
+      'user_id',
+      'customer_id',
+      'order_date',
+      'end_time',
+      'discount',
+      'discount_type',
+      'start_time',
+      'total_amount',
+    ];
+
+    // 1) үндсэн жагсаалт
+    const { items } = await this.dao.list(
+      applyDefaultStatusFilter(pg, role),
+      selectCols.join(','),
+    );
+
+    // 2) user/customer-уудыг багцлаад авах (боломжтой бол findManyByIds ашигла)
+    const userIds = Array.from(
+      new Set(items.map((x) => x.user_id).filter(Boolean)),
+    );
+    const customerIds = Array.from(
+      new Set(items.map((x) => x.customer_id).filter(Boolean)),
+    );
+
+    const [usersArr, customersArr] = await Promise.all([
+      Promise.all(userIds.map((id) => this.user.findOne(id))),
+      Promise.all(customerIds.map((id) => this.user.findOne(id))),
+    ]);
+
+    const usersMap = new Map(
+      usersArr.filter(Boolean).map((u: any) => [u.id, u]),
+    );
+    const customersMap = new Map(
+      customersArr.filter(Boolean).map((c: any) => [c.id, c]),
+    );
+
+    // 3) мөрүүдээ бэлдэх
+    type Row = {
+      artist: string;
+      customer: string;
+      customerName: string;
+      order: Date | string;
+      time: string;
+      timeEnd: number;
+      discountType: number;
+      discount: number;
+      amount: number;
+    };
+
+    const rows: Row[] = items.map((it: any) => {
+      const u = usersMap.get(it.user_id);
+      const c = customersMap.get(it.customer_id);
+
+      return {
+        artist: usernameFormatter(u) ?? '',
+        customer: c?.mobile ? MobileParser(c.mobile) : '',
+        customerName: usernameFormatter(c),
+        order: it.order_date ? new Date(it.order_date) : '',
+        time: it.start_time ?? '',
+        timeEnd: it.end_time ?? '',
+        discountType: it.discount_type,
+        discount: it.discount,
+        amount: Number(it.total_amount ?? 0),
+      };
+    });
+
+    // 4) Excel баганууд
+    const cols = [
+      { header: 'Artist', key: 'artist', width: 24 },
+      { header: 'Customer', key: 'customer', width: 18 },
+      { header: 'Customer name', key: 'customerName', width: 18 },
+      { header: 'Order', key: 'order', width: 14 }, // date
+      { header: 'Time', key: 'time', width: 10 },
+      { header: 'Time end', key: 'timeEnd', width: 10 },
+      { header: 'Discount Type', key: 'discountType', width: 10 },
+      { header: 'Discount', key: 'discount', width: 10 },
+      { header: 'Amount', key: 'amount', width: 16 }, // money
+    ];
+
+    // 5) Excel рүү стримлэж буулгах
+    return this.excel.xlsxFromIterable(res, 'order', cols as any, rows as any, {
+      sheetName: 'Orders',
+      moneyKeys: ['amount', 'discount'],
+      dateKeys: ['order'],
+    });
+  }
   public async findByUserDateTime(
     user_id: string,
     date: string,

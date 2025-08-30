@@ -15,15 +15,18 @@ import {
 } from 'src/base/constants';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { BadRequest } from 'src/common/error';
+import { ExcelService } from 'src/excel.service';
+import { Response } from 'express';
 
 @Injectable()
 export class ProductService {
   constructor(
     private readonly dao: ProductDao,
     private brandService: BrandService,
+    private excel: ExcelService,
     private categoryService: CategoryService,
   ) {}
-   public async create(dto: ProductDto, merchant: string) {
+  public async create(dto: ProductDto, merchant: string) {
     const count = await this.dao.count();
     const ref = this.generateReferenceCodeByDate(count);
     let brand = null,
@@ -73,6 +76,66 @@ export class ProductService {
       merchant,
       status: STATUS.Active,
     });
+  }
+
+  public async report(pg: PaginationDto, role: number, res: Response) {
+    const selectCols = [
+      'id',
+      'brand_name',
+      'category_name',
+      'name',
+      'quantity',
+      'price',
+    ];
+
+    // 1) үндсэн жагсаалт
+    const { items } = await this.dao.list(
+      applyDefaultStatusFilter(pg, role),
+      selectCols.join(','),
+    );
+    
+
+    // 2) user/customer-уудыг багцлаад авах (боломжтой бол findManyByIds ашигла)
+
+    // 3) мөрүүдээ бэлдэх
+    type Row = {
+      brand: string;
+      category: string;
+      name: string;
+      quantity: number;
+      price: number;
+    };
+
+    const rows: Row[] = items.map((it: any) => {
+      return {
+        name: it.name,
+        brand: it.brand_name,
+        category: it.category_name,
+        price: it.price,
+        quantity: it.quantity,
+      };
+    });
+
+    // 4) Excel баганууд
+    const cols = [
+      { header: 'Name', key: 'name', width: 24 },
+      { header: 'Brand', key: 'brand', width: 16 },
+      { header: 'Category', key: 'category', width: 16 },
+      { header: 'Price', key: 'price', width: 16 },
+      { header: 'Quantity', key: 'quantity', width: 16 },
+    ];
+
+    // 5) Excel рүү стримлэж буулгах
+    return this.excel.xlsxFromIterable(
+      res,
+      'product',
+      cols as any,
+      rows as any,
+      {
+        sheetName: 'Products',
+        moneyKeys: ['price'],
+      },
+    );
   }
 
   public async findOne(id: string) {

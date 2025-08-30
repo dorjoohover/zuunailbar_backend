@@ -65,7 +65,7 @@ export class ProductWarehouseDao {
     );
   }
 
-  async list(query) {
+  async list(query, cols?: string) {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -79,7 +79,7 @@ export class ProductWarehouseDao {
       .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date')
       .criteria();
     const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
