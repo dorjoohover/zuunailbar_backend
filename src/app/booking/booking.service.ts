@@ -10,6 +10,7 @@ import {
   startOfISOWeek,
   STATUS,
   toTimeString,
+  ubDateAt00,
 } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
@@ -26,10 +27,44 @@ export class BookingService {
 
     // dto.times урт нь 7 биш байж болно → 7 болгож дүүргэнэ
     const weekTimes = Array.from({ length: 7 }, (_, i) => dto.times?.[i] ?? '');
-
+    const date = ubDateAt00(base);
+    const bookings = await this.dao.findByDate(date, merchant, dto.branch_id);
+    if (bookings?.length > 0) {
+      await Promise.all(
+        bookings.map(async (booking, index) => {
+          const parts = String(weekTimes[index])
+            .split('|')
+            .filter(Boolean)
+            .map(Number)
+            .filter((n) => Number.isFinite(n));
+          const bookingParts = String(booking.times)
+            .split('|')
+            .filter(Boolean)
+            .map(Number)
+            .filter((n) => Number.isFinite(n));
+          const times = Array.from(new Set([...parts, ...bookingParts])).sort(
+            (a, b) => a - b,
+          );
+          const start = times[0];
+          const end = times[times.length - 1];
+          const payload = {
+            times: times.length ? times.join('|') : null,
+            start_time: times.length ? toTimeString(start) : null,
+            end_time: times.length ? toTimeString(end) : null,
+          };
+          await this.dao.update(
+            { ...payload, id: booking.id },
+            getDefinedKeys(payload),
+          );
+        }),
+      );
+      return;
+    }
+    const targetDate = date;
     await Promise.all(
       weekTimes.map(async (timeLine, idx) => {
         // "8|10|12" -> [8,10,12]
+        console.log(timeLine);
         const parts = String(timeLine)
           .split('|')
           .filter(Boolean)
@@ -39,9 +74,7 @@ export class BookingService {
 
         const start = parts[0];
         const end = parts[parts.length - 1];
-
-        const targetDate = new Date(base);
-        targetDate.setDate(base.getDate() + idx); // 0=Даваа, 1=Мягмар, ...
+        targetDate.setDate(base.getDate() + idx);
 
         await this.dao.add({
           ...dto,
@@ -65,11 +98,9 @@ export class BookingService {
 
   public async findClient(pg: PaginationDto) {
     const date = mnDate();
-    console.log(date)
     const res = await this.dao.list(
       applyDefaultStatusFilter({ ...pg, start_date: date, times: -1 }, CLIENT),
     );
-    console.log(res);
     if (!res.items?.length) {
       return { count: 0, items: [] };
     }

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
+import { isOnlyFieldPresent, mnDate, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Booking } from './booking.entity';
@@ -63,6 +63,21 @@ export class BookingDao {
       [mobile],
     );
   }
+  async findByDate(date: Date, merchant_id: string, branch_id: string) {
+    const d = mnDate(date);
+
+    return await this._db.select(
+      `SELECT id,date, times 
+    FROM "${tableName}" 
+    WHERE "merchant_id"=$1 
+      AND "status"=$2 
+     AND "date" >= $3::date
+     AND "branch_id"=$4
+    ORDER BY "date" ASC
+    LIMIT 7`,
+      [merchant_id, STATUS.Active, d, branch_id],
+    );
+  }
 
   async getById(id: string) {
     return await this._db.selectOne(
@@ -100,7 +115,7 @@ export class BookingDao {
         // .conditionIsNotNull('times')
         .criteria();
       const sql =
-        `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+        `SELECT * FROM "${tableName}" ${criteria} order by date ${query.sort === 'false' ? 'asc' : 'desc'} ` +
         `${query.limit ? `limit ${query.limit}` : ''}` +
         ` offset ${+query.skip * +(query.limit ?? 0)}`;
       const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;

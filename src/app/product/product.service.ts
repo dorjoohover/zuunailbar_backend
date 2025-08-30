@@ -39,6 +39,7 @@ export class ProductService {
     } catch (error) {
       console.log(error);
     }
+
     await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
@@ -50,7 +51,7 @@ export class ProductService {
       price: 0,
       quantity: 0,
       category_name: category,
-      type: category?.type ?? CategoryType.DEFAULT,
+      type: category?.type ?? dto.type ?? CategoryType.DEFAULT,
     });
   }
 
@@ -93,7 +94,6 @@ export class ProductService {
       applyDefaultStatusFilter(pg, role),
       selectCols.join(','),
     );
-    
 
     // 2) user/customer-уудыг багцлаад авах (боломжтой бол findManyByIds ашигла)
 
