@@ -53,11 +53,15 @@ export class ScheduleDao {
     );
   }
 
-  async getByUser(user_id: string, date: number) {
-    return await this._db.select(
-      `SELECT * FROM "${tableName}" WHERE "user_id"=$1 and "index"=$2`,
-      [user_id, date],
-    );
+  async getByUser(user_id: string) {
+    try {
+      return await this._db.select(
+        `SELECT * FROM "${tableName}" WHERE "user_id"=$1 order by index `,
+        [user_id],
+      );
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   async getById(id: string) {

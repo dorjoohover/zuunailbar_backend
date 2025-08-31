@@ -17,6 +17,7 @@ async function bootstrap() {
   app.setGlobalPrefix('/api/v1');
   app.enableCors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    origin: '*',
   });
   app.use(json({ limit: '20mb' }));
   app.use(urlencoded({ extended: true, limit: '20mb' }));
@@ -33,7 +34,7 @@ async function bootstrap() {
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   app.useGlobalInterceptors(new LoggingInterceptor());
   setupSwagger(app);
-  await app.listen(3000);
-  // await app.listen(5000);
+  // await app.listen(3000);
+  await app.listen(5000);
 }
 bootstrap();

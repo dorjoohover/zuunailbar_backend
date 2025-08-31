@@ -54,9 +54,12 @@ export class AppController {
   @Public()
   @Post('/login')
   async login(@Body() dto: LoginDto) {
-    return dto.password
-      ? await this.authService.adminLogin(dto)
-      : await this.authService.login(dto.mobile);
+    return await this.authService.adminLogin(dto);
+  }
+  @Public()
+  @Post('/client/login')
+  async clientLogin(@Body() dto: LoginDto) {
+    return await this.authService.login(dto.mobile);
   }
   @ApiHeader({
     name: 'merchant-id',

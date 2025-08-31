@@ -7,6 +7,7 @@ import { MobileFormat } from 'src/common/formatter';
 import { UserService } from 'src/app/user/user.service';
 import { CLIENT } from 'src/base/constants';
 import { FirebaseService } from 'src/base/firebase.service';
+import { BadRequest } from 'src/common/error';
 
 @Injectable()
 export class AuthService {
@@ -46,9 +47,14 @@ export class AuthService {
 
   async login(mobile: string) {
     // otp
-    const result = await this.userService.findMobile(mobile);
+    let result;
+    try {
+      result = await this.userService.findMobile(mobile);
+    } catch (error) {
+      console.log(error);
+    }
     if (!result) {
-      throw new UnauthorizedException();
+      new BadRequest().notFoundClient;
     }
     return {
       accessToken: this.jwtService.sign({

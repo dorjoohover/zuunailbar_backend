@@ -28,7 +28,9 @@ export class BookingService {
     // dto.times урт нь 7 биш байж болно → 7 болгож дүүргэнэ
     const weekTimes = Array.from({ length: 7 }, (_, i) => dto.times?.[i] ?? '');
     const date = ubDateAt00(base);
+    console.log(date);
     const bookings = await this.dao.findByDate(date, merchant, dto.branch_id);
+    console.log(bookings);
     if (bookings?.length > 0) {
       await Promise.all(
         bookings.map(async (booking, index) => {
@@ -60,11 +62,13 @@ export class BookingService {
       );
       return;
     }
-    const targetDate = date;
+
     await Promise.all(
       weekTimes.map(async (timeLine, idx) => {
         // "8|10|12" -> [8,10,12]
-        console.log(timeLine);
+        const targetDate = new Date(base);
+        targetDate.setHours(0, 0, 0, 0);
+        targetDate.setDate(targetDate.getDate() + idx);
         const parts = String(timeLine)
           .split('|')
           .filter(Boolean)
@@ -74,7 +78,6 @@ export class BookingService {
 
         const start = parts[0];
         const end = parts[parts.length - 1];
-        targetDate.setDate(base.getDate() + idx);
 
         await this.dao.add({
           ...dto,

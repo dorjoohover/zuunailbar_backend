@@ -19,6 +19,9 @@ export class BadRequest {
       HttpStatus.BAD_REQUEST,
     );
   }
+  get notFoundClient() {
+    throw new HttpException('Хэрэглэгч олдсонгүй.', HttpStatus.BAD_REQUEST);
+  }
   get OTP_INVALID() {
     throw new HttpException(
       'Нэг удаагийн нууц үг буруу байна',

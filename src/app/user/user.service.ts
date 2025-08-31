@@ -131,7 +131,7 @@ export class UserService {
   }
 
   public async findMobile(mobile: string) {
-    return await this.dao.getByMobile(MobileFormat(mobile));
+    return await this.dao.getByMobile(mobile);
   }
   public async findOne(id: string) {
     return await this.dao.getById(id);

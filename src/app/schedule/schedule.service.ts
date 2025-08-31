@@ -24,7 +24,40 @@ export class ScheduleService {
   ) {}
   public async create(dto: ScheduleDto, branch: string, user: User) {
     const weekTimes = Array.from({ length: 7 }, (_, i) => dto.times?.[i] ?? '');
-
+    const schedules = await this.dao.getByUser(dto.user_id);
+    if (schedules.length > 0) {
+      await Promise.all(
+        schedules.map(async (schedule, index) => {
+          const parts = String(weekTimes[index])
+            .split('|')
+            .filter(Boolean)
+            .map(Number)
+            .filter((n) => Number.isFinite(n));
+          const bookingParts = String(schedule.times)
+            .split('|')
+            .filter(Boolean)
+            .map(Number)
+            .filter((n) => Number.isFinite(n));
+          const times = Array.from(new Set([...parts, ...bookingParts])).sort(
+            (a, b) => a - b,
+          );
+          const start = times[0];
+          const end = times[times.length - 1];
+          if (times.length > 0) {
+            const payload = {
+              times: times.length ? times.join('|') : null, // "" хадгална
+              start_time: times.length ? toTimeString(start) : null,
+              end_time: times.length ? toTimeString(end) : null,
+            };
+            await this.dao.update(
+              { id: schedule.id, ...payload },
+              getDefinedKeys(payload),
+            );
+          }
+        }),
+      );
+      return;
+    }
     await Promise.all(
       weekTimes.map(async (timeLine, idx) => {
         const parts = String(timeLine)
@@ -33,37 +66,22 @@ export class ScheduleService {
           .map(Number)
           .filter((n) => Number.isFinite(n))
           .sort((a, b) => a - b);
-        const schedules = await this.dao.getByUser(
-          dto.user_id,
 
-          idx,
-        );
         const start = parts[0];
         const end = parts[parts.length - 1];
-        if (schedules.length > 0) {
-          await this.update(schedules?.[0].id, {
-            ...dto,
-            branch_id: branch,
-            approved_by: user.id,
-            index: idx,
-            times: parts.length ? parts.join('|') : null, // "" хадгална
-            start_time: parts.length ? toTimeString(start) : null,
-            end_time: parts.length ? toTimeString(end) : null,
-          });
-        } else {
-          await this.dao.add({
-            ...dto,
-            id: AppUtils.uuid4(),
-            branch_id: branch,
-            approved_by: user.id,
-            schedule_status: ScheduleStatus.Active,
-            status: STATUS.Active,
-            index: idx,
-            times: parts.length ? parts.join('|') : null, // "" хадгална
-            start_time: parts.length ? toTimeString(start) : null,
-            end_time: parts.length ? toTimeString(end) : null,
-          });
-        }
+
+        await this.dao.add({
+          ...dto,
+          id: AppUtils.uuid4(),
+          branch_id: branch,
+          approved_by: user.id,
+          schedule_status: ScheduleStatus.Active,
+          status: STATUS.Active,
+          index: idx,
+          times: parts.length ? parts.join('|') : null, // "" хадгална
+          start_time: parts.length ? toTimeString(start) : null,
+          end_time: parts.length ? toTimeString(end) : null,
+        });
       }),
     );
   }
