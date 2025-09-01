@@ -12,6 +12,8 @@ export class ServiceDto {
   @ApiProperty()
   min_price: number;
   @ApiProperty()
+  pre_amount: number;
+  @ApiProperty()
   max_price: number;
   @ApiProperty()
   duration: number;

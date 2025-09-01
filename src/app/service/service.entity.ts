@@ -5,6 +5,7 @@ export class Service {
   public name: string;
   public max_price: number;
   public min_price: number;
+  public pre_amount: number;
   public duration: number;
   public image: string;
   public icon: string;

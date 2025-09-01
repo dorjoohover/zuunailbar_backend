@@ -21,6 +21,7 @@ export class ServiceDao {
       'max_price',
       'duration',
       'description',
+      'pre_amount',
       'branch_id',
       'created_by',
       'status',
