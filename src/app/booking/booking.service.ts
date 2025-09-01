@@ -28,9 +28,7 @@ export class BookingService {
     // dto.times урт нь 7 биш байж болно → 7 болгож дүүргэнэ
     const weekTimes = Array.from({ length: 7 }, (_, i) => dto.times?.[i] ?? '');
     const date = ubDateAt00(base);
-    console.log(date);
     const bookings = await this.dao.findByDate(date, merchant, dto.branch_id);
-    console.log(bookings);
     if (bookings?.length > 0) {
       await Promise.all(
         bookings.map(async (booking, index) => {

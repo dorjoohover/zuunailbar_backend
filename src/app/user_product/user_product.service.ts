@@ -53,7 +53,7 @@ export class UserProductService {
 
   public async findAll(pg: PaginationDto, role: number) {
     const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
-    return res
+    return res;
   }
 
   public async findOne(id: string) {
@@ -67,7 +67,10 @@ export class UserProductService {
     ]);
   }
 
-  public async updateStatus(id: string, status: number) {
-    return await this.dao.updateStatus(id, status);
+  public async updateUserProductStatus(id: string, status: number) {
+    return await this.dao.updateUserProductStatus(id, status);
+  }
+  public async updateStatus(id: string) {
+    return await this.dao.updateStatus(id, STATUS.Hidden);
   }
 }

@@ -62,6 +62,13 @@ export class OrderDetailDao {
     );
   }
 
+  async findByOrder(id: string) {
+    return await this._db.select(
+      `SELECT * FROM "${tableName}" WHERE "order_id"=$1`,
+      [id],
+    );
+  }
+
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;

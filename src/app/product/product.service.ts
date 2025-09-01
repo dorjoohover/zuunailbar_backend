@@ -143,7 +143,32 @@ export class ProductService {
   }
 
   public async update(id: string, dto: ProductDto) {
-    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+    const headers = [];
+    try {
+      if (dto.brand_id && dto.brand_id != '') {
+        dto.brand_name =
+          (await this.brandService.getById(dto.brand_id))?.name ?? '';
+      } else {
+        headers.push('brand_id');
+        headers.push('brand_name');
+        dto.brand_id = null;
+        dto.brand_name = null;
+      }
+      if (dto.category_id && dto.category_id != '') {
+        dto.category_name =
+          (await this.categoryService.getById(dto.category_id))?.name ?? '';
+      } else {
+        headers.push('category_id');
+        headers.push('category_name');
+        dto.category_id = null;
+        dto.category_name = null;
+      }
+    } catch (error) {}
+
+    return await this.dao.update({ ...dto, id }, [
+      ...getDefinedKeys(dto),
+      ...headers,
+    ]);
   }
   public async updateQuantity(id: string, qty: number) {
     const { quantity } = await this.findOne(id);

@@ -11,7 +11,6 @@ export const CLIENT = 50;
 
 export const isOnlyFieldPresent = (query, field) => {
   const removeKeys = ['size', 'page', 'limit', 'skip', 'sort'];
-  console.log(query);
   const filteredKeys = Object.keys(query).filter(
     (key) => !removeKeys.includes(key),
   );

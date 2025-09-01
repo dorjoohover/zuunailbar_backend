@@ -67,6 +67,11 @@ export class UserProductController {
   @Manager()
   @SAP(['status'])
   updateStatus(@Param('id') id: string, @Param() status: number) {
-    return this.userProductService.updateStatus(id, status);
+    return this.userProductService.updateUserProductStatus(id, status);
+  }
+  @Delete(':id')
+  @SAP()
+  remove(@Param('id') id: string) {
+    return this.userProductService.updateStatus(id);
   }
 }

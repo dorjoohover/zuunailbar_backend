@@ -4,6 +4,8 @@ export class OrderDetailDto {
   @ApiProperty()
   order_id: string;
   @ApiProperty()
+  id?: string;
+  @ApiProperty()
   service_id: string;
   @ApiProperty()
   service_name: string;

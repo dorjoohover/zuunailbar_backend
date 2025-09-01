@@ -88,7 +88,6 @@ export class AuthService {
       merchant_id: merchant,
       branch_id: null,
     };
-    console.log(res);
     return res;
   }
 

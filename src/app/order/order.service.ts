@@ -41,64 +41,70 @@ export class OrderService {
     return x;
   }
   public async create(dto: OrderDto, customerId: string) {
-    const totalMinutes = (dto.details ?? []).reduce(
-      (sum, it) => sum + (it.duration ?? 0),
-      0,
-    );
-    const durationHours = Math.ceil(totalMinutes / 60);
+    try {
+      const totalMinutes = (dto.details ?? []).reduce(
+        (sum, it) => sum + (it.duration ?? 0),
+        0,
+      );
+      const durationHours = Math.ceil(totalMinutes / 60);
 
-    const startHour = +dto.start_time;
-    const endHourRaw = +startHour + durationHours;
+      const startHour = +dto.start_time;
+      const endHourRaw = +startHour + durationHours;
 
-    const dayShift = Math.floor(endHourRaw / 24); // хэдэн өдөр давсан бэ
-    const endHour = +endHourRaw;
+      const dayShift = Math.floor(endHourRaw / 24); // хэдэн өдөр давсан бэ
+      const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
 
-    const orderDate = new Date(dto.order_date);
-    const effectiveOrderDate = dayShift
-      ? this.addDays(orderDate, dayShift)
-      : orderDate;
+      const orderDate = new Date(dto.order_date);
+      const effectiveOrderDate = dayShift
+        ? this.addDays(orderDate, dayShift)
+        : orderDate;
 
-    // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
-    const payload: Order = {
-      id: AppUtils.uuid4(),
-      customer_id: customerId,
-      user_id: dto.user_id,
-      order_date: effectiveOrderDate, // Date (өдөр давсан бол +1, +2 ...)
-      start_time: toTimeString(startHour),
-      end_time: toTimeString(endHour),
-      duration: durationHours,
-      customer_desc: dto.customer_desc ?? null,
-      discount_type: dto.discount_type ?? null,
-      discount: dto.discount ?? null,
-      total_amount: dto.total_amount ?? null,
-      paid_amount: dto.paid_amount ?? null,
-      pre_amount: 10000,
-      is_pre_amount_paid: true,
-      order_status: OrderStatus.Pending,
-      status: STATUS.Active,
-      user_desc: null,
-    } as const;
-    console.log(payload);
-    const order = await this.dao.add(payload);
-    // 5) details-ийг зэрэг үүсгэнэ
-    await Promise.all(
-      (dto.details ?? []).map((d) =>
-        this.orderDetail.create({
-          order_id: order,
-          service_id: d.service_id,
-          service_name: d.service_name,
-          price: d.price,
-          duration: d.duration, // минут чигээр нь хадгалж болно
+      // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
+      const payload: Order = {
+        id: AppUtils.uuid4(),
+        customer_id: customerId,
+        user_id: dto.user_id,
+        order_date: effectiveOrderDate, // Date (өдөр давсан бол +1, +2 ...)
+        start_time: toTimeString(startHour),
+        end_time: toTimeString(endHour),
+        duration: durationHours,
+        customer_desc: dto.customer_desc ?? null,
+        discount_type: dto.discount_type ?? null,
+        discount: dto.discount ?? null,
+        total_amount: dto.total_amount ?? null,
+        paid_amount: dto.paid_amount ?? null,
+        pre_amount: 10000,
+        is_pre_amount_paid: true,
+        order_status: dto.order_status ?? OrderStatus.Pending,
+        status: STATUS.Active,
+        user_desc: null,
+      } as const;
+      const order = await this.dao.add(payload);
+      // 5) details-ийг зэрэг үүсгэнэ
+      await Promise.all(
+        (dto.details ?? []).map(async (d) => {
+          const service = await this.service.findOne(d.service_id);
+          await this.orderDetail.create({
+            id: AppUtils.uuid4(),
+            order_id: order,
+            service_id: service.id,
+            service_name: service.name,
+            price: service.price,
+            duration: service.duration,
+          });
         }),
-      ),
-    );
-    const invoice = await this.qpay.createInvoice(
-      10000,
-      order.id,
-      customerId,
-      dto.branch_name,
-    );
-    return { id: order.id, invoice };
+      );
+
+      // const invoice = await this.qpay.createInvoice(
+      //   10000,
+      //   order.id,
+      //   customerId,
+      //   dto.branch_name,
+      // );
+      // return { id: order.id, invoice: '' };
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   async findOne(id: string) {
@@ -245,7 +251,14 @@ export class OrderService {
   }
 
   public async update(id: string, dto: OrderDto) {
-    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+    const { details, ...payload } = dto;
+    await this.dao.update({ ...payload, id }, getDefinedKeys(payload));
+    await Promise.all(
+      details.map(async (detail) => {
+        await this.orderDetail.remove(detail.id);
+        await this.orderDetail.create(detail);
+      }),
+    );
   }
   public async updateStatus(id: string, status: OrderStatus) {
     return await this.dao.updateOrderStatus(id, status);
@@ -255,7 +268,13 @@ export class OrderService {
   }
 
   public async remove(id: string) {
-    return await this.dao.updateStatus(id, STATUS.Hidden);
+    const details = await this.orderDetail.findByOrder(id);
+    await Promise.all(
+      details.map(async (detail) => {
+        await this.orderDetail.remove(detail.id);
+      }),
+    );
+    await this.dao.updateStatus(id, STATUS.Hidden);
   }
 
   public async checkCallback(user: string, id: string, order_id: string) {

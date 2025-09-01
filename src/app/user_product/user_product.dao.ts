@@ -50,7 +50,7 @@ export class UserProductsDao {
     );
   }
 
-  async updateStatus(id: string, status: number): Promise<number> {
+  async updateUserProductStatus(id: string, status: number): Promise<number> {
     try {
       return await this._db._update(
         `UPDATE "${tableName}" SET "user_product_status"=$1 WHERE "id"=$2`,
@@ -60,6 +60,12 @@ export class UserProductsDao {
       console.log(error);
       return 0;
     }
+  }
+  async updateStatus(id: string, status: number): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
+      [status, id],
+    );
   }
 
   async getByMobile(mobile: string) {

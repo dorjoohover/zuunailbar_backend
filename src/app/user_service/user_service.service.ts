@@ -24,43 +24,47 @@ export class UserServiceService {
     private userService: UserService,
   ) {}
   public async create(dto: UserServiceDto, u: User) {
-    let user: User;
-    u.role == EMPLOYEE
-      ? (user = u)
-      : (user = await this.userService.findOne(dto.user_id));
-    let userServices = await this.findAll(
-      {
-        user_id: dto.user_id,
-        limit: -1,
-        page: 0,
-        skip: 0,
-        sort: false,
-      },
-      CLIENT,
-    );
-    const payload = await Promise.all(
-      dto.services.map(async (s) => {
-        const service = await this.service.findOne(s);
-        if (userServices.items.find((i) => i.service_id == s)) return;
-        return {
-          ...dto,
-          id: AppUtils.uuid4(),
-          branch_id: dto.branch_id ?? user.branch_id,
-          user_name: usernameFormatter(user),
-          service_name: service.name,
-          user_id: user.id,
-          service_id: s,
-          status: STATUS.Active,
-        };
-      }),
-    );
-    await this.dao.addMany(payload);
+    try {
+      let user: User;
+      u.role == EMPLOYEE
+        ? (user = u)
+        : (user = await this.userService.findOne(dto.user_id));
+      let userServices = await this.findAll(
+        {
+          user_id: dto.user_id,
+          limit: -1,
+          page: 0,
+          skip: 0,
+          sort: false,
+        },
+        CLIENT,
+      );
+      if (userServices.items.length > 0) await this.deleteByUser(user.id);
+
+      const payload = await Promise.all(
+        dto.services.map(async (s) => {
+          const service = await this.service.findOne(s);
+          return {
+            ...dto,
+            id: AppUtils.uuid4(),
+            branch_id: dto.branch_id ?? user.branch_id,
+            user_name: usernameFormatter(user),
+            service_name: service.name,
+            user_id: user.id,
+            service_id: s,
+            status: STATUS.Active,
+          };
+        }),
+      );
+      await this.dao.addMany(payload);
+    } catch (error) {
+      console.log(error);
+    }
   }
   public async findForClient(pg: PaginationDto) {
     const { count, items } = await this.dao.list(
       applyDefaultStatusFilter(pg, CLIENT),
     );
-    console.log(items);
     const res = await Promise.all(
       items.map(async (item) => {
         const user = await this.userService.findOne(item.user_id);
@@ -96,5 +100,11 @@ export class UserServiceService {
       'status',
       'updated_at',
     ]);
+  }
+  public async deleteByUser(user_id: string) {
+    return await this.dao.updateByUser(
+      { user_id, status: STATUS.Hidden, updated_at: mnDate() },
+      ['user_id', 'status', 'updated_at'],
+    );
   }
 }

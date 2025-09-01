@@ -95,7 +95,6 @@ export class ScheduleService {
   ): Promise<
     Record<string, { date: string; times: number[]; index: number }[]>
   > {
-    console.log(items);
     const wantByDay = new Map<number, { date: string; hours: Set<number> }>();
 
     for (const obj of items) {

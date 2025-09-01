@@ -42,6 +42,11 @@ export class UserServiceDao {
       new SqlCondition('id', '=', data.id),
     ]);
   }
+  async updateByUser(data: any, attr: string[]): Promise<number> {
+    return await this._db.update(tableName, data, attr, [
+      new SqlCondition('user_id', '=', data.user_id),
+    ]);
+  }
 
   async updateTags(data: any): Promise<number> {
     return await this._db._update(

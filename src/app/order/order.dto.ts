@@ -10,6 +10,8 @@ export class OrderDto {
   @ApiProperty()
   start_time: number;
   @ApiProperty()
+  end_time?: number;
+  @ApiProperty()
   order_status: number;
   @ApiProperty()
   total_amount: number;
@@ -27,21 +29,29 @@ export class OrderDto {
   details: OrderDetailDto[];
 }
 
-
 export enum ReportFormat {
   XLSX = 'xlsx',
   CSV = 'csv',
 }
 export class PaymentReportQueryDto {
-  @ApiProperty({ example: '2025-08-01', description: 'Эхлэх огноо (YYYY-MM-DD)' })
+  @ApiProperty({
+    example: '2025-08-01',
+    description: 'Эхлэх огноо (YYYY-MM-DD)',
+  })
   @IsDateString()
   from!: string;
 
-  @ApiProperty({ example: '2025-08-29', description: 'Дуусах огноо (YYYY-MM-DD)' })
+  @ApiProperty({
+    example: '2025-08-29',
+    description: 'Дуусах огноо (YYYY-MM-DD)',
+  })
   @IsDateString()
   to!: string;
 
-  @ApiPropertyOptional({ example: 'card', description: 'Төлбөрийн арга (шүүлтүүр)' })
+  @ApiPropertyOptional({
+    example: 'card',
+    description: 'Төлбөрийн арга (шүүлтүүр)',
+  })
   @IsOptional()
   method?: string;
 

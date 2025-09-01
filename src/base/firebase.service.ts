@@ -30,7 +30,6 @@ export class FirebaseService {
 
     try {
       const response = await admin.messaging().send(message);
-      console.log(response);
       return response;
     } catch (error) {
       console.error('Push error:', error);

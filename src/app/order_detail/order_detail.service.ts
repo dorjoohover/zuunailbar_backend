@@ -25,6 +25,10 @@ export class OrderDetailService {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
 
+  public async findByOrder(order: string) {
+    return await this.dao.findByOrder(order);
+  }
+
   public async update(id: string, dto: OrderDetailDto) {
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }
