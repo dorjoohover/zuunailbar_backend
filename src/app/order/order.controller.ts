@@ -45,10 +45,7 @@ const COLS: any[] = [
 })
 @Controller('order')
 export class OrderController {
-  constructor(
-    private readonly orderService: OrderService,
-    private excel: ExcelService,
-  ) {}
+  constructor(private readonly orderService: OrderService) {}
 
   @Post()
   create(@Body() dto: OrderDto, @Req() { user }) {
@@ -125,5 +122,10 @@ export class OrderController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.orderService.remove(id);
+  }
+  @Public()
+  @Get('excel')
+  excel() {
+    return this.orderService.excelAdd();
   }
 }

@@ -3,7 +3,7 @@ export class Order {
   user_id: string;
   customer_id: string;
   duration: number;
-  order_date: Date;
+  order_date: Date | string;
   start_time: string;
   end_time: string;
   order_status: number;

@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
 import { mnDate, ubDateAt00 } from './base/constants';
-
+import * as path from 'path';
 export type ColumnDef<T> = { header: string; key: keyof T; width?: number };
 
 @Injectable()
@@ -73,5 +73,19 @@ export class ExcelService {
     ws.commit();
     await wb.commit();
     res.end();
+  }
+  async readExcel(name: string) {
+    const workbook = new ExcelJS.Workbook();
+    const filePath = path.join(process.cwd(), 'uploads', `${name}.xlsx`);
+    await workbook.xlsx.readFile(filePath);
+
+    const worksheet = workbook.worksheets[0];
+    const rows: any[] = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      rows.push(row.values);
+    });
+
+    return rows;
   }
 }

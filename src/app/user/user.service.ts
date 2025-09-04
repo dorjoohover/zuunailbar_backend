@@ -4,7 +4,6 @@ import { UserDao } from './user.dao';
 import { AppUtils } from 'src/core/utils/app.utils';
 import {
   ADMIN,
-  ADMINUSERS,
   CLIENT,
   EMPLOYEE,
   getDefinedKeys,
@@ -21,7 +20,6 @@ import * as bcrypt from 'bcrypt';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { RegisterDto } from 'src/auth/auth.dto';
 import { BranchService } from '../branch/branch.service';
-import { P } from 'src/common/const/app.const';
 @Injectable()
 export class UserService {
   constructor(

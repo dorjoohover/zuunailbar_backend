@@ -68,6 +68,12 @@ export class ServiceDao {
       [id],
     );
   }
+  async findName(name: string) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "name" like %$1%`,
+      [name],
+    );
+  }
 
   async list(query) {
     if (query.id) {

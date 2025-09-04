@@ -29,6 +29,7 @@ export class ServiceService {
       created_by: user.id,
       status: STATUS.Active,
     });
+    return res;
   }
 
   public async findAll(pg: PaginationDto, role: number) {
@@ -67,6 +68,9 @@ export class ServiceService {
 
   public async findOne(id: string) {
     return await this.dao.getById(id);
+  }
+  public async findByName(name: string) {
+    return await this.dao.findName(name);
   }
 
   public async update(id: string, dto: ServiceDto) {

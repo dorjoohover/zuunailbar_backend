@@ -24,6 +24,7 @@ import { ExcelService } from 'src/excel.service';
 import { Response } from 'express';
 import { UserService } from '../user/user.service';
 import { MobileParser } from 'src/common/formatter';
+import { parse } from 'date-fns';
 
 @Injectable()
 export class OrderService {
@@ -54,17 +55,14 @@ export class OrderService {
       const dayShift = Math.floor(endHourRaw / 24); // хэдэн өдөр давсан бэ
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
 
-      const orderDate = new Date(dto.order_date);
-      const effectiveOrderDate = dayShift
-        ? this.addDays(orderDate, dayShift)
-        : orderDate;
+      const orderDate = mnDate(dto.order_date);
 
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
         customer_id: customerId,
         user_id: dto.user_id,
-        order_date: effectiveOrderDate, // Date (өдөр давсан бол +1, +2 ...)
+        order_date: orderDate, // Date (өдөр давсан бол +1, +2 ...)
         start_time: toTimeString(startHour),
         end_time: toTimeString(endHour),
         duration: durationHours,
@@ -101,7 +99,7 @@ export class OrderService {
       //   customerId,
       //   dto.branch_name,
       // );
-      // return { id: order.id, invoice: '' };
+      return { id: order.id, invoice: '' };
     } catch (error) {
       console.log(error);
     }
@@ -277,6 +275,83 @@ export class OrderService {
     await this.dao.updateStatus(id, STATUS.Hidden);
   }
 
+  public async excelAdd() {
+    const res = await this.excel.readExcel('client');
+    const artist = await this.user.findOne('2c25b08bc5fc4f86a22bf947c9db5f54');
+    const merchant = '3f86c0b23a5a4ef89a745269e7849640';
+    const creater = await this.user.findOne('05e0434bbf4c4dd587a11c3709c889c3');
+    await Promise.all(
+      res.map(async (r) => {
+        const mobile = String(r[1]).trim();
+        let user;
+        try {
+          user = await this.user.findMobile(mobile);
+        } catch (error) {
+          user = await this.user.register(
+            { mobile, password: 'string' },
+            merchant,
+          );
+        }
+        console.log(user.id);
+        const service = String(r[4])?.split(';');
+        const description = String(r[3]);
+        const date = parse(
+          r[5]?.replace(/\s+/g, ' '),
+          'MMM d yyyy h:mma',
+          new Date(),
+        );
+        const hour = date.getHours();
+
+        const services = await Promise.all(
+          service.map(async (s) => {
+            let ser;
+            try {
+              ser = (await this.service.findByName(s)).id;
+            } catch (error) {
+              ser = await this.service.create(
+                {
+                  branch_id: artist.branch_id,
+                  description: null,
+                  duration: 30,
+                  min_price: 10000,
+                  max_price: 10000,
+                  name: s,
+                  icon: null,
+                  image: null,
+                  pre_amount: 10000,
+                },
+                merchant,
+                creater,
+              );
+            }
+            return {
+              service_id: ser,
+            };
+          }),
+        );
+        const res = await this.create(
+          {
+            order_date: date,
+            details: services as any,
+            branch_name: artist.branch_name,
+            customer_desc: null,
+            discount: null,
+            discount_type: null,
+            order_status: OrderStatus.Finished,
+            paid_amount: 0,
+            start_time: hour,
+            total_amount: 0,
+            user_desc: description,
+            user_id: user.id,
+          },
+          user.id,
+        );
+        console.log(res);
+
+        // console.log(mobile, mnDate(date), hour);
+      }),
+    );
+  }
   public async checkCallback(user: string, id: string, order_id: string) {
     const res = await this.qpay.getInvoice(id);
 
