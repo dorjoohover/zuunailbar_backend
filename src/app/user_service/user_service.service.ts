@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { UserServiceDao } from './user_service.dao';
 import { UserServiceDto } from './user_service.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
@@ -21,7 +21,7 @@ export class UserServiceService {
   constructor(
     private readonly dao: UserServiceDao,
     private service: ServiceService,
-    private userService: UserService,
+    @Inject(forwardRef(() => UserService)) private userService: UserService,
   ) {}
   public async create(dto: UserServiceDto, u: User) {
     try {
@@ -60,6 +60,10 @@ export class UserServiceService {
     } catch (error) {
       console.log(error);
     }
+  }
+
+  public async search(services: string, user?: string) {
+    return await this.dao.getByServices(services, user);
   }
   public async findForClient(pg: PaginationDto) {
     const { count, items } = await this.dao.list(

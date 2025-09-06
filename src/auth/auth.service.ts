@@ -8,6 +8,7 @@ import { UserService } from 'src/app/user/user.service';
 import { CLIENT } from 'src/base/constants';
 import { FirebaseService } from 'src/base/firebase.service';
 import { BadRequest } from 'src/common/error';
+import axios from 'axios';
 
 @Injectable()
 export class AuthService {
@@ -95,12 +96,36 @@ export class AuthService {
     return await this.userService.findMobile(mobile);
   }
 
-  async checkOtp(otp: string) {
-    return +otp == 1234;
+  generateOtp() {
+    return `${Math.random() * 100000}`.slice(2, 6);
+  }
+
+  async sendOtp(mobile: string) {
+    try {
+      const otp = this.generateOtp();
+      console.log(otp);
+      await this.userService.updateOtp(mobile, otp);
+      const res = await axios.get(
+        `https://sms-api.telcocom.mn/sms-api/v2/sms/telco/send?toNumber=${mobile}&sms=Таны OTP код: ${otp}\nХүндэтгэсэн &tenantId=${process.env.TELCOCOM}`,
+        {
+          headers: {
+            'telco-auth-token': process.env.TELCOCOM_TOKEN,
+          },
+        },
+      );
+      const { result, message, data } = res.data;
+      console.log(result, message, data);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async checkOtp(otp: string, mobile: string) {
+    return await this.userService.checkOtp(otp, MobileFormat(mobile));
   }
 
   async reset(dto: ResetPasswordDto) {
-    if (!this.checkOtp(dto.otp)) return;
+    if (!this.checkOtp(dto.otp, dto.mobile)) return;
     return await this.userService.resetPassword(dto.mobile, dto.password);
   }
 }

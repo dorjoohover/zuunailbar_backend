@@ -3,7 +3,7 @@ import { BranchDto } from './branch.dto';
 import { BranchDao } from './branch.dao';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { getDefinedKeys, STATUS } from 'src/base/constants';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 
 @Injectable()
@@ -26,7 +26,13 @@ export class BranchService {
   public async find(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
-
+  public async search(filter: SearchDto, merchant: string) {
+    return await this.dao.search({
+      ...filter,
+      merchant,
+      status: STATUS.Active,
+    });
+  }
   public async update(id: string, dto: BranchDto) {
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }

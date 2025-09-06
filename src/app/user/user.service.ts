@@ -15,15 +15,17 @@ import {
 import { BadRequest, NoPermissionException } from 'src/common/error';
 import { User } from './user.entity';
 import { MobileFormat, MobileParser } from 'src/common/formatter';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import * as bcrypt from 'bcrypt';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { RegisterDto } from 'src/auth/auth.dto';
 import { BranchService } from '../branch/branch.service';
+import { UserServiceService } from '../user_service/user_service.service';
 @Injectable()
 export class UserService {
   constructor(
     private readonly dao: UserDao,
+    private readonly userService: UserServiceService,
     private readonly branchService: BranchService,
   ) {}
   public async create(
@@ -40,8 +42,9 @@ export class UserService {
     try {
       res = await this.dao.getByMobile(mobile);
     } catch (error) {
-      res = null;
+      error.message == 'Select One not found' ? (res = null) : (res = 0);
     }
+
     if (res != null) throw new BadRequest().registered;
     let branch;
     if (branch_id) branch = await this.branchService.findOne(branch_id);
@@ -111,6 +114,29 @@ export class UserService {
     }
   }
 
+  public async updateOtp(mobile: string, otp: string) {
+    await this.dao.updateOtp(mobile, otp);
+  }
+  public async checkOtp(otp: string, mobile: string) {
+    const res = await this.findMobile(mobile);
+    return res.otp == otp;
+  }
+  public async search(filter: SearchDto, merchant: string) {
+    const services = filter.services;
+    let res = await this.dao.search({
+      ...filter,
+      merchant,
+      status: STATUS.Active,
+    });
+
+    if (services) {
+      const service = await this.userService.search(services);
+      res = service
+        .map((s) => res.find((r) => r.id == s.user_id))
+        .filter((d) => d != undefined);
+    }
+    return res;
+  }
   public async findAll(pg: PaginationDto, role: number) {
     const data = await this.dao.list(applyDefaultStatusFilter(pg, role));
 

@@ -13,9 +13,9 @@ import { ApiBearerAuth, ApiHeader, ApiHeaders } from '@nestjs/swagger';
 import { UserDto } from './user.dto';
 import { Manager } from 'src/auth/guards/role/role.decorator';
 import { BadRequest } from 'src/common/error';
-import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
-import { Pagination } from 'src/common/decorator/pagination.decorator';
+import { PQ, SQ } from 'src/common/decorator/use-pagination-query.decorator';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
+import { Filter, Pagination } from 'src/common/decorator/pagination.decorator';
 import { ADMIN, CLIENT, MANAGER } from 'src/base/constants';
 import { SAP, SAQ } from 'src/common/decorator/use-param.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
@@ -71,6 +71,12 @@ export class UserController {
     );
   }
 
+  @Get('search')
+  @SQ(['id', 'limit', 'page', 'services'])
+  search(@Filter() sd: SearchDto, @Req() { user }) {
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
+    return this.userService.search(sd, user.merchant.id);
+  }
   @SAP()
   @Get('get/:id')
   findOne(@Param('id') id: string) {

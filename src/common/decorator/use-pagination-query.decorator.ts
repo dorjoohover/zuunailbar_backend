@@ -13,3 +13,14 @@ export function PQ(additionalQueries?: string[]) {
 
   return applyDecorators(...decorators);
 }
+export function SQ(additionalQueries?: string[]) {
+  const decorators = [ApiQuery(Q.SKIP), ApiQuery(Q.PAGE)];
+
+  if (additionalQueries?.length) {
+    for (const name of additionalQueries) {
+      decorators.push(ApiQuery({ name, required: false, type: String }));
+    }
+  }
+
+  return applyDecorators(...decorators);
+}

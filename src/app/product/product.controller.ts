@@ -15,9 +15,9 @@ import { ProductDto } from './product.dto';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { Admin } from 'src/auth/guards/role/role.decorator';
 import { BadRequest } from 'src/common/error';
-import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
-import { Pagination } from 'src/common/decorator/pagination.decorator';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PQ, SQ } from 'src/common/decorator/use-pagination-query.decorator';
+import { Filter, Pagination } from 'src/common/decorator/pagination.decorator';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { SAQ } from 'src/common/decorator/use-param.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { Response } from 'express';
@@ -51,16 +51,11 @@ export class ProductController {
   findOne(@Param('id') id: string) {
     return this.productService.findOne(id);
   }
-  @Get('search/:id')
-  @SAQ()
-  serach(@Query('id') id: string, @Req() { user }) {
+  @Get('search')
+  @SQ(['id', 'limit', 'page'])
+  serach(@Filter() sd: SearchDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
-    return this.productService.search(
-      {
-        id,
-      },
-      user.merchant.id,
-    );
+    return this.productService.search(sd, user.merchant.id);
   }
   @Public()
   @Get('report')

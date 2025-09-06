@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
+import { isOnlyFieldPresent, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { UserService } from './user_service.entity';
@@ -69,16 +69,19 @@ export class UserServiceDao {
     );
   }
 
-  async getByMobile(mobile: string) {
+  async getByServices(services: string, user?: string) {
     return await this._db.select(
-      `SELECT * FROM "${tableName}" WHERE "mobile"=$1`,
-      [mobile],
+      `SELECT id, user_id, service_id 
+     FROM "${tableName}" 
+     WHERE status = ${STATUS.Active} 
+       AND ($1 = ANY(string_to_array("service_id", ',')) OR user_id = $2)`,
+      [services, user],
     );
   }
 
   async getById(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "id"=$1`,
+      `SELECT id, user_id, service_id FROM "${tableName}" WHERE "id"=$1`,
       [id],
     );
   }

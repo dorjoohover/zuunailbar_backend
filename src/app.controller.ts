@@ -29,6 +29,7 @@ import { createReadStream, existsSync } from 'fs';
 import * as mime from 'mime-types';
 import { Response } from 'express';
 import { CLIENT } from './base/constants';
+import axios from 'axios';
 
 @Controller()
 export class AppController {
@@ -72,7 +73,7 @@ export class AppController {
     // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
     let merchantId = req.headers['merchant-id'] as string;
     BadRequest.merchantNotFound(merchantId, CLIENT);
-    const res = await this.authService.checkOtp(dto.otp);
+    const res = await this.authService.checkOtp(dto.otp, dto.mobile);
     if (res) return await this.authService.register(dto, merchantId);
     throw new BadRequest().OTP_INVALID;
   }

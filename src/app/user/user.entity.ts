@@ -2,6 +2,7 @@ export class User {
   public id: string;
   public firstname: string;
   public lastname: string;
+  public otp?: string;
   public role: number;
   public mobile: string;
   public birthday: Date;

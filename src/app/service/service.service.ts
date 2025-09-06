@@ -1,21 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { ServiceDto } from './service.dto';
 import { ServiceDao } from './service.dao';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { BadRequest } from 'src/common/error';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { getDefinedKeys, STATUS } from 'src/base/constants';
 import { DiscountService } from '../discount/discount.service';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { User } from '../user/user.entity';
-import { ScheduleService } from '../schedule/schedule.service';
-import { BookingService } from '../booking/booking.service';
+import { UserServiceService } from '../user_service/user_service.service';
 
 @Injectable()
 export class ServiceService {
   constructor(
     private readonly dao: ServiceDao,
     private readonly discount: DiscountService,
+    @Inject(forwardRef(() => UserServiceService))
+    private readonly userService: UserServiceService,
     // private readonly schedule: ScheduleService,
     // private readonly booking: BookingService,
   ) {}
@@ -65,7 +66,22 @@ export class ServiceService {
     res.items = items;
     return res;
   }
+  public async search(filter: SearchDto, merchant: string) {
+    const user = filter.user_id;
 
+    let res = await this.dao.search({
+      ...filter,
+      merchant,
+      status: STATUS.Active,
+    });
+    if (user) {
+      const services = await this.userService.search('', user);
+      res = services
+        .map((s) => res.find((r) => r.id == s.service_id))
+        .filter((d) => d != undefined);
+    }
+    return res;
+  }
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }

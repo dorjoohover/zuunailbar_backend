@@ -71,6 +71,12 @@ export class UserDao {
       [status, id],
     );
   }
+  async updateOtp(mobile: string, otp: string): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "mobile"=$1 WHERE "otp"=$2`,
+      [mobile, otp],
+    );
+  }
   async updatePercent(id: string, percent: number): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "percent"=$1 WHERE "id"=$2`,
@@ -79,6 +85,7 @@ export class UserDao {
   }
 
   async getByMobile(mobile: string) {
+    console.log(mobile);
     return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "mobile"=$1 or "mobile" = $2`,
       [mobile, MobileFormat(mobile)],
@@ -149,7 +156,7 @@ export class UserDao {
     const criteria = builder.criteria();
 
     const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT id, nickname, mobile, created_at FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
@@ -160,21 +167,48 @@ export class UserDao {
 
   async search(filter: any): Promise<any[]> {
     let nameCondition = ``;
-    if (filter.merchantId) {
-      filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+    if (filter.id) {
+      filter.id = `%${filter.id.toLowerCase()}%`;
     }
 
     const builder = new SqlBuilder(filter);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
-      .criteria();
-    return await this._db.select(
-      `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
-      builder.values,
-    );
-  }
+    builder
+      .conditionIfNotEmpty('merchant_id', '=', filter.merchant)
+      .conditionIfNotEmpty('status', '=', filter.status)
+      .conditionIfNotEmpty(
+        'role',
+        filter.role == 35 ? '<=' : '=',
+        filter.role == 35 ? 40 : filter.role,
+      )
+      .conditionIfNotEmpty(
+        'role',
+        filter.role == 35 ? '>=' : '=',
+        filter.role == 35 ? 30 : filter.role,
+      )
+      .orConditions([
+        new SqlCondition('LOWER("nickname")', 'LIKE', filter.id),
+        new SqlCondition('LOWER("mobile")', 'LIKE', filter.id),
+      ]);
 
+    const criteria = builder.criteria();
+    filter.limit = filter.limit == -1 ? undefined : filter.limit;
+
+    const sql = `
+    SELECT "id",
+           CONCAT(
+             COALESCE("mobile", ''), '__',
+             COALESCE("nickname", ''), '__',
+             COALESCE("branch_id", ''), '__',
+             COALESCE("color", 0),''
+           ) AS "value"
+    FROM "${tableName}"
+    ${criteria} ${nameCondition}
+    ${filter.limit ? `LIMIT ${filter.limit}` : ''}
+    ${filter.skip && filter.limit ? `OFFSET ${filter.skip * filter.limit}` : ''}
+  `;
+
+    return await this._db.select(sql, builder.values);
+  }
   async pairs(query) {
     const items = await this._db.select(
       `SELECT "id" as "key", CONCAT("id", '-', "name") as "value" FROM "${tableName}" order by "id" asc`,

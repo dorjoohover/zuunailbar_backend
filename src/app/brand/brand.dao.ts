@@ -79,17 +79,21 @@ export class BrandDao {
 
   async search(filter: any): Promise<any[]> {
     let nameCondition = ``;
-    if (filter.merchantId) {
-      filter.merchantId = `%${filter.merchantId}%`;
+    if (filter.id) {
+      filter.id = `%${filter.id.toLowerCase()}%`;
       nameCondition = ` OR "name" LIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('name', 'LIKE', filter.id)
       .criteria();
     return await this._db.select(
-      `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
+      ` SELECT "id",
+           CONCAT(
+             COALESCE("name", ''), ''
+
+           ) AS "value" FROM "${tableName}" ${criteria}${nameCondition}`,
       builder.values,
     );
   }

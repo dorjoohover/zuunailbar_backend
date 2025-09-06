@@ -3,7 +3,7 @@ import { ApiParam, ApiQuery } from '@nestjs/swagger';
 import { P } from '../const/app.const';
 
 // swagger api param
-export function SAQ(queries?: string) {
+export function SAQ(queries?: string[]) {
   const decorators = [];
   if (queries?.length) {
     for (const param of queries) {

@@ -15,9 +15,9 @@ import { ServiceDto } from './service.dto';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { Admin, System } from 'src/auth/guards/role/role.decorator';
 import { BadRequest } from 'src/common/error';
-import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
-import { Pagination } from 'src/common/decorator/pagination.decorator';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PQ, SQ } from 'src/common/decorator/use-pagination-query.decorator';
+import { Filter, Pagination } from 'src/common/decorator/pagination.decorator';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { SAQ } from 'src/common/decorator/use-param.decorator';
 import { CLIENT } from 'src/base/constants';
@@ -49,6 +49,12 @@ export class ServiceController {
   @System()
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.serviceService.findAll(pg, user.user.role);
+  }
+  @Public()
+  @Get('search')
+  @SQ(['id', 'limit', 'page'])
+  search(@Filter() sd: SearchDto) {
+    return this.serviceService.search(sd, '3f86c0b23a5a4ef89a745269e7849640');
   }
   @Get('admin')
   @SAQ()

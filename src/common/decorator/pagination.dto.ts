@@ -19,4 +19,17 @@ export class PaginationDto {
 
 export class SearchDto {
   id: string;
+  skip: number = DEFAULT_SKIP;
+  limit: number = DEFAULT_LIMIT;
+  [filter: string]: any;
+  constructor(query: any) {
+    this.skip = parseInt(query.page) || DEFAULT_SKIP;
+    this.limit = parseInt(query.limit) || DEFAULT_SKIP;
+    this.id = query.id;
+    for (const key in query) {
+      if (!['page', 'limit'].includes(key)) {
+        this[key] = query[key];
+      }
+    }
+  }
 }
