@@ -156,7 +156,7 @@ export class UserDao {
     const criteria = builder.criteria();
 
     const sql =
-      `SELECT id, nickname, mobile, created_at FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT *  FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
