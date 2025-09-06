@@ -5,6 +5,7 @@ import { IsDateString, IsEnum, IsOptional } from 'class-validator';
 export class OrderDto {
   @ApiProperty()
   user_id: string;
+  customer_id?: string;
   @ApiProperty()
   order_date: Date;
   @ApiProperty()
@@ -17,6 +18,7 @@ export class OrderDto {
   total_amount: number;
   @ApiProperty()
   paid_amount: number;
+  pre_amount?: number;
   @ApiProperty()
   customer_desc: string;
   user_desc?: string;

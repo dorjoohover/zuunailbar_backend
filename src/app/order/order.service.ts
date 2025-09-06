@@ -23,7 +23,7 @@ import { QpayService } from './qpay.service';
 import { ExcelService } from 'src/excel.service';
 import { Response } from 'express';
 import { UserService } from '../user/user.service';
-import { MobileParser } from 'src/common/formatter';
+import { MobileFormat, MobileParser } from 'src/common/formatter';
 import { parse } from 'date-fns';
 
 @Injectable()
@@ -60,7 +60,7 @@ export class OrderService {
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
-        customer_id: customerId,
+        customer_id: dto.customer_id ?? customerId,
         user_id: dto.user_id,
         order_date: orderDate, // Date (өдөр давсан бол +1, +2 ...)
         start_time: toTimeString(startHour),
@@ -71,11 +71,11 @@ export class OrderService {
         discount: dto.discount ?? null,
         total_amount: dto.total_amount ?? null,
         paid_amount: dto.paid_amount ?? null,
-        pre_amount: 10000,
+        pre_amount: dto.pre_amount ?? 10000,
         is_pre_amount_paid: true,
         order_status: dto.order_status ?? OrderStatus.Pending,
         status: STATUS.Active,
-        user_desc: null,
+        user_desc: dto.user_desc ?? null,
       } as const;
       const order = await this.dao.add(payload);
       // 5) details-ийг зэрэг үүсгэнэ
@@ -110,23 +110,35 @@ export class OrderService {
   }
 
   public async find(pg: PaginationDto, role: number) {
-    const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
-    const items = await Promise.all(
-      res.items.map(async (item) => {
-        const detail = await this.orderDetail.find(
-          { ...pg, order_id: item.id },
-          role,
-        );
-        return {
-          ...item,
-          details: detail.items,
-        };
-      }),
-    );
-    return {
-      items,
-      count: res.count,
-    };
+    try {
+      const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
+      const items = await Promise.all(
+        res.items.map(async (item) => {
+          const detail = await this.orderDetail.find(
+            { ...pg, order_id: item.id },
+            role,
+          );
+          const artist = await this.user.findOne(item.user_id);
+          const artist_name = `${firstLetterUpper(artist.nickname ?? '')} ${MobileFormat(artist.mobile)}`;
+          const user = await this.user.findOne(item.customer_id);
+          const user_name = `${MobileFormat(user.mobile)} ${firstLetterUpper(user.nickname ?? '')}`;
+          return {
+            ...item,
+            artist_name,
+            user_name,
+            branch_id: artist.branch_id,
+            color: artist.color,
+            details: detail.items,
+          };
+        }),
+      );
+      return {
+        items,
+        count: res.count,
+      };
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   public async getOrders(user: string) {

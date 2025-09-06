@@ -5,6 +5,7 @@ import { AppUtils } from 'src/core/utils/app.utils';
 import {
   ADMIN,
   CLIENT,
+  E_M,
   EMPLOYEE,
   getDefinedKeys,
   MANAGER,
@@ -42,7 +43,10 @@ export class UserService {
     try {
       res = await this.dao.getByMobile(mobile);
     } catch (error) {
-      error.message == 'Select One not found' ? (res = null) : (res = 0);
+      console.log(error);
+      error.message?.toLowerCase().includes('not found')
+        ? (res = null)
+        : (res = 0);
     }
 
     if (res != null) throw new BadRequest().registered;
@@ -123,18 +127,31 @@ export class UserService {
   }
   public async search(filter: SearchDto, merchant: string) {
     const services = filter.services;
+    const value = filter.value;
+    let user;
+    if (value) {
+      try {
+        const res = await this.dao.getById(value);
+        user = {
+          id: res.id,
+          value: `${res.mobile}__${res.nickname}__${res.branch_id}__${res.color}`,
+        };
+      } catch (error) {}
+    }
     let res = await this.dao.search({
       ...filter,
       merchant,
       status: STATUS.Active,
     });
 
-    if (services) {
+    if (services && filter.role == E_M) {
       const service = await this.userService.search(services);
       res = service
         .map((s) => res.find((r) => r.id == s.user_id))
         .filter((d) => d != undefined);
     }
+    if (user && res.find((r) => user.id == r.id) === undefined)
+      return [...res, user];
     return res;
   }
   public async findAll(pg: PaginationDto, role: number) {

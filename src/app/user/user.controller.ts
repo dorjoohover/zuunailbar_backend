@@ -72,7 +72,7 @@ export class UserController {
   }
 
   @Get('search')
-  @SQ(['id', 'limit', 'page', 'services'])
+  @SQ(['id', 'limit', 'page', 'services', 'value'])
   search(@Filter() sd: SearchDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.userService.search(sd, user.merchant.id);

@@ -7,6 +7,7 @@ export const ADMINUSERS = 10;
 export const ADMIN = 20;
 export const MANAGER = 30;
 export const EMPLOYEE = 40;
+export const E_M = 35;
 export const CLIENT = 50;
 
 export const isOnlyFieldPresent = (query, field) => {
