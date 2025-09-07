@@ -11,11 +11,11 @@ import {
 import { CategoryService } from './category.service';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { CategoryDto } from './category.dto';
-import { Admin } from 'src/auth/guards/role/role.decorator';
+import { Admin, Manager } from 'src/auth/guards/role/role.decorator';
 import { BadRequest } from 'src/common/error';
-import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
-import { Pagination } from 'src/common/decorator/pagination.decorator';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PQ, SQ } from 'src/common/decorator/use-pagination-query.decorator';
+import { Filter, Pagination } from 'src/common/decorator/pagination.decorator';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 
 @ApiBearerAuth('access-token')
 @ApiHeader({
@@ -39,7 +39,14 @@ export class CategoryController {
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.categoryService.findAll(pg, user.user.role);
   }
-
+  @Get('search')
+  @Manager()
+  @SQ(['id', 'limit', 'page', 'type'])
+  async search(@Filter() sd: SearchDto, @Req() { user }) {
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
+    const res = await this.categoryService.search(sd, user.merchant.id);
+    return res;
+  }
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: CategoryDto) {
     return this.categoryService.update(id, dto);

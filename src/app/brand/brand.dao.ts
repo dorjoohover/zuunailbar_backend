@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
+import { isOnlyFieldPresent, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Brand } from './brand.entity';
@@ -81,12 +81,13 @@ export class BrandDao {
     let nameCondition = ``;
     if (filter.id) {
       filter.id = `%${filter.id.toLowerCase()}%`;
-      nameCondition = ` OR "name" LIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('name', 'LIKE', filter.id)
+      .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.id)
+      .conditionIfNotEmpty('status', '=', STATUS.Active)
+
       .criteria();
     return await this._db.select(
       ` SELECT "id",

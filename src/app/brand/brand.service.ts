@@ -25,11 +25,13 @@ export class BrandService {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
   public async search(filter: SearchDto, merchant: string) {
-    return await this.dao.search({
+    const res = await this.dao.search({
       ...filter,
       merchant,
       status: STATUS.Active,
     });
+    console.log(res);
+    return res;
   }
   public async update(id: string, dto: BrandDto) {
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));

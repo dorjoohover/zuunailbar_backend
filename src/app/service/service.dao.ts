@@ -105,12 +105,11 @@ export class ServiceDao {
     let nameCondition = ``;
     if (filter.id) {
       filter.id = `%${filter.id.toLowerCase()}%`;
-      nameCondition = ` OR "name" LIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('name', 'LIKE', filter.id)
+      .conditionIfNotEmpty('lower("name")', 'LIKE', filter.id)
       .criteria();
     return await this._db.select(
       ` SELECT "id",

@@ -52,7 +52,7 @@ export class ProductController {
     return this.productService.findOne(id);
   }
   @Get('search')
-  @SQ(['id', 'limit', 'page'])
+  @SQ(['id', 'limit', 'page', 'type'])
   serach(@Filter() sd: SearchDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.productService.search(sd, user.merchant.id);

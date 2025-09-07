@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
+import { isOnlyFieldPresent, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Category } from './category.entity';
@@ -81,17 +81,23 @@ export class CategoryDao {
 
   async search(filter: any): Promise<any[]> {
     let nameCondition = ``;
-    if (filter.merchantId) {
-      filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+    if (filter.id) {
+      filter.id = `%${filter.id.toLowerCase()}%`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.id)
+      .conditionIfNotEmpty('type', '=', filter.type)
+      .conditionIfNotEmpty('status', '=', STATUS.Active)
       .criteria();
+
     return await this._db.select(
-      `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
+      `SELECT "id",
+            CONCAT(
+              COALESCE("name", ''), ''
+ 
+            ) AS "value" FROM "${tableName}" ${criteria}${nameCondition}`,
       builder.values,
     );
   }

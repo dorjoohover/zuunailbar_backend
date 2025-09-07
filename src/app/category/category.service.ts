@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CategoryDao } from './category.dao';
 import { CategoryDto } from './category.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import {
   ADMIN,
   ADMINUSERS,
@@ -31,6 +31,13 @@ export class CategoryService {
 
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
+  }
+  public async search(filter: SearchDto, merchant: string) {
+    return await this.dao.search({
+      ...filter,
+      merchant,
+      status: STATUS.Active,
+    });
   }
 
   public async update(id: string, dto: CategoryDto) {

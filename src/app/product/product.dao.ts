@@ -121,6 +121,7 @@ export class ProductDao {
     builder
       .conditionIfNotEmpty('merchant_id', '=', filter.merchant)
       .conditionIfNotEmpty('status', '=', filter.status)
+      .conditionIfNotEmpty('type', '=', filter.type)
       .orConditions([
         new SqlCondition('LOWER("name")', 'LIKE', filter.name),
         new SqlCondition('LOWER("name")', 'LIKE', filter.id),
