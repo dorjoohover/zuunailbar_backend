@@ -34,6 +34,8 @@ async function bootstrap() {
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   app.useGlobalInterceptors(new LoggingInterceptor());
   setupSwagger(app);
+  console.log(new Date());
+  console.log(new Date().toString());
   await app.listen(process.env.PORT ?? 3000);
   // await app.listen(5000);
 }
