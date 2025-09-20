@@ -14,6 +14,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
   });
+  (Date.prototype as any)[Symbol.for('nodejs.util.inspect.custom')] =
+    function () {
+      return this.toString(); // Local timezone string
+    };
   app.setGlobalPrefix('/api/v1');
   app.enableCors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
