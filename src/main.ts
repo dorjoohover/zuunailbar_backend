@@ -34,7 +34,7 @@ async function bootstrap() {
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   app.useGlobalInterceptors(new LoggingInterceptor());
   setupSwagger(app);
-  await app.listen(3000);
+  await app.listen(process.env.PORT ?? 3000);
   // await app.listen(5000);
 }
 bootstrap();

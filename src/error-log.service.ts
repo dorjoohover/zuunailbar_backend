@@ -22,7 +22,7 @@ export class FileErrorLogService implements OnModuleDestroy {
   private day = '';
 
   private today(): string {
-    return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    return new Date().toISOString().slice(0, 10);
   }
 
   private async ensureStream() {

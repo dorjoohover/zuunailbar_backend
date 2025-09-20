@@ -30,6 +30,7 @@ import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { ExcelService } from 'src/excel.service';
 import { Response } from 'express';
 import { CLIENT } from 'src/base/constants';
+import { BadRequest } from 'src/common/error';
 
 const COLS: any[] = [
   { header: 'Date', key: 'date', width: 14 },
@@ -49,7 +50,8 @@ export class OrderController {
 
   @Post()
   create(@Body() dto: OrderDto, @Req() { user }) {
-    return this.orderService.create(dto, user.user.id);
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
+    return this.orderService.create(dto, user.user, user.merchant.id);
   }
 
   @Get()

@@ -1,18 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { OrderDto } from './order.dto';
 import { OrdersDao } from './order.dao';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
+  ADMIN,
   CLIENT,
   DISCOUNT,
+  EMPLOYEE,
+  ENDTIME,
   firstLetterUpper,
   getDefinedKeys,
+  MANAGER,
   mnDate,
   OrderStatus,
+  STARTTIME,
   STATUS,
   toTimeString,
+  ubDateAt00,
   usernameFormatter,
+  UserStatus,
 } from 'src/base/constants';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { OrderDetailService } from '../order_detail/order_detail.service';
@@ -25,23 +32,103 @@ import { Response } from 'express';
 import { UserService } from '../user/user.service';
 import { MobileFormat, MobileParser } from 'src/common/formatter';
 import { parse } from 'date-fns';
+import { User } from '../user/user.entity';
+import { OrderError } from 'src/common/error';
+import { OrderDetailDto } from '../order_detail/order_detail.dto';
+import { BookingService } from '../booking/booking.service';
+import { ScheduleService } from '../schedule/schedule.service';
 
 @Injectable()
 export class OrderService {
+  private orderError = new OrderError();
   constructor(
     private readonly dao: OrdersDao,
     private readonly orderDetail: OrderDetailService,
     private readonly service: ServiceService,
     private readonly user: UserService,
     private excel: ExcelService,
+    private booking: BookingService,
+    @Inject(forwardRef(() => ScheduleService))
+    private schedule: ScheduleService,
     private qpay: QpayService,
   ) {}
-  private addDays(d: Date, days: number) {
-    const x = new Date(d);
-    x.setDate(x.getDate() + days);
-    return x;
+  public async canPlaceOrder(
+    dto: Order,
+    user: User,
+    details: OrderDetailDto[],
+    merchant: string,
+  ) {
+    if (user.role == EMPLOYEE) this.orderError.orderNotAllowed;
+
+    if (user.status == UserStatus.Banned) this.orderError.bannedUser;
+    let artist;
+    try {
+      artist = await this.user.findOne(dto.user_id);
+    } catch (error) {
+      artist = null;
+    }
+    if (artist == null || (artist.role <= EMPLOYEE && artist >= MANAGER))
+      this.orderError.userNotFound;
+    let client;
+    try {
+      client = await this.user.findOne(dto.customer_id);
+    } catch (error) {
+      client = null;
+    }
+    if (client == null || client.role != CLIENT) this.orderError.clientNotFound;
+    if (!dto.start_time || !dto.order_date)
+      this.orderError.dateOrTimeNotSelected;
+
+    if (details.length <= 0) this.orderError.serviceNotSelected;
+    const start_time = +dto.start_time.slice(0, 2);
+    if (start_time < STARTTIME || start_time > ENDTIME)
+      this.orderError.invalidHour;
+    const order_date = ubDateAt00(dto.order_date);
+    const now = ubDateAt00();
+    const isAdmin = user.role <= ADMIN;
+
+    if (
+      !isAdmin &&
+      (order_date < now ||
+        (order_date.getTime() === now.getTime() && now.getHours() < start_time))
+    )
+      this.orderError.nonWorkingHour;
+
+    const booking = await this.booking.findByDateTime(
+      dto.order_date as string,
+      start_time,
+      merchant,
+      artist.branch_id,
+    );
+    if (booking == null || !booking.isTimeAvailable)
+      this.orderError.nonWorkingHour;
+    const schedule = await this.schedule.findByUserDateTime(
+      dto.user_id,
+      dto.order_date as string,
+      start_time,
+    );
+    if (schedule == null || !schedule.isTimeAvailable)
+      this.orderError.artistTimeUnavailable;
+
+    let order;
+    try {
+      order = await this.dao.getOrderByDateTime(
+        dto.order_date,
+        dto.start_time,
+        dto.end_time,
+        OrderStatus.Cancelled,
+        dto.user_id,
+      );
+    } catch (error) {
+      order = null;
+    }
+
+    if (order != null)
+      throw order.customer_id() == user.id
+        ? new OrderError().orderAlreadyPlaced
+        : new OrderError().timeConflict;
   }
-  public async create(dto: OrderDto, customerId: string) {
+  public async create(dto: OrderDto, user: User, merchant: string) {
     try {
       const totalMinutes = (dto.details ?? []).reduce(
         (sum, it) => sum + (it.duration ?? 0),
@@ -49,7 +136,7 @@ export class OrderService {
       );
       const durationHours = Math.ceil(totalMinutes / 60);
 
-      const startHour = +dto.start_time;
+      const startHour = +dto.start_time.toString().slice(0, 2);
       const endHourRaw = +startHour + durationHours;
 
       const dayShift = Math.floor(endHourRaw / 24); // хэдэн өдөр давсан бэ
@@ -60,7 +147,7 @@ export class OrderService {
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
-        customer_id: dto.customer_id ?? customerId,
+        customer_id: dto.customer_id ?? user.id,
         user_id: dto.user_id,
         order_date: orderDate, // Date (өдөр давсан бол +1, +2 ...)
         start_time: toTimeString(startHour),
@@ -77,8 +164,16 @@ export class OrderService {
         status: STATUS.Active,
         user_desc: dto.user_desc ?? null,
       } as const;
+      await this.canPlaceOrder(
+        {
+          ...payload,
+        },
+        user,
+        dto.details,
+        merchant,
+      );
+
       const order = await this.dao.add(payload);
-      // 5) details-ийг зэрэг үүсгэнэ
       await Promise.all(
         (dto.details ?? []).map(async (d) => {
           const service = await this.service.findOne(d.service_id);
@@ -102,6 +197,7 @@ export class OrderService {
       return { id: order.id, invoice: '' };
     } catch (error) {
       console.log(error);
+      throw error;
     }
   }
 
@@ -357,6 +453,7 @@ export class OrderService {
             user_id: user.id,
           },
           user.id,
+          merchant,
         );
         console.log(res);
 

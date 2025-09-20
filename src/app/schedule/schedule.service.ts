@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { ScheduleDao } from './schedule.dao';
 import { ScheduleDto, UpdateScheduleDto } from './schedule.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
@@ -12,6 +12,7 @@ import {
   startOfISOWeek,
   STATUS,
   toTimeString,
+  ubDateAt00,
 } from 'src/base/constants';
 import { User } from '../user/user.entity';
 import { OrderService } from '../order/order.service';
@@ -20,6 +21,7 @@ import { OrderService } from '../order/order.service';
 export class ScheduleService {
   constructor(
     private readonly dao: ScheduleDao,
+    @Inject(forwardRef(() => OrderService))
     private readonly order: OrderService,
   ) {}
   public async create(dto: ScheduleDto, branch: string, user: User) {
@@ -88,6 +90,12 @@ export class ScheduleService {
 
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
+  }
+
+  public async findByUserDateTime(user: string, date: string, time: number) {
+    const jsDay = ubDateAt00(date).getDay();
+    const day = jsDay === 0 ? 7 : jsDay;
+    return await this.dao.findByUserDayTime(user, day, time);
   }
 
   public async checkSchedule(

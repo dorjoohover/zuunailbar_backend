@@ -94,6 +94,33 @@ export class OrdersDao {
       [id],
     );
   }
+
+  async getOrderByDateTime(
+    date: string | Date,
+    start_time: string,
+    end_time: string,
+    status: number,
+    user: string,
+  ) {
+    console.log(start_time, end_time, date);
+    const sql = `
+    SELECT *
+    FROM ${tableName}
+    WHERE order_status != $1
+      AND user_id = $2
+      AND order_date = $3
+      AND start_time between $4 and $5
+  `;
+
+    return this._db.select(sql, [
+      status,
+      user,
+      date.toString().slice(0, 10),
+      start_time,
+      end_time,
+    ]);
+  }
+
   async getOrders(userId: string) {
     const today = ubDateAt00(); // moment эсвэл өөр date util
     const year = today.getUTCFullYear();
@@ -200,7 +227,6 @@ export class OrdersDao {
     const items = await this._db.select(sql, builder.values);
     return { count, items };
   }
-  
 
   async search(filter: any): Promise<any[]> {
     let nameCondition = ``;

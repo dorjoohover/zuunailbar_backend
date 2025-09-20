@@ -186,7 +186,33 @@ export class ScheduleDao {
       terminalId,
     ]);
   }
+  async findByUserDayTime(user: string, day: number, time: number) {
+    // User-ийн өгөгдлийг авна
+    const res = await this._db.select(
+      `SELECT * FROM "${tableName}" 
+     WHERE "user_id" = $1
+       AND "status" = $2
+       AND "schedule_status" = $3
+       AND "index" = $4`,
+      [user, STATUS.Active, ScheduleStatus.Active, day],
+    );
 
+    if (!res || res.length === 0) return null;
+
+    // times field-ийг pipe '|'-ээр салгаж array болгох
+    const availableTimes: number[] = [];
+    for (const record of res) {
+      if (record.times) {
+        const timesArray = record.times.split('|').map((t) => parseInt(t, 10));
+        availableTimes.push(...timesArray);
+      }
+    }
+
+    // тухайн time байгаа эсэхийг boolean-аар шалгах
+    const isTimeAvailable = availableTimes.includes(time);
+
+    return { availableTimes, isTimeAvailable };
+  }
   async getDevice(udid: string) {
     return await this._db.selectOne(`SELECT * FROM "DEVICES" WHERE "udid"=$1`, [
       udid,

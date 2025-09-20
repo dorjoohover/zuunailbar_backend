@@ -9,7 +9,8 @@ export const MANAGER = 30;
 export const EMPLOYEE = 40;
 export const E_M = 35;
 export const CLIENT = 50;
-
+export const STARTTIME = 7;
+export const ENDTIME = 22;
 export const isOnlyFieldPresent = (query, field) => {
   const removeKeys = ['size', 'page', 'limit', 'skip', 'sort'];
   const filteredKeys = Object.keys(query).filter(
@@ -148,6 +149,7 @@ export enum CategoryType {
 export enum UserStatus {
   Active = 10,
   Deleted = 20,
+  Banned = 30,
 }
 export enum CostStatus {
   Paid = 10,
@@ -227,9 +229,9 @@ export enum SALARY_LOG_STATUS {
 }
 
 export const SalaryLogValue = {
-  [SALARY_LOG_STATUS.Pending] : 'Өгөөгүй',
-  [SALARY_LOG_STATUS.Paid] : 'Өгсөн',
-}
+  [SALARY_LOG_STATUS.Pending]: 'Өгөөгүй',
+  [SALARY_LOG_STATUS.Paid]: 'Өгсөн',
+};
 export enum PRODUCT_TRANSACTION_STATUS {
   Used = 10,
   Sold = 20,

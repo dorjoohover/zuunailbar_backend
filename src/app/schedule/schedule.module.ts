@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ScheduleService } from './schedule.service';
 import { ScheduleController } from './schedule.controller';
 import { AppDbModule } from 'src/core/db/database.module';
@@ -7,7 +7,7 @@ import { ScheduleDao } from './schedule.dao';
 import { OrderModule } from '../order/order.module';
 
 @Module({
-  imports: [AppDbModule, BaseModule, OrderModule],
+  imports: [AppDbModule, BaseModule, forwardRef(() => OrderModule)],
   controllers: [ScheduleController],
   providers: [ScheduleService, ScheduleDao],
   exports: [ScheduleService],

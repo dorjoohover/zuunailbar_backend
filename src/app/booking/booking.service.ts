@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { BookingDao } from './booking.dao';
 import { BookingDto } from './booking.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
@@ -20,6 +20,7 @@ import { ScheduleService } from '../schedule/schedule.service';
 export class BookingService {
   constructor(
     private readonly dao: BookingDao,
+    @Inject(forwardRef(() => ScheduleService))
     private readonly schedule: ScheduleService,
   ) {}
   public async create(dto: BookingDto, merchant: string, user: string) {
@@ -30,37 +31,40 @@ export class BookingService {
     const date = ubDateAt00(base);
     const bookings = await this.dao.findByDate(date, merchant, dto.branch_id);
     if (bookings?.length > 0) {
-      await Promise.all(
-        bookings.map(async (booking, index) => {
-          const parts = String(weekTimes[index])
-            .split('|')
-            .filter(Boolean)
-            .map(Number)
-            .filter((n) => Number.isFinite(n));
-          const bookingParts = String(booking.times)
-            .split('|')
-            .filter(Boolean)
-            .map(Number)
-            .filter((n) => Number.isFinite(n));
-          const times = Array.from(new Set([...parts, ...bookingParts])).sort(
-            (a, b) => a - b,
-          );
-          const start = times[0];
-          const end = times[times.length - 1];
-          const payload = {
-            times: times.length ? times.join('|') : null,
-            start_time: times.length ? toTimeString(start) : null,
-            end_time: times.length ? toTimeString(end) : null,
-          };
-          await this.dao.update(
-            { ...payload, id: booking.id },
-            getDefinedKeys(payload),
-          );
-        }),
-      );
-      return;
+      try {
+        await Promise.all(
+          bookings.map(async (booking, index) => {
+            const parts = String(weekTimes[index])
+              .split('|')
+              .filter(Boolean)
+              .map(Number)
+              .filter((n) => Number.isFinite(n));
+            const bookingParts = String(booking.times)
+              .split('|')
+              .filter(Boolean)
+              .map(Number)
+              .filter((n) => Number.isFinite(n));
+            const times = Array.from(new Set([...parts, ...bookingParts])).sort(
+              (a, b) => a - b,
+            );
+            const start = times[0];
+            const end = times[times.length - 1];
+            const payload = {
+              times: times.length ? times.join('|') : null,
+              start_time: times.length ? toTimeString(start) : null,
+              end_time: times.length ? toTimeString(end) : null,
+            };
+            await this.dao.update(
+              { ...payload, id: booking.id },
+              getDefinedKeys(payload),
+            );
+          }),
+        );
+        return;
+      } catch (error) {
+        console.log(error);
+      }
     }
-
     await Promise.all(
       weekTimes.map(async (timeLine, idx) => {
         // "8|10|12" -> [8,10,12]
@@ -139,6 +143,15 @@ export class BookingService {
 
   public async findOne(id: string) {
     return await this.dao.getById(id);
+  }
+
+  public async findByDateTime(
+    date: string,
+    time: number,
+    merchant: string,
+    branch_id: string,
+  ) {
+    return await this.dao.findByDateTime(date, time, merchant, branch_id);
   }
 
   public async update(id: string, dto: BookingDto) {

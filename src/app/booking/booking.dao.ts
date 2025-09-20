@@ -79,6 +79,43 @@ export class BookingDao {
     );
   }
 
+  async findByDateTime(
+    date: string,
+    time: number, // 10, 11 гэх мэт
+    merchant_id: string,
+    branch_id: string,
+  ) {
+    // Монголын огноо форматлах функц
+    const d = mnDate(date);
+
+    // Огноо дээр filter хийж record-уудыг авах
+    const res = await this._db.select(
+      `SELECT id, date, times 
+     FROM "${tableName}" 
+     WHERE "merchant_id" = $1
+       AND "status" = $2
+       AND "date" = $3::date
+       AND "branch_id" = $4`,
+      [merchant_id, STATUS.Active, d, branch_id],
+    );
+
+    if (!res || res.length === 0) return null; // record байхгүй бол
+
+    // res нь массив, times нь массив учраас тухайн time байгаа эсэхийг filter хийж авна
+    const availableTimes: number[] = [];
+    for (const record of res) {
+      if (record.times) {
+        const timesArray = record.times.split('|').map((t) => parseInt(t, 10));
+        availableTimes.push(...timesArray);
+      }
+    }
+
+    // тухайн time байгаа эсэхийг boolean-аар шалгах
+    const isTimeAvailable = availableTimes.includes(time);
+
+    return { availableTimes, isTimeAvailable };
+  }
+
   async getById(id: string) {
     return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "id"=$1`,

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { OrderController } from './order.controller';
 import { AppDbModule } from 'src/core/db/database.module';
@@ -10,6 +10,10 @@ import { QpayService } from './qpay.service';
 import { HttpModule } from '@nestjs/axios';
 import { ExcelService } from 'src/excel.service';
 import { UserModule } from '../user/user.module';
+import { BookingModule } from '../booking/booking.module';
+import { ScheduleModule } from '../schedule/schedule.module';
+import { AllExceptionsFilter } from 'src/core/utils/all-exceptions.filter';
+import { FileErrorLogService } from 'src/error-log.service';
 
 @Module({
   imports: [
@@ -19,9 +23,18 @@ import { UserModule } from '../user/user.module';
     ServiceModule,
     HttpModule,
     UserModule,
+    BookingModule,
+    forwardRef(() => ScheduleModule),
   ],
   controllers: [OrderController],
-  providers: [OrderService, OrdersDao, QpayService, ExcelService],
+  providers: [
+    OrderService,
+    OrdersDao,
+    QpayService,
+    ExcelService,
+    FileErrorLogService,
+    AllExceptionsFilter,
+  ],
   exports: [OrderService],
 })
 export class OrderModule {}
