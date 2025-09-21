@@ -31,39 +31,39 @@ export class BookingService {
     const date = ubDateAt00(base);
     const bookings = await this.dao.findByDate(date, merchant, dto.branch_id);
     if (bookings?.length > 0) {
-      try {
-        await Promise.all(
-          bookings.map(async (booking, index) => {
-            const parts = String(weekTimes[index])
-              .split('|')
-              .filter(Boolean)
-              .map(Number)
-              .filter((n) => Number.isFinite(n));
-            const bookingParts = String(booking.times)
-              .split('|')
-              .filter(Boolean)
-              .map(Number)
-              .filter((n) => Number.isFinite(n));
-            const times = Array.from(new Set([...parts, ...bookingParts])).sort(
-              (a, b) => a - b,
-            );
-            const start = times[0];
-            const end = times[times.length - 1];
-            const payload = {
-              times: times.length ? times.join('|') : null,
-              start_time: times.length ? toTimeString(start) : null,
-              end_time: times.length ? toTimeString(end) : null,
-            };
-            await this.dao.update(
-              { ...payload, id: booking.id },
-              getDefinedKeys(payload),
-            );
-          }),
-        );
-        return;
-      } catch (error) {
-        console.log(error);
-      }
+      await Promise.all(
+        bookings.map(async (booking, index) => {
+          const parts = String(weekTimes[index])
+            .split('|')
+            .filter(Boolean)
+            .map(Number)
+            .filter((n) => Number.isFinite(n));
+
+          let bookingParts = String(booking.times)
+            .split('|')
+            .filter(Boolean)
+            .map(Number)
+            .filter((n) => Number.isFinite(n));
+
+          const times = [
+            ...parts.filter((n) => !bookingParts.includes(n)),
+            ...bookingParts.filter((n) => !parts.includes(n)),
+          ];
+
+          const start = times[0];
+          const end = times[times.length - 1];
+          const payload = {
+            times: times.length ? times.join('|') : '',
+            start_time: times.length ? toTimeString(start) : null,
+            end_time: times.length ? toTimeString(end) : null,
+          };
+          await this.dao.update(
+            { ...payload, id: booking.id },
+            getDefinedKeys(payload),
+          );
+        }),
+      );
+      return;
     }
     await Promise.all(
       weekTimes.map(async (timeLine, idx) => {

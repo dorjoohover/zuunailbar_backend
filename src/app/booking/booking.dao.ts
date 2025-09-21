@@ -31,6 +31,7 @@ export class BookingDao {
   }
 
   async update(data: any, attr: string[]): Promise<number> {
+    console.log(data, attr);
     return await this._db.update(tableName, data, attr, [
       new SqlCondition('id', '=', data.id),
     ]);
