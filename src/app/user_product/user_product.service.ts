@@ -18,6 +18,7 @@ import {
 } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { BadRequest } from 'src/common/error';
 
 @Injectable()
 export class UserProductService {
@@ -26,6 +27,7 @@ export class UserProductService {
     private readonly userService: UserService,
     private readonly productService: ProductService,
   ) {}
+  private badRequestError = new BadRequest();
   public async create(dto: UserProductsDto) {
     if (!dto.items.length) return [];
 
@@ -36,7 +38,9 @@ export class UserProductService {
     const results = await Promise.all(
       dto.items.map(async (item) => {
         const product = await this.productService.findOne(item.product_id);
-
+        if (+product.quantity != 0) this.badRequestError.STOCK_EMPTY;
+        if (+product.quantity < +(item.quantity ?? '0'))
+          this.badRequestError.STOCK_INSUFFICIENT;
         return this.dao.add({
           ...item,
           id: AppUtils.uuid4(),

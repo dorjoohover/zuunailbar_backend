@@ -58,7 +58,7 @@ export class ProductWarehouseController {
 
   @Manager()
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: ProductWarehouseDto) {
+  update(@Param('id') id: string, @Body() dto: ProductsWarehouseDto) {
     return this.productWarehouseService.update(id, dto);
   }
 

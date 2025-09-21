@@ -31,6 +31,11 @@ export class BadRequest {
   get STOCK_INSUFFICIENT() {
     throw new HttpException('Үлдэгдэл хүрэлцэхгүй', HttpStatus.BAD_REQUEST);
   }
+
+  get STOCK_EMPTY() {
+    throw new HttpException('Үлдэгдэлгүй байна.', HttpStatus.BAD_REQUEST);
+  }
+
   static required(message: string) {
     throw new HttpException(
       `${firstLetterUpper(message)} is required`,
@@ -131,5 +136,21 @@ export class OrderError {
 export class NoPermissionException extends ForbiddenException {
   constructor(message = 'Эрх хүрэлцэхгүй байна') {
     super(message);
+  }
+}
+
+export class AuthError {
+  get unregister() {
+    throw new HttpException(
+      'Бүртгэлгүй хэрэглэгч байна.',
+      HttpStatus.FORBIDDEN,
+    );
+  }
+  get wrongPassword() {
+    throw new HttpException('Нууц үг буруу байна.', HttpStatus.FORBIDDEN);
+  }
+
+  get checkPermission() {
+    throw new HttpException('Эрх хүрэлцэхгүй байна.', HttpStatus.FORBIDDEN);
   }
 }

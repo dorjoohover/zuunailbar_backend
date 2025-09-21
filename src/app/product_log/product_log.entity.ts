@@ -8,6 +8,8 @@ export class ProductLog {
   public price: number;
   public currency: string;
   public currency_amount: number;
+  public unit_price: number;
+  public cargo: number;
   public total_amount: number;
   public paid_amount: number;
   public date: Date;

@@ -43,7 +43,6 @@ export class UserService {
     try {
       res = await this.dao.getByMobile(mobile);
     } catch (error) {
-      console.log(error);
       error.message?.toLowerCase().includes('not found')
         ? (res = null)
         : (res = 0);

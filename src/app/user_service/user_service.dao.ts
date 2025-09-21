@@ -115,6 +115,44 @@ export class UserServiceDao {
     const items = await this._db.select(sql, builder.values);
     return { count, items };
   }
+  async groupByUserList(query) {
+    if (query.id) {
+      query.id = `%${query.id}%`;
+    }
+    const builder = new SqlBuilder(query);
+    console.log(query);
+    const criteria = builder
+      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('user_id', '=', query.user_id)
+      .conditionIfNotEmpty('service_id', '=', query.service_id)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfArray('service_id', query.services?.split(','))
+      .criteria();
+    const sql = `
+  SELECT
+    user_id,
+    array_agg(json_build_object(
+      'service_id', service_id,
+      'service_name', service_name
+    )) AS services
+  FROM user_services
+
+  ${criteria}
+  GROUP BY user_id
+  ORDER BY MIN(created_at) DESC
+  LIMIT ${query.limit ?? 20}
+  OFFSET ${+query.skip * +(query.limit ?? 20)}
+`;
+    const countSql = `
+  SELECT COUNT(DISTINCT us.user_id)
+  FROM user_services us
+  ${criteria}
+`;
+
+    const count = await this._db.count(countSql, builder.values);
+    const items = await this._db.select(sql, builder.values);
+    return { count, items };
+  }
 
   async search(filter: any): Promise<any[]> {
     let nameCondition = ``;

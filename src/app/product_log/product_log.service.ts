@@ -23,7 +23,8 @@ export class ProductLogService {
       id: AppUtils.uuid4(),
       created_by: user,
       status: STATUS.Active,
-      // total_amount: dto.total_amount ?? +dto.price * +dto.quantity,
+      unit_price: dto.unit_price ?? 0,
+      cargo: dto.cargo ?? 0,
       total_amount: total_amount,
       paid_amount: paid_amount,
       product_log_status:
@@ -32,7 +33,7 @@ export class ProductLogService {
           : PRODUCT_LOG_STATUS.Remainder,
       price: dto.price ?? 0,
       currency: dto.currency ?? 'CNY',
-      currency_amount: 500,
+      currency_amount: dto.currency_amount ?? 500,
     });
   }
 

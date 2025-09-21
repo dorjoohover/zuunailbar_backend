@@ -107,8 +107,16 @@ export class ProductWarehouseService {
     return await this.dao.getById(id);
   }
 
-  public async update(id: string, dto: ProductWarehouseDto) {
-    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+  public async update(id: string, dto: ProductsWarehouseDto) {
+    await Promise.all(
+      dto.products.map(async (p) => {
+        const payload = p;
+        return await this.dao.update(
+          { ...payload, id },
+          getDefinedKeys(payload),
+        );
+      }),
+    );
   }
 
   public async remove(id: string) {

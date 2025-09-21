@@ -16,7 +16,7 @@ import { Admin, Employee, Manager } from 'src/auth/guards/role/role.decorator';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
-import { CLIENT, EMPLOYEE } from 'src/base/constants';
+import { CLIENT, EMPLOYEE, STATUS } from 'src/base/constants';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { SAP } from 'src/common/decorator/use-param.decorator';
 @ApiBearerAuth('access-token')
@@ -37,11 +37,12 @@ export class UserServiceController {
   findAll(@Pagination() pg: PaginationDto) {
     return this.userServiceService.findForClient(pg);
   }
+
   @Employee()
   @Get('employee')
   @PQ(UserServiceController.employeeFields)
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
-    return this.userServiceService.findAll(pg, user.user.role);
+    return this.userServiceService.findAllUserService(pg, user.user.role);
   }
 
   @Get('get/:id')
@@ -57,9 +58,8 @@ export class UserServiceController {
   }
 
   @Admin()
-  @Put(':id/:status')
-  @SAP(['status'])
-  remove(@Param('id') id: string, @Param('status') status: number) {
-    return this.userServiceService.updateStatus(id, status);
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.userServiceService.updateStatus(id, STATUS.Hidden);
   }
 }

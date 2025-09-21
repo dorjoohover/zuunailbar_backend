@@ -75,7 +75,7 @@ export class ProductDao {
       query.id = `%${query.id}%`;
     }
     if (query.name) {
-      query.name = `%${query.name}%`;
+      query.name = `%${query.name.toLowerCase()}%`;
     }
 
     const builder = new SqlBuilder(query);
@@ -84,7 +84,7 @@ export class ProductDao {
       .conditionIfNotEmpty('brand_id', '=', query.brand_id)
       .conditionIfNotEmpty('category_id', '=', query.category_id)
       .conditionIfNotEmpty('category_id', '!=', query.spending)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
+      .conditionIfNotEmpty('LOWER("name")', 'LIKE', query.name)
       .conditionIfNotEmpty('type', '=', query.type)
 
       .conditionIfNotEmpty('status', '=', query.status)

@@ -84,7 +84,16 @@ export class UserServiceService {
     };
   }
   public async findAll(pg: PaginationDto, role: number) {
-    return await this.dao.list(applyDefaultStatusFilter(pg, role));
+    const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
+
+    return res;
+  }
+  public async findAllUserService(pg: PaginationDto, role: number) {
+    const res = await this.dao.groupByUserList(
+      applyDefaultStatusFilter(pg, role),
+    );
+
+    return res;
   }
 
   public async findOne(id: string) {
@@ -105,10 +114,10 @@ export class UserServiceService {
       'updated_at',
     ]);
   }
-  public async deleteByUser(user_id: string) {
+  public async deleteByUser(id: string) {
     return await this.dao.updateByUser(
-      { user_id, status: STATUS.Hidden, updated_at: mnDate() },
-      ['user_id', 'status', 'updated_at'],
+      { id, status: STATUS.Hidden, updated_at: mnDate() },
+      ['id', 'status', 'updated_at'],
     );
   }
 }

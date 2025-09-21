@@ -5,9 +5,9 @@ import { AdminUserService } from 'src/app/admin.user/admin.user.service';
 import { LoginDto, RegisterDto, ResetPasswordDto } from './auth.dto';
 import { MobileFormat } from 'src/common/formatter';
 import { UserService } from 'src/app/user/user.service';
-import { CLIENT } from 'src/base/constants';
+import { ADMIN, CLIENT } from 'src/base/constants';
 import { FirebaseService } from 'src/base/firebase.service';
-import { BadRequest } from 'src/common/error';
+import { AuthError, BadRequest } from 'src/common/error';
 import axios from 'axios';
 
 @Injectable()
@@ -17,21 +17,31 @@ export class AuthService {
     private userService: UserService,
     private jwtService: JwtService,
   ) {}
+  private authError = new AuthError();
 
   async validateAdminUser(mobile: string, pass: string): Promise<any> {
-    const user = await this.adminUsersService.getAdminUser(mobile);
+    let user;
+    try {
+      user = await this.adminUsersService.getAdminUser(mobile);
+    } catch (error) {
+      user = null;
+    }
+
+    if (user == null) this.authError.unregister;
+
     const isMatch = await bcrypt.compare(pass, user.password);
+    if (isMatch != true) this.authError.wrongPassword;
+
     if (user && isMatch == true) {
       const { password, ...result } = user;
       return result;
     }
-    return false;
   }
 
   async adminLogin(user: any) {
     const result = await this.validateAdminUser(user.mobile, user.password);
-    if (!result) {
-      throw new UnauthorizedException();
+    if (result.role > ADMIN) {
+      this.authError.checkPermission;
     }
     return {
       accessToken: this.jwtService.sign({
