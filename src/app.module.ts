@@ -38,6 +38,7 @@ import { ScheduleModule as CronModule } from '@nestjs/schedule';
 import { TasksService } from './task.service';
 import { FileErrorLogService } from './error-log.service';
 import { ExcelService } from './excel.service';
+import { UserSalariesModule } from './app/user_salaries/user_salaries.module';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { ExcelService } from './excel.service';
     VoucherModule,
     CostModule,
     UserProductModule,
+    UserSalariesModule,
   ],
   controllers: [AppController],
   providers: [

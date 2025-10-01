@@ -12,9 +12,10 @@ import { ServiceService } from '../service/service.service';
 import { ServiceDao } from '../service/service.dao';
 import { DiscountService } from '../discount/discount.service';
 import { DiscountDao } from '../discount/discount.dao';
+import { UserSalariesModule } from '../user_salaries/user_salaries.module';
 
 @Module({
-  imports: [AppDbModule, BaseModule, BranchModule],
+  imports: [AppDbModule, BaseModule, BranchModule, UserSalariesModule],
   controllers: [UserController],
   providers: [
     UserService,

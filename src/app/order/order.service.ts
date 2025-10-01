@@ -58,8 +58,9 @@ export class OrderService {
     details: OrderDetailDto[],
     merchant: string,
   ) {
+    console.log(dto);
     if (user.role == EMPLOYEE) this.orderError.orderNotAllowed;
-
+    if (dto.order_status == OrderStatus.Friend) return;
     if (user.status == UserStatus.Banned) this.orderError.bannedUser;
     let artist;
     try {
@@ -100,7 +101,10 @@ export class OrderService {
       merchant,
       artist.branch_id,
     );
-    if (booking == null || !booking.isTimeAvailable)
+    if (
+      (booking == null || !booking.isTimeAvailable) &&
+      dto.order_status != OrderStatus.Friend
+    )
       this.orderError.nonWorkingHour;
     const schedule = await this.schedule.findByUserDateTime(
       dto.user_id,
@@ -143,7 +147,7 @@ export class OrderService {
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
 
       const orderDate = mnDate(dto.order_date);
-
+      console.log(dto);
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
@@ -208,6 +212,7 @@ export class OrderService {
   public async find(pg: PaginationDto, role: number) {
     try {
       const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
+      console.log(res)
       const items = await Promise.all(
         res.items.map(async (item) => {
           const detail = await this.orderDetail.find(
@@ -362,7 +367,7 @@ export class OrderService {
     await Promise.all(
       details.map(async (detail) => {
         await this.orderDetail.remove(detail.id);
-        await this.orderDetail.create(detail);
+        await this.orderDetail.create({ ...detail, order_id: id });
       }),
     );
   }
@@ -427,6 +432,7 @@ export class OrderService {
                   icon: null,
                   image: null,
                   pre_amount: 10000,
+                  duplicated: false,
                 },
                 merchant,
                 creater,

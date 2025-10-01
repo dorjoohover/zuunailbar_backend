@@ -27,7 +27,7 @@ export class ScheduleService {
   public async create(dto: ScheduleDto, branch: string, user: User) {
     const weekTimes = Array.from({ length: 7 }, (_, i) => dto.times?.[i] ?? '');
     const schedules = await this.dao.getByUser(dto.user_id);
-    if (schedules.length > 0) {
+    if (schedules?.length > 0) {
       await Promise.all(
         schedules.map(async (schedule, index) => {
           const parts = String(weekTimes[index])
@@ -95,7 +95,7 @@ export class ScheduleService {
   public async findByUserDateTime(user: string, date: string, time: number) {
     const jsDay = ubDateAt00(date).getDay();
     const day = jsDay === 0 ? 7 : jsDay;
-    return await this.dao.findByUserDayTime(user, day, time);
+    return await this.dao.findByUserDayTime(user, day - 1, time);
   }
 
   public async checkSchedule(

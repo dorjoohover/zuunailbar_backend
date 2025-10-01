@@ -213,6 +213,9 @@ export enum OrderStatus {
   Finished = 40,
   // tsutsalsan
   Cancelled = 50,
+  // tsutsalsan
+  Absent = 60,
+  Friend = 70,
 }
 export enum COST_STATUS {
   Paid = 10,

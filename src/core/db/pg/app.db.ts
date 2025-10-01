@@ -85,7 +85,7 @@ export class AppDB {
         }
       } catch (err: any) {
         if (err instanceof AppDBResultNotFoundException) {
-          console.warn('Select One not found!', `[${sql}], [${params}]`);
+          // console.warn('Select One not found!', `[${sql}], [${params}]`);
         } else if (err instanceof AppDBTooManyResultException) {
           console.warn('More than one result!', `[${sql}], [${params}]`);
         } else {

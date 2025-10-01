@@ -3,10 +3,10 @@ export class Booking {
   public approved_by: string;
   public merchant_id: string;
   public branch_id: string;
-  public date: Date;
   public start_time: string;
   public end_time: string;
   public status: number;
+  public index: number;
   public booking_status: number;
   public times: string;
   public created_at?: Date;

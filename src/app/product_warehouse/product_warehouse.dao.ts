@@ -30,24 +30,28 @@ export class ProductWarehouseDao {
     ]);
   }
 
-  async updateTags(data: any): Promise<number> {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "tags"=$1 WHERE "id"=$2`,
-      [data.tags, data.id],
+  async getByProductWarehouse(productId: string, warehouseId: string) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "product_id"=$1 and "warehouse_id"=$2`,
+      [productId, warehouseId],
     );
   }
-
-  async updateFee(id: string, fee: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
-      [fee, id],
+  async getByWarehouse(warehouseId: string) {
+    return await this._db.select(
+      `SELECT product_id, quantity FROM "${tableName}" WHERE  "warehouse_id"=$1`,
+      [warehouseId],
     );
   }
-
   async updateStatus(id: string, status: number): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
       [status, id],
+    );
+  }
+  async updateQuantity(id: string, quantity: number): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "quantity"=$1, "updated_at"=now() WHERE "id"=$2`,
+      [quantity, id],
     );
   }
 
@@ -79,7 +83,7 @@ export class ProductWarehouseDao {
       .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date')
       .criteria();
     const sql =
-      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by updated_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;

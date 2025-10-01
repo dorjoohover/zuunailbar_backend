@@ -23,6 +23,7 @@ export class ServiceDao {
       'description',
       'pre_amount',
       'branch_id',
+      'duplicated',
       'created_by',
       'status',
     ]);

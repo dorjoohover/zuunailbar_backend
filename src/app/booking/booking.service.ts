@@ -7,7 +7,6 @@ import {
   getDefinedKeys,
   mnDate,
   ScheduleStatus,
-  startOfISOWeek,
   STATUS,
   toTimeString,
   ubDateAt00,
@@ -24,22 +23,19 @@ export class BookingService {
     private readonly schedule: ScheduleService,
   ) {}
   public async create(dto: BookingDto, merchant: string, user: string) {
-    const base = startOfISOWeek(new Date(dto.date)); // Энэ 7 хоногийн Даваа
-
-    // dto.times урт нь 7 биш байж болно → 7 болгож дүүргэнэ
     const weekTimes = Array.from({ length: 7 }, (_, i) => dto.times?.[i] ?? '');
-    const date = ubDateAt00(base);
-    const bookings = await this.dao.findByDate(date, merchant, dto.branch_id);
+    const bookings = await this.dao.getLastWeek(merchant, dto.branch_id);
+    console.log(dto, weekTimes, bookings);
     if (bookings?.length > 0) {
       await Promise.all(
-        bookings.map(async (booking, index) => {
+        bookings.map(async (schedule, index) => {
           const parts = String(weekTimes[index])
             .split('|')
             .filter(Boolean)
             .map(Number)
             .filter((n) => Number.isFinite(n));
-
-          let bookingParts = String(booking.times)
+          if (parts.length == 0) return;
+          const bookingParts = String(schedule.times)
             .split('|')
             .filter(Boolean)
             .map(Number)
@@ -49,28 +45,25 @@ export class BookingService {
             ...parts.filter((n) => !bookingParts.includes(n)),
             ...bookingParts.filter((n) => !parts.includes(n)),
           ];
-
           const start = times[0];
           const end = times[times.length - 1];
-          const payload = {
-            times: times.length ? times.join('|') : '',
-            start_time: times.length ? toTimeString(start) : null,
-            end_time: times.length ? toTimeString(end) : null,
-          };
-          await this.dao.update(
-            { ...payload, id: booking.id },
-            getDefinedKeys(payload),
-          );
+          if (times.length > 0) {
+            const payload = {
+              times: times.length ? times.join('|') : null, // "" хадгална
+              start_time: times.length ? toTimeString(start) : null,
+              end_time: times.length ? toTimeString(end) : null,
+            };
+            await this.dao.update(
+              { id: schedule.id, ...payload },
+              getDefinedKeys(payload),
+            );
+          }
         }),
       );
       return;
     }
     await Promise.all(
       weekTimes.map(async (timeLine, idx) => {
-        // "8|10|12" -> [8,10,12]
-        const targetDate = new Date(base);
-        targetDate.setHours(0, 0, 0, 0);
-        targetDate.setDate(targetDate.getDate() + idx);
         const parts = String(timeLine)
           .split('|')
           .filter(Boolean)
@@ -84,15 +77,15 @@ export class BookingService {
         await this.dao.add({
           ...dto,
           id: AppUtils.uuid4(),
-          merchant_id: merchant,
+          branch_id: dto.branch_id,
           approved_by: user,
-          booking_status: ScheduleStatus.Pending,
+          booking_status: ScheduleStatus.Active,
           status: STATUS.Active,
-
-          date: targetDate,
+          index: idx,
           times: parts.length ? parts.join('|') : null,
           start_time: parts.length ? toTimeString(start) : null,
           end_time: parts.length ? toTimeString(end) : null,
+          merchant_id: merchant,
         });
       }),
     );
@@ -151,7 +144,9 @@ export class BookingService {
     merchant: string,
     branch_id: string,
   ) {
-    return await this.dao.findByDateTime(date, time, merchant, branch_id);
+    const jsDay = ubDateAt00(date).getDay();
+    const day = jsDay === 0 ? 7 : jsDay;
+    return await this.dao.findByDateTime(day - 1, time, merchant, branch_id);
   }
 
   public async update(id: string, dto: BookingDto) {

@@ -22,6 +22,9 @@ export class BranchService {
   async findOne(id: string) {
     return await this.dao.getById(id);
   }
+  async findByMerchant(id: string) {
+    return await this.dao.getByMerchant(id);
+  }
 
   public async find(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));

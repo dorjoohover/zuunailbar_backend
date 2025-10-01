@@ -7,4 +7,5 @@ export class BranchDto {
   name: string;
   @ApiProperty()
   address: string;
+  order_days: number;
 }

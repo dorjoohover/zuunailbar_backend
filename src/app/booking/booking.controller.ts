@@ -29,11 +29,11 @@ import { SAP } from 'src/common/decorator/use-param.decorator';
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
-  private static clientFields = ['branch_id', 'date', 'start_time', 'end_time'];
+  private static clientFields = ['branch_id', 'index', 'start_time', 'end_time'];
   private static fields = [
     'user_id',
     'end_time',
-    'date',
+    'index',
     'start_time',
     'booking_status',
     'status',

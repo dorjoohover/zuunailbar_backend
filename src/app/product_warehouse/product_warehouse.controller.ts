@@ -16,12 +16,13 @@ import {
   ProductWarehouseDto,
 } from './product_warehouse.dto';
 import { Admin, Employee, Manager } from 'src/auth/guards/role/role.decorator';
-import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
-import { Pagination } from 'src/common/decorator/pagination.decorator';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PQ, SQ } from 'src/common/decorator/use-pagination-query.decorator';
+import { Filter, Pagination } from 'src/common/decorator/pagination.decorator';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { Response } from 'express';
 import { CLIENT } from 'src/base/constants';
+import { BadRequest } from 'src/common/error';
 @ApiBearerAuth('access-token')
 @Controller('product_warehouse')
 export class ProductWarehouseController {
@@ -40,6 +41,13 @@ export class ProductWarehouseController {
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.productWarehouseService.findAll({ ...pg }, user.user.role);
   }
+  @Get('search')
+  @SQ(['id', 'limit', 'page', 'type', 'warehouse_id'])
+  search(@Filter() sd: SearchDto, @Req() { user }) {
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
+    return this.productWarehouseService.search(sd, user.merchant.id);
+  }
+
   @Employee()
   @Get('get/:id')
   findOne(@Param('id') id: string) {

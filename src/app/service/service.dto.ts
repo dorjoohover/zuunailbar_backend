@@ -19,4 +19,6 @@ export class ServiceDto {
   duration: number;
   @ApiProperty()
   branch_id: string;
+  isAll?: boolean;
+  duplicated: boolean;
 }

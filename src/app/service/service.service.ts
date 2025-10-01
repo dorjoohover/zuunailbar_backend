@@ -9,18 +9,36 @@ import { DiscountService } from '../discount/discount.service';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { User } from '../user/user.entity';
 import { UserServiceService } from '../user_service/user_service.service';
+import { BranchService } from '../branch/branch.service';
 
 @Injectable()
 export class ServiceService {
   constructor(
     private readonly dao: ServiceDao,
     private readonly discount: DiscountService,
+    private readonly branchService: BranchService,
     @Inject(forwardRef(() => UserServiceService))
     private readonly userService: UserServiceService,
     // private readonly schedule: ScheduleService,
     // private readonly booking: BookingService,
   ) {}
   public async create(dto: ServiceDto, merchant: string, user: User) {
+    if (dto.isAll) {
+      const branches = await this.branchService.findByMerchant(merchant);
+      await Promise.all(
+        branches.map(async (branch) => {
+          await this.dao.add({
+            ...dto,
+            id: AppUtils.uuid4(),
+            branch_id: branch.id,
+            merchant_id: merchant,
+            created_by: user.id,
+            status: STATUS.Active,
+          });
+        }),
+      );
+      return;
+    }
     BadRequest.branchNotFound(dto.branch_id, user.role);
     const res = await this.dao.add({
       ...dto,
@@ -42,13 +60,10 @@ export class ServiceService {
     res.count = list.count;
     const items = [];
     for (const item of list.items) {
-      let discount;
       let service = item;
-      try {
-        discount = await this.discount.findByService(item.id);
-      } catch (error) {
-        discount = undefined;
-      }
+
+      const discount = await this.discount.findByService(item.id);
+
       if (discount) {
         const value = await this.discount.calculateDiscountedPrice(
           discount.type,

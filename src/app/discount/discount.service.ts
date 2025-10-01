@@ -66,7 +66,11 @@ export class DiscountService {
     };
   }
   public async findByService(id: string) {
-    return await this.dao.getByService(id);
+    try {
+      return await this.dao.getByService(id);
+    } catch (error) {
+      return null;
+    }
   }
 
   public async update(id: string, dto: DiscountDto) {

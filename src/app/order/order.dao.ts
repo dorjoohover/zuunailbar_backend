@@ -48,20 +48,6 @@ export class OrdersDao {
     ]);
   }
 
-  async updateTags(data: any): Promise<number> {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "tags"=$1 WHERE "id"=$2`,
-      [data.tags, data.id],
-    );
-  }
-
-  async updateFee(id: string, fee: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
-      [fee, id],
-    );
-  }
-
   async updateOrderStatus(id: string, status: number): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "order_status"=$1 WHERE "id"=$2`,
@@ -102,13 +88,13 @@ export class OrdersDao {
     status: number,
     user: string,
   ) {
-    console.log(start_time, end_time, date);
     const sql = `
     SELECT *
     FROM ${tableName}
     WHERE order_status != $1
       AND user_id = $2
       AND order_date = $3
+      and order_status != ${OrderStatus.Friend}
       AND start_time between $4 and $5
   `;
 
@@ -144,6 +130,7 @@ export class OrdersDao {
     SELECT *
     FROM ${tableName}
     WHERE order_status = $1
+    AND order_status != ${OrderStatus.Friend}
       AND user_id = $2
       AND order_date >= $3
       AND order_date < $4
@@ -176,6 +163,7 @@ export class OrdersDao {
       ON  o.user_id = $5
       AND o.order_date = $1::date
       AND o.status = $3
+      AND o.order_status != ${OrderStatus.Friend}
       AND o.order_status <= $4
       -- [start, end) завсарт багтсан цагийг барина
       AND (
@@ -205,7 +193,7 @@ export class OrdersDao {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
-
+    query.friend = query.friend ? 0 : OrderStatus.Friend;
     const builder = new SqlBuilder(query);
     const criteria = builder
       // nemne
@@ -213,15 +201,16 @@ export class OrdersDao {
       .conditionIfNotEmpty('user_id', '=', query.user_id)
       .conditionIfNotEmpty('costumer_id', '=', query.costumer_id)
       .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('order_status', '!=', query.friend)
       .conditionIfNotEmpty('order_status', '=', query.order_status)
       .conditionIfNotEmpty('start_time', '=', query.times)
       .conditionIfNotEmpty('order_date', '=', query.date)
-
       .criteria();
     const sql =
       `SELECT ${columns ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
+
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
@@ -238,58 +227,12 @@ export class OrdersDao {
     const builder = new SqlBuilder(filter);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend)
+      .conditionIfNotEmpty('status', '!=', STATUS.Hidden)
       .criteria();
     return await this._db.select(
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
       builder.values,
     );
-  }
-
-  async pairs(query) {
-    const items = await this._db.select(
-      `SELECT "id" as "key", CONCAT("id", '-', "name") as "value" FROM "${tableName}" order by "id" asc`,
-      {},
-    );
-    return items;
-  }
-
-  async getMerchantsByTag(value: string) {
-    return await this._db.select(
-      `SELECT * FROM "${tableName}" m 
-             WHERE $1 = ANY(m."tags")`,
-      [value],
-    );
-  }
-
-  async terminalList(merchantId: string) {
-    return this._db.select(
-      `SELECT "id", "udid", "name" FROM "TERMINALS" WHERE "merchantId"=$1 order by "id" asc`,
-      [merchantId],
-    );
-  }
-
-  async updateTerminalStatus(id: string, status: number) {
-    return await this._db._update(
-      `UPDATE "TERMINALS" SET "status"=$1 WHERE "id"=$2`,
-      [status, id],
-    );
-  }
-
-  async updateDeviceStatus(udid: string, status: number) {
-    return await this._db._update(
-      `UPDATE "DEVICES" SET "status"=$1 WHERE "udid"=$2`,
-      [status, udid],
-    );
-  }
-  async getTerminal(terminalId: string) {
-    return await this._db.selectOne(`SELECT * FROM "TERMINALS" WHERE "id"=$1`, [
-      terminalId,
-    ]);
-  }
-
-  async getDevice(udid: string) {
-    return await this._db.selectOne(`SELECT * FROM "DEVICES" WHERE "udid"=$1`, [
-      udid,
-    ]);
   }
 }

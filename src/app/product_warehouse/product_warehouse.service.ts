@@ -8,7 +8,7 @@ import { AppUtils } from 'src/core/utils/app.utils';
 import { getDefinedKeys, mnDate, STATUS, ubDateAt00 } from 'src/base/constants';
 import { ProductService } from '../product/product.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
-import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { Response } from 'express';
 import { ExcelService } from 'src/excel.service';
@@ -28,21 +28,66 @@ export class ProductWarehouseService {
       products.map(async (pro) => {
         const product = await this.product.findOne(pro.product_id);
 
-        await this.dao.add({
-          ...pro,
-          warehouse_id: warehouse.id,
-          product_name: product.name,
-          warehouse_name: warehouse.name,
-          id: AppUtils.uuid4(),
-          created_by: user,
-          status: STATUS.Active,
-        });
+        let productWarehouse;
+        try {
+          productWarehouse = await this.dao.getByProductWarehouse(
+            pro.product_id,
+            warehouse.id,
+          );
+        } catch (error) {
+          productWarehouse = null;
+        }
+        if (productWarehouse && productWarehouse != null) {
+          const quantity =
+            +(productWarehouse.quantity ?? 0) + +(pro.quantity ?? 0);
+          await this.dao.updateQuantity(productWarehouse.id, quantity);
+        } else {
+          await this.dao.add({
+            ...pro,
+            warehouse_id: warehouse.id,
+            product_name: product.name,
+            warehouse_name: warehouse.name,
+            id: AppUtils.uuid4(),
+            created_by: user,
+            status: STATUS.Active,
+          });
+        }
       }),
     );
   }
 
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
+  }
+
+  public async search(filter: SearchDto, merchant: string) {
+    let results = await this.product.search(filter, merchant);
+    if (filter.warehouse_id) {
+      const warehouseProducts = await this.dao.getByWarehouse(
+        filter.warehouse_id,
+      );
+      const warehouseMap = new Map<number, number>();
+      warehouseProducts.forEach((p) =>
+        warehouseMap.set(p.product_id, p.quantity),
+      );
+
+      results = results.map((r) => {
+        const parts = r.value.split('__');
+        let qty = parseInt(parts[3], 10) || 0;
+
+        const whQty = warehouseMap.get(r.id) ?? 0;
+        qty = qty - whQty;
+        qty = qty < 0 ? 0 : qty;
+        parts[3] = qty.toString();
+        return {
+          ...r,
+          value: parts.join('__'),
+          quantity: whQty,
+        };
+      });
+    }
+
+    return results;
   }
 
   public async report(pg: PaginationDto, role: number, res: Response) {

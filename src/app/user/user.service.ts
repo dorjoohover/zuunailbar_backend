@@ -22,11 +22,13 @@ import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { RegisterDto } from 'src/auth/auth.dto';
 import { BranchService } from '../branch/branch.service';
 import { UserServiceService } from '../user_service/user_service.service';
+import { UserSalariesService } from '../user_salaries/user_salaries.service';
 @Injectable()
 export class UserService {
   constructor(
     private readonly dao: UserDao,
     private readonly userService: UserServiceService,
+    private readonly userSalary: UserSalariesService,
     private readonly branchService: BranchService,
   ) {}
   public async create(
@@ -53,7 +55,7 @@ export class UserService {
     if (branch_id) branch = await this.branchService.findOne(branch_id);
     if (dto.branch_id) branch = await this.branchService.findOne(dto.branch_id);
     const password = await this.hash(dto.password);
-    await this.dao.add({
+    const result = await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
       status: STATUS.Active,
@@ -66,8 +68,16 @@ export class UserService {
       branch_name: branch_id ? branch.name : null,
       birthday: new Date(dto.birthday),
       color: dto.color,
-      percent: null,
     });
+    if (dto.duration || dto.percent || dto.date) {
+      await this.userSalary.create({
+        user_id: result,
+        duration: dto.duration,
+        percent: dto.percent,
+        status: STATUS.Active,
+        date: dto.date,
+      });
+    }
   }
   private async hash(password: string) {
     return await bcrypt.hash(password, saltOrRounds);
@@ -106,7 +116,6 @@ export class UserService {
         device: null,
         branch_name: null,
         color: null,
-        percent: dto.percent ?? 30,
       });
       return {
         id,

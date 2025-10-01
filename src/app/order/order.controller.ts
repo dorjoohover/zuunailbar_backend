@@ -55,7 +55,7 @@ export class OrderController {
   }
 
   @Get()
-  @PQ()
+  @PQ(['order_status', 'friend'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.orderService.find(pg, user.user.role);
   }

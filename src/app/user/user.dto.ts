@@ -15,6 +15,9 @@ export class UserDto {
   @ApiProperty()
   branch_id: string;
   branch_name?: string;
+  duration?: number;
+  date?: Date;
+  percent?: number;
   @ApiProperty()
   role: number;
   @ApiProperty()

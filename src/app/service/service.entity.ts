@@ -10,6 +10,7 @@ export class Service {
   public image: string;
   public icon: string;
   public description: string;
+  public duplicated: boolean;
   public status: number;
   public created_by: string;
   public created_at?: Date;
