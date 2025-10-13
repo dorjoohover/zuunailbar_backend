@@ -41,6 +41,7 @@ import { ScheduleService } from '../schedule/schedule.service';
 @Injectable()
 export class OrderService {
   private orderError = new OrderError();
+  private orderLimit = 7;
   constructor(
     private readonly dao: OrdersDao,
     private readonly orderDetail: OrderDetailService,
@@ -132,6 +133,9 @@ export class OrderService {
         ? new OrderError().orderAlreadyPlaced
         : new OrderError().timeConflict;
   }
+  public async updateOrderLimit(limit: number) {
+    this.orderLimit = limit;
+  }
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
       const totalMinutes = (dto.details ?? []).reduce(
@@ -212,7 +216,7 @@ export class OrderService {
   public async find(pg: PaginationDto, role: number) {
     try {
       const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
-      console.log(res)
+      console.log(res);
       const items = await Promise.all(
         res.items.map(async (item) => {
           const detail = await this.orderDetail.find(

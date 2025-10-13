@@ -96,6 +96,12 @@ export class OrderController {
   ) {
     return await this.orderService.report(pg, CLIENT, res);
   }
+  @Get('limit/:limit')
+  @Admin()
+  @ApiParam({ name: 'liimt' })
+  async limit(@Param('limit') limit: number) {
+    return this.orderService.updateOrderLimit(limit);
+  }
 
   @Employee()
   @Patch('/update/:id')
