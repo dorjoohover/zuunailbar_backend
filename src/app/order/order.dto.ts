@@ -63,3 +63,9 @@ export class PaymentReportQueryDto {
   @IsEnum(ReportFormat)
   format?: ReportFormat = ReportFormat.XLSX;
 }
+
+export class AvailableTimeDto {
+  branch_id: string;
+  date?: Date;
+  serviceArtist: Record<string, string | null>;
+}

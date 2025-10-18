@@ -98,6 +98,55 @@ export class ScheduleService {
     return await this.dao.findByUserDayTime(user, day - 1, time);
   }
 
+  public async getAvailableTime(user: string, date?: Date) {
+    let today = date ? ubDateAt00(date) : ubDateAt00();
+    const isSpecificDate = !!date; // true бол зөвхөн тухайн өдөр шалгах
+    let attempts = 0;
+
+    while (true) {
+      const weekday = (today.getDay() + 6) % 7;
+      const currentHour =
+        today.getHours() + Math.floor((today.getMinutes() + 59.9) / 60);
+
+      // Тухайн өдрийн боломжит цагийг DAO-оос авна
+      const pg = { user_id: user, index: weekday };
+      const result = await this.dao.list({
+        ...pg,
+        status: STATUS.Active,
+        limit: 100,
+        sort: 1,
+        skip: 0,
+      });
+      if (result?.items?.length) {
+        const res = result.items[0];
+        const times = res.times
+          .split('|')
+          .map(Number)
+          .filter((a) => a >= currentHour);
+
+        if (times.length > 0) {
+          return {
+            weekday,
+            date: today,
+            times,
+          };
+        }
+      }
+
+      if (isSpecificDate) {
+        return null;
+      }
+
+      today = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+      today.setHours(0, 0, 0, 0);
+      attempts += 1;
+
+      if (attempts >= 7) {
+        return null;
+      }
+    }
+  }
+
   public async checkSchedule(
     items: Record<string, string | number[] | number>[],
   ): Promise<

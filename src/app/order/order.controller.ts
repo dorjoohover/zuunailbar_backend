@@ -21,7 +21,12 @@ import {
   ApiParam,
   ApiProduces,
 } from '@nestjs/swagger';
-import { OrderDto, PaymentReportQueryDto, ReportFormat } from './order.dto';
+import {
+  AvailableTimeDto,
+  OrderDto,
+  PaymentReportQueryDto,
+  ReportFormat,
+} from './order.dto';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
@@ -101,6 +106,11 @@ export class OrderController {
   @ApiParam({ name: 'liimt' })
   async limit(@Param('limit') limit: number) {
     return this.orderService.updateOrderLimit(limit);
+  }
+  @Post('available_times')
+  @Public()
+  async availableTimes(@Body() dto: AvailableTimeDto) {
+    return this.orderService.getAvailableTimes(dto);
   }
 
   @Employee()

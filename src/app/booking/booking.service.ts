@@ -14,6 +14,7 @@ import {
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { ScheduleService } from '../schedule/schedule.service';
+import { Booking } from './booking.entity';
 
 @Injectable()
 export class BookingService {
@@ -93,45 +94,53 @@ export class BookingService {
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
+  public async getAvailableTime(branch_id: string, date?: Date) {
+    let today = date ? ubDateAt00(date) : ubDateAt00();
+    const isSpecificDate = !!date; // true бол зөвхөн тухайн өдөр шалгах
+    let attempts = 0;
 
-  public async findClient(pg: PaginationDto) {
-    const date = mnDate();
-    const res = await this.dao.list(
-      applyDefaultStatusFilter({ ...pg, start_date: date, times: -1 }, CLIENT),
-    );
-    if (!res.items?.length) {
-      return { count: 0, items: [] };
-    }
-    // N мөрийг зэрэг шалгах
-    const items: Record<string, number[]>[] = await Promise.all(
-      res.items.map((r) => {
-        const d = new Date(r.date);
-        if (r.times == null) return;
-        const date = new Date(d);
-        const key = new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'Asia/Ulaanbaatar',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }).format(date);
-        const day = date.getUTCDay();
-        const times: number[] = (r.times ?? '')
+    while (true) {
+      const weekday = (today.getDay() + 6) % 7;
+      const currentHour =
+        today.getHours() + Math.floor((today.getMinutes() + 59.9) / 60);
+
+      // Тухайн өдрийн боломжит цагийг DAO-оос авна
+      const pg = { branch_id, index: weekday };
+      const result = await this.dao.list({
+        ...pg,
+        status: STATUS.Active,
+        limit: 100,
+        sort: 1,
+        skip: 0,
+      });
+      if (result?.items?.length) {
+        const res = result.items[0];
+        const times = res.times
           .split('|')
-          .map((s) => s.trim())
-          .filter((s) => s !== '')
-          .map((s) => Number(s))
-          .filter((n) => Number.isFinite(n));
+          .map(Number)
+          .filter((a) => a >= currentHour);
 
-        return { [`${key}|${day}`]: times };
-      }),
-    );
+        if (times.length > 0) {
+          return {
+            weekday,
+            date: today,
+            times,
+          };
+        }
+      }
 
-    const overlap = await this.schedule.checkSchedule(items);
+      if (isSpecificDate) {
+        return null;
+      }
 
-    return {
-      count: items.length,
-      items: [{ overlap }],
-    };
+      today = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+      today.setHours(0, 0, 0, 0);
+      attempts += 1;
+
+      if (attempts >= 7) {
+        return null;
+      }
+    }
   }
 
   public async findOne(id: string) {

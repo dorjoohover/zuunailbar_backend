@@ -106,7 +106,28 @@ export class OrdersDao {
       end_time,
     ]);
   }
+  async getLastOrderOfArtist(artistId: string) {
+    const sql = `
+    SELECT order_date, start_time, end_time
+    FROM ${tableName}
+    WHERE user_id = $1
+      AND order_status NOT IN ($2, $3, $4, $5, $6)
+      ORDER BY order_date DESC, end_time DESC
+      LIMIT 1
+      `;
+      // AND order_date >= CURRENT_DATE - INTERVAL '1 day'
 
+    const params = [
+      artistId,
+      OrderStatus.Cancelled,
+      OrderStatus.Active,
+      OrderStatus.Started,
+      OrderStatus.Pending,
+      OrderStatus.Friend,
+    ];
+
+    return await this._db.select(sql, params);
+  }
   async getOrders(userId: string) {
     const today = ubDateAt00(); // moment эсвэл өөр date util
     const year = today.getUTCFullYear();

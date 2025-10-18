@@ -1,5 +1,5 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
-import { OrderDto } from './order.dto';
+import { AvailableTimeDto, OrderDto } from './order.dto';
 import { OrdersDao } from './order.dao';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
@@ -59,7 +59,6 @@ export class OrderService {
     details: OrderDetailDto[],
     merchant: string,
   ) {
-    console.log(dto);
     if (user.role == EMPLOYEE) this.orderError.orderNotAllowed;
     if (dto.order_status == OrderStatus.Friend) return;
     if (user.status == UserStatus.Banned) this.orderError.bannedUser;
@@ -135,6 +134,68 @@ export class OrderService {
   }
   public async updateOrderLimit(limit: number) {
     this.orderLimit = limit;
+  }
+  private async getLastOrderOfArtist(user: string) {
+    const results = await this.dao.getLastOrderOfArtist(user);
+    return results[0];
+  }
+  private getTargetDate(dtoDate?: Date, artist?: Order): Date {
+    let artistDateTime: Date | undefined;
+
+    if (artist) {
+      artistDateTime = new Date(artist.order_date);
+      const [hour, minute] = artist.end_time.split(':').map(Number);
+      artistDateTime.setHours(hour, minute, 0, 0); // цаг, минут, секунд, мс
+    }
+
+    // dtoDate байхгүй бол өнөөдөр
+    const referenceDate = dtoDate || ubDateAt00();
+
+    if (artistDateTime) {
+      return artistDateTime > referenceDate ? artistDateTime : referenceDate;
+    }
+
+    return referenceDate;
+  }
+  public async getAvailableTimes(dto: AvailableTimeDto) {
+    console.log(dto);
+    const firstArtist = Object.values(dto.serviceArtist).find(
+      (artist): artist is string => !!artist,
+    );
+
+    let availableTimes: number[] = [];
+    let targetDate: Date | undefined;
+
+    if (firstArtist) {
+      // 2. Эхний artist-ийн сүүлчийн захиалгыг авах
+      const artistOrder = await this.getLastOrderOfArtist(firstArtist);
+
+      // 3. TargetDate-ийг тодорхойлох
+      targetDate = this.getTargetDate(dto.date, artistOrder);
+
+      // 4. Эхний artist-ийн боломжит цагийг авах
+      const artistSchedule = await this.schedule.getAvailableTime(
+        firstArtist,
+        targetDate,
+      );
+
+      // 5. Branch-ийн боломжит цагийг авах
+      const branchBooking = await this.booking.getAvailableTime(
+        dto.branch_id,
+        targetDate,
+      );
+
+      // 6. Давхцсан цагийг гаргах (intersection)
+      availableTimes = (artistSchedule?.times || []).filter((t) =>
+        branchBooking?.times?.includes(t),
+      );
+    }
+    console.log({ date: targetDate, times: availableTimes });
+    return {
+      date: targetDate,
+      times: availableTimes,
+      limit: this.orderLimit,
+    };
   }
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {

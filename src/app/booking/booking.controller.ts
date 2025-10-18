@@ -29,7 +29,13 @@ import { SAP } from 'src/common/decorator/use-param.decorator';
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
-  private static clientFields = ['branch_id', 'index', 'start_time', 'end_time'];
+  private static clientFields = [
+    'branch_id',
+    'index',
+    'start_time',
+    'end_time',
+    'users',
+  ];
   private static fields = [
     'user_id',
     'end_time',
@@ -45,15 +51,6 @@ export class BookingController {
     return this.bookingService.create(dto, user.merchant.id, user.user.id);
   }
 
-  @Get()
-  @Public()
-  @PQ(BookingController.clientFields)
-  findAll(@Pagination() pg: PaginationDto) {
-    return this.bookingService.findClient({
-      ...pg,
-      schedule_status: ScheduleStatus.Active,
-    });
-  }
   @Get('employee')
   @PQ(BookingController.fields)
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
