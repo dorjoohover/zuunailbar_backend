@@ -111,19 +111,16 @@ export class OrdersDao {
     SELECT order_date, start_time, end_time
     FROM ${tableName}
     WHERE user_id = $1
-      AND order_status NOT IN ($2, $3, $4, $5, $6)
+      AND order_status NOT IN ($2, $3)
+      AND order_date >= CURRENT_DATE - INTERVAL '1 day'
       ORDER BY order_date DESC, end_time DESC
       LIMIT 1
       `;
-      // AND order_date >= CURRENT_DATE - INTERVAL '1 day'
 
     const params = [
       artistId,
       OrderStatus.Cancelled,
-      OrderStatus.Active,
-      OrderStatus.Started,
-      OrderStatus.Pending,
-      OrderStatus.Friend,
+      OrderStatus.Finished,
     ];
 
     return await this._db.select(sql, params);

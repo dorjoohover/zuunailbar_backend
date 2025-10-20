@@ -103,9 +103,20 @@ export class OrderController {
   }
   @Get('limit/:limit')
   @Admin()
-  @ApiParam({ name: 'liimt' })
+  @ApiParam({ name: 'limit' })
   async limit(@Param('limit') limit: number) {
     return this.orderService.updateOrderLimit(limit);
+  }
+  @Get('check/:invoice/:id')
+  @ApiParam({ name: 'id' })
+  @ApiParam({ name: 'invoice' })
+  async check(@Param('id') id: string, @Param('invoice') invoice: string) {
+    return this.orderService.checkPayment(invoice, id);
+  }
+  @Get('cancel/:id')
+  @ApiParam({ name: 'id' })
+  async cancel(@Param('id') id: string) {
+    return this.orderService.cancelOrder(id);
   }
   @Post('available_times')
   @Public()

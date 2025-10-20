@@ -21,4 +21,5 @@ export class ServiceDto {
   branch_id: string;
   isAll?: boolean;
   duplicated: boolean;
+  pre?: number
 }

@@ -33,6 +33,7 @@ export class ServiceService {
             branch_id: branch.id,
             merchant_id: merchant,
             created_by: user.id,
+            pre: dto.pre ?? 0,
             status: STATUS.Active,
           });
         }),
@@ -43,7 +44,7 @@ export class ServiceService {
     const res = await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
-
+      pre: dto.pre ?? 0,
       merchant_id: merchant,
       created_by: user.id,
       status: STATUS.Active,

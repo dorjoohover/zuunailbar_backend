@@ -17,6 +17,7 @@ export class ServiceDao {
       'name',
       'min_price',
       'image',
+      'pre',
       'icon',
       'max_price',
       'duration',

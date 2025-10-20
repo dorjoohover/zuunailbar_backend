@@ -28,6 +28,7 @@ export class OrderDto {
   discount_type: number;
   @ApiProperty()
   discount: number;
+
   @ApiProperty({ isArray: true })
   details: OrderDetailDto[];
 }

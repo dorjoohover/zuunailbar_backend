@@ -11,6 +11,7 @@ export class Service {
   public icon: string;
   public description: string;
   public duplicated: boolean;
+  public pre: number;
   public status: number;
   public created_by: string;
   public created_at?: Date;

@@ -81,21 +81,25 @@ export class QpayService {
     }
   }
   private async authenticate() {
-    const response = await this.httpService
-      .post(
-        `${this.baseUrl}auth/token`,
-        {},
-        {
-          auth: {
-            username: process.env.QPAY_CLIENT_ID,
-            password: process.env.QPAY_CLIENT_SECRET,
+    try {
+      const response = await this.httpService
+        .post(
+          `${this.baseUrl}auth/token`,
+          {},
+          {
+            auth: {
+              username: process.env.QPAY_CLIENT_ID,
+              password: process.env.QPAY_CLIENT_SECRET,
+            },
           },
-        },
-      )
-      .toPromise();
-    this.accessToken = response.data.access_token;
-    this.refreshToken = response.data.refresh_token;
-    this.expiresIn = new Date(Date.now() + response.data.expires_in * 1000);
+        )
+        .toPromise();
+      this.accessToken = response.data.access_token;
+      this.refreshToken = response.data.refresh_token;
+      this.expiresIn = new Date(Date.now() + response.data.expires_in * 1000);
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   // ✅ Invoice үүсгэх
@@ -107,7 +111,8 @@ export class QpayService {
   ) {
     try {
       const res = this.requestWithToken('POST', 'invoice', {
-        invoice_code: 'Zuunailbar',
+        // invoice_code: 'Zuunailbar',
+        invoice_code: process.env.QPAY_INVOICE_CODE,
         sender_invoice_no: `${order_id}`,
         sender_branch_code: branch,
         invoice_receiver_code: `${userId}`,

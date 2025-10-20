@@ -84,16 +84,8 @@ export class OrderService {
     const start_time = +dto.start_time.slice(0, 2);
     if (start_time < STARTTIME || start_time > ENDTIME)
       this.orderError.invalidHour;
-    const order_date = ubDateAt00(dto.order_date);
-    const now = ubDateAt00();
-    const isAdmin = user.role <= ADMIN;
-
-    if (
-      !isAdmin &&
-      (order_date < now ||
-        (order_date.getTime() === now.getTime() && now.getHours() < start_time))
-    )
-      this.orderError.nonWorkingHour;
+    const date = ubDateAt00(dto.order_date);
+    date.setHours(+(start_time ?? 0), 0, 0);
 
     const booking = await this.booking.findByDateTime(
       dto.order_date as string,
@@ -127,8 +119,8 @@ export class OrderService {
       order = null;
     }
 
-    if (order != null)
-      throw order.customer_id() == user.id
+    if (order != null && order.length != 0)
+      throw order.customer_id == user.id
         ? new OrderError().orderAlreadyPlaced
         : new OrderError().timeConflict;
   }
@@ -139,7 +131,7 @@ export class OrderService {
     const results = await this.dao.getLastOrderOfArtist(user);
     return results[0];
   }
-  private getTargetDate(dtoDate?: Date, artist?: Order): Date {
+  private getTargetDate(dtoDate?: Date, artist?: Order) {
     let artistDateTime: Date | undefined;
 
     if (artist) {
@@ -147,15 +139,22 @@ export class OrderService {
       const [hour, minute] = artist.end_time.split(':').map(Number);
       artistDateTime.setHours(hour, minute, 0, 0); // цаг, минут, секунд, мс
     }
-
     // dtoDate байхгүй бол өнөөдөр
-    const referenceDate = dtoDate || ubDateAt00();
-
+    const referenceDate = ubDateAt00(dtoDate) || ubDateAt00();
     if (artistDateTime) {
-      return artistDateTime > referenceDate ? artistDateTime : referenceDate;
+      return artistDateTime >= referenceDate
+        ? {
+            date: artistDateTime,
+            time: artist.end_time.split(':').map(Number)[0],
+          }
+        : {
+            date: referenceDate,
+          };
     }
 
-    return referenceDate;
+    return {
+      date: referenceDate,
+    };
   }
   public async getAvailableTimes(dto: AvailableTimeDto) {
     console.log(dto);
@@ -169,9 +168,11 @@ export class OrderService {
     if (firstArtist) {
       // 2. Эхний artist-ийн сүүлчийн захиалгыг авах
       const artistOrder = await this.getLastOrderOfArtist(firstArtist);
-
+      console.log(artistOrder);
       // 3. TargetDate-ийг тодорхойлох
-      targetDate = this.getTargetDate(dto.date, artistOrder);
+
+      const target = this.getTargetDate(dto.date, artistOrder);
+      targetDate = target.date;
 
       // 4. Эхний artist-ийн боломжит цагийг авах
       const artistSchedule = await this.schedule.getAvailableTime(
@@ -189,8 +190,11 @@ export class OrderService {
       availableTimes = (artistSchedule?.times || []).filter((t) =>
         branchBooking?.times?.includes(t),
       );
+      console.log(target);
+      if (target.time) {
+        availableTimes = availableTimes.filter((a) => a >= target.time);
+      }
     }
-    console.log({ date: targetDate, times: availableTimes });
     return {
       date: targetDate,
       times: availableTimes,
@@ -203,6 +207,7 @@ export class OrderService {
         (sum, it) => sum + (it.duration ?? 0),
         0,
       );
+
       const durationHours = Math.ceil(totalMinutes / 60);
 
       const startHour = +dto.start_time.toString().slice(0, 2);
@@ -212,7 +217,6 @@ export class OrderService {
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
 
       const orderDate = mnDate(dto.order_date);
-      console.log(dto);
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
@@ -230,7 +234,7 @@ export class OrderService {
         pre_amount: dto.pre_amount ?? 10000,
         is_pre_amount_paid: true,
         order_status: dto.order_status ?? OrderStatus.Pending,
-        status: STATUS.Active,
+        status: STATUS.Pending,
         user_desc: dto.user_desc ?? null,
       } as const;
       await this.canPlaceOrder(
@@ -243,9 +247,11 @@ export class OrderService {
       );
 
       const order = await this.dao.add(payload);
+      let pre = 0;
       await Promise.all(
         (dto.details ?? []).map(async (d) => {
           const service = await this.service.findOne(d.service_id);
+          pre += service.pre;
           await this.orderDetail.create({
             id: AppUtils.uuid4(),
             order_id: order,
@@ -256,14 +262,28 @@ export class OrderService {
           });
         }),
       );
+      if (pre > 0) {
+        const invoice = await this.qpay.createInvoice(
+          pre,
+          order.id,
+          user.id,
+          dto.branch_name,
+        );
 
-      // const invoice = await this.qpay.createInvoice(
-      //   10000,
-      //   order.id,
-      //   customerId,
-      //   dto.branch_name,
-      // );
-      return { id: order.id, invoice: '' };
+        return {
+          id: order,
+          invoice: {
+            ...invoice,
+            price: pre,
+            status: OrderStatus.Pending,
+            created: new Date(),
+          },
+        };
+      } else {
+        await this.updatePrePaid(order, true);
+        await this.dao.updateOrderStatus(order, OrderStatus.Active);
+        return { id: order };
+      }
     } catch (error) {
       console.log(error);
       throw error;
@@ -274,10 +294,28 @@ export class OrderService {
     return await this.dao.getById(id);
   }
 
+  public async checkPayment(invoiceId: string, id: string) {
+    const res = await this.qpay.checkPayment(invoiceId);
+    if (res?.paid_amount) {
+      await this.updateStatus(id, OrderStatus.Active);
+      return {
+        status: OrderStatus.Active,
+        paid: true,
+      };
+    }
+    return {
+      paid: false,
+    };
+  }
+
+  public async cancelOrder(id: string) {
+    await this.dao.updateOrderStatus(id, OrderStatus.Cancelled);
+    return true;
+  }
+
   public async find(pg: PaginationDto, role: number) {
     try {
       const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
-      console.log(res);
       const items = await Promise.all(
         res.items.map(async (item) => {
           const detail = await this.orderDetail.find(
