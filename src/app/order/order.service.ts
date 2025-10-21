@@ -93,11 +93,11 @@ export class OrderService {
       merchant,
       artist.branch_id,
     );
-    if (
-      (booking == null || !booking.isTimeAvailable) &&
-      dto.order_status != OrderStatus.Friend
-    )
-      this.orderError.nonWorkingHour;
+    // if (
+    //   (booking == null || !booking.isTimeAvailable) &&
+    //   dto.order_status != OrderStatus.Friend
+    // )
+    //   this.orderError.nonWorkingHour;
     const schedule = await this.schedule.findByUserDateTime(
       dto.user_id,
       dto.order_date as string,
