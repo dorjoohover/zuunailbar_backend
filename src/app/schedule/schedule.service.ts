@@ -99,7 +99,7 @@ export class ScheduleService {
   }
 
   public async getAvailableTime(user: string, date?: Date) {
-    let today = date ? ubDateAt00(date) : ubDateAt00();
+    let today = date ? new Date(date) : new Date();
     const isSpecificDate = !!date; // true бол зөвхөн тухайн өдөр шалгах
     let attempts = 0;
 
