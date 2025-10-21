@@ -262,6 +262,7 @@ export class OrderService {
         status: STATUS.Pending,
         user_desc: dto.user_desc ?? null,
       } as const;
+      console.log(payload);
       await this.canPlaceOrder(
         {
           ...payload,
@@ -272,6 +273,7 @@ export class OrderService {
       );
 
       const order = await this.dao.add(payload);
+      console.log(order);
       let pre = 0;
       await Promise.all(
         (dto.details ?? []).map(async (d) => {
@@ -287,6 +289,7 @@ export class OrderService {
           });
         }),
       );
+      console.log(pre);
       if (pre > 0) {
         const invoice = await this.qpay.createInvoice(
           pre,
@@ -294,6 +297,7 @@ export class OrderService {
           user.id,
           dto.branch_name,
         );
+        console.log(invoice);
 
         return {
           id: order,
