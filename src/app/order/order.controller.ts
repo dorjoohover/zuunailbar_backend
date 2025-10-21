@@ -55,6 +55,7 @@ export class OrderController {
 
   @Post()
   create(@Body() dto: OrderDto, @Req() { user }) {
+    console.log(user)
     BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.orderService.create(dto, user.user, user.merchant.id);
   }
