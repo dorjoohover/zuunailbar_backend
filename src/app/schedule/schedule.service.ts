@@ -104,13 +104,15 @@ export class ScheduleService {
     let attempts = 0;
 
     while (true) {
-      const weekday = (today.getDay() + 6) % 7;
+      console.log(today.getDay())
+      let weekday = today.getDay() - 1;
+      if (weekday == -1) weekday = 6;
       const currentHour =
         today.getHours() + Math.floor((today.getMinutes() + 59.9) / 60);
 
       // Тухайн өдрийн боломжит цагийг DAO-оос авна
       const pg = { user_id: user, index: weekday };
-      console.log(weekday)
+      console.log(weekday);
       const result = await this.dao.list({
         ...pg,
         status: STATUS.Active,

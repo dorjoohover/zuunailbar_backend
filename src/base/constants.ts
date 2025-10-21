@@ -66,7 +66,7 @@ export function toTimeString(hour: number | string): string {
 export function startOfISOWeek(d: Date) {
   const date = new Date(d);
   let isoDay = date.getDay() - 1;
-  isoDay == -1 && 6;
+  if(isoDay == -1) isoDay = 6 
   date.setDate(date.getDate() - isoDay);
   date.setHours(0, 0, 0, 0);
   return date;
