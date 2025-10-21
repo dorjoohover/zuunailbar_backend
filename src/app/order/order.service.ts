@@ -146,7 +146,7 @@ export class OrderService {
       artistDateTime.setHours(hour, minute, 0, 0); // цаг, минут, секунд, мс
     }
     // dtoDate байхгүй бол өнөөдөр
-    const referenceDate = ubDateAt00(dtoDate) || ubDateAt00();
+    const referenceDate = new Date(dtoDate) || ubDateAt00();
     if (artistDateTime) {
       return artistDateTime >= referenceDate
         ? {
