@@ -110,6 +110,7 @@ export class ScheduleService {
 
       // Тухайн өдрийн боломжит цагийг DAO-оос авна
       const pg = { user_id: user, index: weekday };
+      console.log(weekday)
       const result = await this.dao.list({
         ...pg,
         status: STATUS.Active,
@@ -117,6 +118,7 @@ export class ScheduleService {
         sort: 1,
         skip: 0,
       });
+      console.log('result', result);
       if (result?.items?.length) {
         const res = result.items[0];
         const times = res.times

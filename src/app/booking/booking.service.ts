@@ -103,7 +103,7 @@ export class BookingService {
       const weekday = (today.getDay() + 6) % 7;
       const currentHour =
         today.getHours() + Math.floor((today.getMinutes() + 59.9) / 60);
-
+      console.log(weekday)  
       // Тухайн өдрийн боломжит цагийг DAO-оос авна
       const pg = { branch_id, index: weekday };
       const result = await this.dao.list({
@@ -113,6 +113,7 @@ export class BookingService {
         sort: 1,
         skip: 0,
       });
+      console.log(result, 'result')
       if (result?.items?.length) {
         const res = result.items[0];
         const times = res.times

@@ -195,7 +195,7 @@ export class OrderService {
         dto.branch_id,
         targetDate,
       );
-      console.log(artistSchedule, 'branch');
+      console.log(branchBooking, 'branch');
 
       // 6. Давхцсан цагийг гаргах (intersection)
       availableTimes = (artistSchedule?.times || []).filter((t) =>
