@@ -150,7 +150,7 @@ export class OrderService {
     let referenceDate = new Date();
     if (dtoDate) {
       const minutes = referenceDate.getMinutes();
-      let hour = referenceDate.getHours();
+      let hour = referenceDate.getHours() + 8;
       minutes > 0 && hour++;
       const day = referenceDate.getDate();
       const date = new Date(dtoDate);
@@ -158,6 +158,8 @@ export class OrderService {
       if (day == date.getDate()) {
         referenceDate.setHours(hour, 0, 0);
       }
+    } else {
+      referenceDate.setHours(0, 0, 0);
     }
     if (artistDateTime) {
       return artistDateTime >= referenceDate
