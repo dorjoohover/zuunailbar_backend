@@ -65,7 +65,8 @@ export function toTimeString(hour: number | string): string {
 }
 export function startOfISOWeek(d: Date) {
   const date = new Date(d);
-  const isoDay = (date.getDay() + 6) % 7; // 0=Даваа, 6=Ням
+  let isoDay = date.getDay() - 1;
+  isoDay == -1 && 6;
   date.setDate(date.getDate() - isoDay);
   date.setHours(0, 0, 0, 0);
   return date;
