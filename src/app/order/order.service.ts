@@ -131,7 +131,13 @@ export class OrderService {
     const results = await this.dao.getLastOrderOfArtist(user);
     return results[0];
   }
-  private getTargetDate(dtoDate?: Date, artist?: Order) {
+  private getTargetDate({
+    dtoDate,
+    artist,
+  }: {
+    dtoDate?: Date;
+    artist?: Order;
+  }) {
     let artistDateTime: Date | undefined;
 
     if (artist) {
@@ -164,14 +170,18 @@ export class OrderService {
 
     let availableTimes: number[] = [];
     let targetDate: Date | undefined;
-
+    console.log('firstArtist', firstArtist);
     if (firstArtist) {
       // 2. Эхний artist-ийн сүүлчийн захиалгыг авах
       const artistOrder = await this.getLastOrderOfArtist(firstArtist);
       console.log(artistOrder);
       // 3. TargetDate-ийг тодорхойлох
 
-      const target = this.getTargetDate(dto.date, artistOrder);
+      const target = this.getTargetDate({
+        artist: artistOrder,
+        dtoDate: dto.date,
+      });
+      console.log(target);
       targetDate = target.date;
 
       // 4. Эхний artist-ийн боломжит цагийг авах
@@ -179,12 +189,13 @@ export class OrderService {
         firstArtist,
         targetDate,
       );
-
+      console.log(artistSchedule, 'schedules');
       // 5. Branch-ийн боломжит цагийг авах
       const branchBooking = await this.booking.getAvailableTime(
         dto.branch_id,
         targetDate,
       );
+      console.log(artistSchedule, 'branch');
 
       // 6. Давхцсан цагийг гаргах (intersection)
       availableTimes = (artistSchedule?.times || []).filter((t) =>
