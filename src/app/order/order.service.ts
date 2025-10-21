@@ -98,13 +98,13 @@ export class OrderService {
     //   dto.order_status != OrderStatus.Friend
     // )
     //   this.orderError.nonWorkingHour;
-    const schedule = await this.schedule.findByUserDateTime(
-      dto.user_id,
-      dto.order_date as string,
-      start_time,
-    );
-    if (schedule == null || !schedule.isTimeAvailable)
-      this.orderError.artistTimeUnavailable;
+    // const schedule = await this.schedule.findByUserDateTime(
+    //   dto.user_id,
+    //   dto.order_date as string,
+    //   start_time,
+    // );
+    // if (schedule == null || !schedule.isTimeAvailable)
+    //   this.orderError.artistTimeUnavailable;
 
     let order;
     try {
