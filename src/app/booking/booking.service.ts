@@ -98,7 +98,7 @@ export class BookingService {
     let today = date ? ubDateAt00(date) : ubDateAt00();
     const isSpecificDate = !!date; // true бол зөвхөн тухайн өдөр шалгах
     let attempts = 0;
-
+    console.log(today)
     while (true) {
       const weekday = (today.getDay() + 6) % 7;
       const currentHour =
