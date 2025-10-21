@@ -146,7 +146,19 @@ export class OrderService {
       artistDateTime.setHours(hour, minute, 0, 0); // цаг, минут, секунд, мс
     }
     // dtoDate байхгүй бол өнөөдөр
-    const referenceDate = new Date(dtoDate) || new Date();
+
+    let referenceDate = new Date();
+    if (dtoDate) {
+      const minutes = referenceDate.getMinutes();
+      let hour = referenceDate.getHours();
+      minutes > 0 && hour++;
+      const day = referenceDate.getDate();
+      const date = new Date(dtoDate);
+      referenceDate = date;
+      if (day == date.getDate()) {
+        referenceDate.setHours(hour, 0, 0);
+      }
+    }
     if (artistDateTime) {
       return artistDateTime >= referenceDate
         ? {
