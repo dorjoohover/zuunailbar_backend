@@ -18,11 +18,11 @@ export class HomeController {
   constructor(private readonly homeService: HomeService) {}
 
   @Post('home')
-  createHome(@Body() dto: HomesDto) {
+  createHome(@Body() dto: HomeDto) {
     return this.homeService.create(dto);
   }
   @Post('feature')
-  createFeature(@Body() dto: FeaturesDto) {
+  createFeature(@Body() dto: FeatureDto) {
     return this.homeService.createFeature(dto);
   }
   @Public()

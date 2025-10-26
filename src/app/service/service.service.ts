@@ -19,8 +19,6 @@ export class ServiceService {
     private readonly branchService: BranchService,
     @Inject(forwardRef(() => UserServiceService))
     private readonly userService: UserServiceService,
-    // private readonly schedule: ScheduleService,
-    // private readonly booking: BookingService,
   ) {}
   public async create(dto: ServiceDto, merchant: string, user: User) {
     if (dto.isAll) {
@@ -33,8 +31,10 @@ export class ServiceService {
             branch_id: branch.id,
             merchant_id: merchant,
             created_by: user.id,
+            category: dto.category ?? null,
             pre: dto.pre ?? 0,
             status: STATUS.Active,
+            view: dto.view == 0 ? null : dto.view,
           });
         }),
       );
@@ -48,6 +48,8 @@ export class ServiceService {
       merchant_id: merchant,
       created_by: user.id,
       status: STATUS.Active,
+      category: dto.category ?? null,
+      view: dto.view == 0 ? null : dto.view,
     });
     return res;
   }
@@ -105,8 +107,30 @@ export class ServiceService {
     return await this.dao.findName(name);
   }
 
-  public async update(id: string, dto: ServiceDto) {
-    await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+  public async update(id: string, dto: ServiceDto, merchant: string) {
+    const { isAll, ...body } = dto;
+    if (isAll) {
+      const branches = await this.branchService.findByMerchant(merchant);
+      await Promise.all(
+        branches.map(async (branch) => {
+          const { branch_id, ...payload } = body;
+          await this.dao.update(
+            {
+              ...payload,
+              id,
+              branch_id: branch.id,
+              view: payload.view == 0 ? null : payload.view,
+            },
+            getDefinedKeys(body),
+          );
+        }),
+      );
+    } else {
+      await this.dao.update(
+        { ...body, id, view: body.view == 0 ? null : body.view },
+        getDefinedKeys(body),
+      );
+    }
   }
 
   public async remove(id: string) {

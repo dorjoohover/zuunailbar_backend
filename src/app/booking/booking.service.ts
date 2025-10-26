@@ -26,17 +26,16 @@ export class BookingService {
   public async create(dto: BookingDto, merchant: string, user: string) {
     const weekTimes = Array.from({ length: 7 }, (_, i) => dto.times?.[i] ?? '');
     const bookings = await this.dao.getLastWeek(merchant, dto.branch_id);
-    console.log(dto, weekTimes, bookings);
     if (bookings?.length > 0) {
       await Promise.all(
-        bookings.map(async (schedule, index) => {
-          const parts = String(weekTimes[index])
+        weekTimes.map(async (weekTime, index) => {
+          const parts = weekTime
             .split('|')
             .filter(Boolean)
             .map(Number)
             .filter((n) => Number.isFinite(n));
           if (parts.length == 0) return;
-          const bookingParts = String(schedule.times)
+          const bookingParts = String(bookings[index].times)
             .split('|')
             .filter(Boolean)
             .map(Number)
@@ -55,7 +54,7 @@ export class BookingService {
               end_time: times.length ? toTimeString(end) : null,
             };
             await this.dao.update(
-              { id: schedule.id, ...payload },
+              { id: bookings[index].id, ...payload },
               getDefinedKeys(payload),
             );
           }
@@ -98,7 +97,6 @@ export class BookingService {
     let today = date ? new Date(date) : new Date();
     const isSpecificDate = !!date; // true бол зөвхөн тухайн өдөр шалгах
     let attempts = 0;
-    console.log(today);
     while (true) {
       let weekday = today.getDay() - 1;
       if (weekday == -1) weekday = 6;

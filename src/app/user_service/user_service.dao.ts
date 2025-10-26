@@ -98,14 +98,17 @@ export class UserServiceDao {
     }
     const builder = new SqlBuilder(query);
 
-    const criteria = builder
+    builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
       .conditionIfNotEmpty('service_id', '=', query.service_id)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
-      .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfArray('service_id', query.services?.split(','))
-      .criteria();
+      .conditionIfNotEmpty('status', '=', query.status);
+    if (query.services) {
+      builder.conditionIfArray('service_id', query.services?.split(','));
+    }
+
+    const criteria = builder.criteria();
     const sql =
       `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
@@ -120,7 +123,6 @@ export class UserServiceDao {
       query.id = `%${query.id}%`;
     }
     const builder = new SqlBuilder(query);
-    console.log(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)

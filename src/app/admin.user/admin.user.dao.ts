@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { saltOrRounds } from 'src/base/constants';
+import { MobileFormat, MobileParser } from 'src/common/formatter';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlBuilder, SqlCondition } from 'src/core/db/pg/sql.builder';
 
@@ -41,7 +42,6 @@ export class AdminUserDao {
   };
 
   changePassword = async (id: string, password: string) => {
-   
     password = await bcrypt.hash(password, saltOrRounds);
 
     const builder = new SqlBuilder({ password }, ['password']);
@@ -149,8 +149,8 @@ export class AdminUserDao {
 
   get = async (mobile: any) => {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE lower("mobile")= lower($1)`,
-      [mobile],
+      `SELECT * FROM "${tableName}" WHERE mobile = $1 or mobile = $2`,
+      [MobileFormat(mobile), MobileParser(mobile)],
     );
   };
 }

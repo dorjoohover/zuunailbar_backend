@@ -18,12 +18,13 @@ export class ServiceDao {
       'min_price',
       'image',
       'pre',
+      'view',
       'icon',
       'max_price',
       'duration',
       'description',
-      'pre_amount',
       'branch_id',
+      'category',
       'duplicated',
       'created_by',
       'status',
@@ -91,6 +92,7 @@ export class ServiceDao {
       .conditionIfNotEmpty('merchant_id', '=', query.merchant_id)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('view', '=', query.view)
       .conditionIfNotEmpty('name', 'LIKE', query.name)
       .criteria();
     const sql =

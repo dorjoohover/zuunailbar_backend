@@ -11,7 +11,8 @@ export class Feature {
   public id: string;
   public title: string;
   public description: string;
-  public icon: number;
+  public icon: string;
+  public index: number;
   public status: number;
   public created_at?: Date;
 }

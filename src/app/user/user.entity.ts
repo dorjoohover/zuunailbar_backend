@@ -2,7 +2,6 @@ export class User {
   public id: string;
   public firstname: string;
   public lastname: string;
-  public otp?: string;
   public role: number;
   public mobile: string;
   public birthday: Date;
@@ -16,6 +15,7 @@ export class User {
   public device: string;
   public profile_img: string;
   public nickname: string;
+  public salary_day: number;
   public experience: number;
   public branch_name: string;
   // push notification d heregtei

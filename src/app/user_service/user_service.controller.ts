@@ -31,13 +31,6 @@ export class UserServiceController {
     return this.userServiceService.create(dto, user.user);
   }
 
-  @Public()
-  @Get()
-  @PQ(UserServiceController.clientFields)
-  findAll(@Pagination() pg: PaginationDto) {
-    return this.userServiceService.findForClient(pg);
-  }
-
   @Employee()
   @Get('employee')
   @PQ(UserServiceController.employeeFields)

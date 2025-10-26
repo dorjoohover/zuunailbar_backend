@@ -20,6 +20,7 @@ export class UserDao {
         'firstname',
         'added_by',
         'lastname',
+        'salary_day',
         'mobile',
         'birthday',
         'password',
@@ -71,12 +72,7 @@ export class UserDao {
       [status, id],
     );
   }
-  async updateOtp(mobile: string, otp: string): Promise<number> {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "mobile"=$1 WHERE "otp"=$2`,
-      [mobile, otp],
-    );
-  }
+
   async updatePercent(id: string, percent: number): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "percent"=$1 WHERE "id"=$2`,

@@ -14,6 +14,7 @@ import {
   MANAGER,
   mnDate,
   OrderStatus,
+  SalaryProcessStatus,
   STARTTIME,
   STATUS,
   toTimeString,
@@ -37,6 +38,9 @@ import { OrderError } from 'src/common/error';
 import { OrderDetailDto } from '../order_detail/order_detail.dto';
 import { BookingService } from '../booking/booking.service';
 import { ScheduleService } from '../schedule/schedule.service';
+import { UserServiceService } from '../user_service/user_service.service';
+import { unescape } from 'querystring';
+import { SalaryLogService } from '../salary_log/salary_log.service';
 
 @Injectable()
 export class OrderService {
@@ -52,6 +56,8 @@ export class OrderService {
     @Inject(forwardRef(() => ScheduleService))
     private schedule: ScheduleService,
     private qpay: QpayService,
+    private userService: UserServiceService,
+    private salaryService: SalaryLogService,
   ) {}
   public async canPlaceOrder(
     dto: Order,
@@ -62,13 +68,19 @@ export class OrderService {
     if (user.role == EMPLOYEE) this.orderError.orderNotAllowed;
     if (dto.order_status == OrderStatus.Friend) return;
     if (user.status == UserStatus.Banned) this.orderError.bannedUser;
-    let artist;
+    let artists;
     try {
-      artist = await this.user.findOne(dto.user_id);
+      artists = await Promise.all(
+        details.map(async (d) => (await this.user.findOne(d.user_id)).role),
+      );
     } catch (error) {
-      artist = null;
+      artists = null;
     }
-    if (artist == null || (artist.role <= EMPLOYEE && artist >= MANAGER))
+    if (
+      artists == null ||
+      artists.filter((artist) => artist <= EMPLOYEE && artist >= MANAGER)
+        .length == 0
+    )
       this.orderError.userNotFound;
     let client;
     try {
@@ -86,49 +98,142 @@ export class OrderService {
       this.orderError.invalidHour;
     const date = ubDateAt00(dto.order_date);
     date.setHours(+(start_time ?? 0), 0, 0);
-
+    console.log(dto.branch_id);
     const booking = await this.booking.findByDateTime(
       dto.order_date as string,
       start_time,
       merchant,
-      artist.branch_id,
+      dto.branch_id,
     );
-    // if (
-    //   (booking == null || !booking.isTimeAvailable) &&
-    //   dto.order_status != OrderStatus.Friend
-    // )
-    //   this.orderError.nonWorkingHour;
-    // const schedule = await this.schedule.findByUserDateTime(
-    //   dto.user_id,
-    //   dto.order_date as string,
-    //   start_time,
-    // );
-    // if (schedule == null || !schedule.isTimeAvailable)
-    //   this.orderError.artistTimeUnavailable;
+    console.log(booking, dto, start_time, details);
+    if (
+      (booking == null || !booking.isTimeAvailable) &&
+      dto.order_status != OrderStatus.Friend
+    )
+      this.orderError.nonWorkingHour;
+    await Promise.all(
+      details.map(async (detail) => {
+        const schedule = await this.schedule.findByUserDateTime(
+          detail.user_id,
+          dto.order_date as string,
+          start_time,
+        );
+        console.log(schedule);
+        if (schedule == null || !schedule.isTimeAvailable)
+          this.orderError.artistTimeUnavailable;
+      }),
+    );
 
-    let order;
-    try {
-      order = await this.dao.getOrderByDateTime(
-        dto.order_date,
-        dto.start_time,
-        dto.end_time,
-        OrderStatus.Cancelled,
-        dto.user_id,
-      );
-    } catch (error) {
-      order = null;
-    }
+    await Promise.all(
+      details.map(async (detail) => {
+        let order;
+        try {
+          order = await this.dao.getOrderByDateTime(
+            dto.order_date,
+            dto.start_time,
+            dto.end_time,
+            OrderStatus.Cancelled,
+            detail.user_id,
+          );
+        } catch (error) {
+          order = null;
+        }
+        if (order != null && order.length != 0)
+          throw order.customer_id == user.id
+            ? new OrderError().orderAlreadyPlaced
+            : new OrderError().timeConflict;
+      }),
+    );
+  }
 
-    if (order != null && order.length != 0)
-      throw order.customer_id == user.id
-        ? new OrderError().orderAlreadyPlaced
-        : new OrderError().timeConflict;
+  public async getArtists(dto: OrderDto) {
+    const userService = await this.userService.findForClient(
+      dto.branch_id,
+      dto.services,
+    );
+    const bookingRes = (
+      await this.booking.findAll(
+        { limit: 100, skip: 0, sort: false, branch_id: dto.branch_id },
+        CLIENT,
+      )
+    )?.items;
+    const bookings = {};
+    bookingRes.map((b) => {
+      bookings[+b.index] = b.times?.split('|').map(Number);
+    });
+    console.log(bookings);
+    const services = [];
+    userService.items.map((u) => {
+      if (
+        dto.services.includes(u.service_id) &&
+        !services.includes(u.service_id)
+      )
+        services.push(u.service_id);
+    });
+    const artistsWithSlots = await Promise.all(
+      userService.items.map(async (us) => {
+        const schedulesItems = await this.schedule.findAll(
+          { limit: 100, skip: 0, sort: false, user_id: us.user.id },
+          CLIENT,
+        );
+        const orders = await this.dao.getOrdersOfArtist(us.user.id);
+
+        const occupiedSlots = orders.map((o) => {
+          const date = new Date(o.order_date);
+          let day = date.getDay() - 1;
+          if (day === -1) day = 6;
+          return {
+            day,
+            date,
+            start_time: +o.start_time?.slice(0, 2),
+            end_time: +o.end_time?.slice(0, 2),
+          };
+        });
+        const slotsByDay: Record<string, number[]> = {};
+        const schedules = await Promise.all(
+          schedulesItems.items.map(async (schedule) => {
+            const { index, times } = schedule;
+            const slotTimes = times.split('|').map(Number);
+            const overlaps = slotTimes.filter((t) =>
+              bookings[index].includes(t),
+            );
+
+            return {
+              index,
+              times: overlaps,
+            };
+          }),
+        );
+        schedules.forEach((slot) => {
+          const { index, times } = slot; // day = 0–6, times = "10|11|12"
+
+          // тухайн slot-ууд orders-тэй давхцаж байгааг filter
+          const freeTimes = times.filter((hour) => {
+            return !occupiedSlots.some(
+              (o) =>
+                o.day === index && hour >= o.start_time && hour < o.end_time,
+            );
+          });
+          if (freeTimes.length > 0) {
+            slotsByDay[index] = freeTimes;
+          }
+        });
+        if (Object.keys(slotsByDay).length === 0) return null;
+        return {
+          ...us,
+          slots: slotsByDay,
+          services,
+        };
+      }),
+    );
+    const filteredArtists = artistsWithSlots.filter(Boolean);
+    return { items: filteredArtists, coount: this.orderLimit };
   }
   public async updateOrderLimit(limit: number) {
     this.orderLimit = limit;
   }
   private async getLastOrderOfArtist(user: string) {
-    const results = await this.dao.getLastOrderOfArtist(user);
+    const results = await this.dao.getOrdersOfArtist(user);
     return results[0];
   }
   private getTargetDate({
@@ -177,25 +282,22 @@ export class OrderService {
     };
   }
   public async getAvailableTimes(dto: AvailableTimeDto) {
-    console.log(dto);
     const firstArtist = Object.values(dto.serviceArtist).find(
       (artist): artist is string => !!artist,
     );
+    const duplicated = Object.values.length > 0;
 
     let availableTimes: number[] = [];
     let targetDate: Date | undefined;
-    console.log('firstArtist', firstArtist);
     if (firstArtist) {
       // 2. Эхний artist-ийн сүүлчийн захиалгыг авах
       const artistOrder = await this.getLastOrderOfArtist(firstArtist);
-      console.log(artistOrder);
       // 3. TargetDate-ийг тодорхойлох
 
       const target = this.getTargetDate({
         artist: artistOrder,
         dtoDate: dto.date,
       });
-      console.log(target);
       targetDate = target.date;
 
       // 4. Эхний artist-ийн боломжит цагийг авах
@@ -203,19 +305,16 @@ export class OrderService {
         firstArtist,
         targetDate,
       );
-      console.log(artistSchedule, 'schedules');
       // 5. Branch-ийн боломжит цагийг авах
       const branchBooking = await this.booking.getAvailableTime(
         dto.branch_id,
         targetDate,
       );
-      console.log(branchBooking, 'branch');
 
       // 6. Давхцсан цагийг гаргах (intersection)
       availableTimes = (artistSchedule?.times || []).filter((t) =>
         branchBooking?.times?.includes(t),
       );
-      console.log(target);
       if (target.time) {
         availableTimes = availableTimes.filter((a) => a >= target.time);
       }
@@ -226,13 +325,15 @@ export class OrderService {
       limit: this.orderLimit,
     };
   }
+
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
-      const totalMinutes = (dto.details ?? []).reduce(
-        (sum, it) => sum + (it.duration ?? 0),
-        0,
-      );
+      const duplicated = dto.duplicated;
+      const totalMinutes = duplicated
+        ? Math.max(...dto.details.map((a) => a.duration))
+        : (dto.details ?? []).reduce((sum, it) => sum + (it.duration ?? 0), 0);
 
+      // artists.length == 0 || artists?.[0] == '0' && artists =
       const durationHours = Math.ceil(totalMinutes / 60);
 
       const startHour = +dto.start_time.toString().slice(0, 2);
@@ -246,7 +347,6 @@ export class OrderService {
       const payload: Order = {
         id: AppUtils.uuid4(),
         customer_id: dto.customer_id ?? user.id,
-        user_id: dto.user_id,
         order_date: orderDate, // Date (өдөр давсан бол +1, +2 ...)
         start_time: toTimeString(startHour),
         end_time: toTimeString(endHour),
@@ -259,10 +359,11 @@ export class OrderService {
         pre_amount: dto.pre_amount ?? 10000,
         is_pre_amount_paid: true,
         order_status: dto.order_status ?? OrderStatus.Pending,
-        status: STATUS.Pending,
+        status: STATUS.Active,
+        branch_id: dto.branch_id,
         user_desc: dto.user_desc ?? null,
+        salary_process_status: SalaryProcessStatus.NONE,
       } as const;
-      console.log(payload);
       await this.canPlaceOrder(
         {
           ...payload,
@@ -273,11 +374,11 @@ export class OrderService {
       );
 
       const order = await this.dao.add(payload);
-      console.log(order);
       let pre = 0;
       await Promise.all(
         (dto.details ?? []).map(async (d) => {
           const service = await this.service.findOne(d.service_id);
+          const artist = await this.user.findOne(d.user_id);
           pre += service.pre;
           await this.orderDetail.create({
             id: AppUtils.uuid4(),
@@ -286,10 +387,11 @@ export class OrderService {
             service_name: service.name,
             price: service.price,
             duration: service.duration,
+            nickname: artist.nickname,
+            user_id: artist.id ?? d.user_id,
           });
         }),
       );
-      console.log(pre);
       if (pre > 0) {
         const invoice = await this.qpay.createInvoice(
           pre,
@@ -297,7 +399,6 @@ export class OrderService {
           user.id,
           dto.branch_name,
         );
-        console.log(invoice);
 
         return {
           id: order,
@@ -345,22 +446,48 @@ export class OrderService {
   public async find(pg: PaginationDto, role: number) {
     try {
       const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
+
       const items = await Promise.all(
         res.items.map(async (item) => {
           const detail = await this.orderDetail.find(
             { ...pg, order_id: item.id },
             role,
           );
-          const artist = await this.user.findOne(item.user_id);
-          const artist_name = `${firstLetterUpper(artist.nickname ?? '')} ${MobileFormat(artist.mobile)}`;
+
+          const users = Array.from(
+            new Map(
+              (detail.items ?? [])
+                .filter((d) => d.user)
+                .map((d) => [d.user.id, d.user]),
+            ).values(),
+          );
+
+          const firstArtist = users[0];
+          const hasArtists = users.length > 0;
+
+          const artist_name = hasArtists
+            ? users
+                .map(
+                  (u) =>
+                    `${firstLetterUpper(u.nickname ?? '')} ${MobileFormat(u.mobile)}`,
+                )
+                .join(' | ')
+            : '';
+
+          const color = firstArtist?.color ?? null;
+          const branch_id = firstArtist?.branch_id ?? null;
+
           const user = await this.user.findOne(item.customer_id);
-          const user_name = `${MobileFormat(user.mobile)} ${firstLetterUpper(user.nickname ?? '')}`;
+          const user_name = user
+            ? `${MobileFormat(user.mobile)} ${firstLetterUpper(user.nickname ?? '')}`
+            : '';
+
           return {
             ...item,
             artist_name,
             user_name,
-            branch_id: artist.branch_id,
-            color: artist.color,
+            branch_id,
+            color,
             details: detail.items,
           };
         }),
@@ -506,6 +633,61 @@ export class OrderService {
   public async updateStatus(id: string, status: OrderStatus) {
     return await this.dao.updateOrderStatus(id, status);
   }
+  private isFullDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+  public async confirmSalaryProcessStatus(
+    id: string,
+    approver: string,
+    param?: string,
+  ) {
+    let date = this.isFullDate(param) ? param : undefined;
+    const orders = await this.find(
+      {
+        limit: 1000,
+        skip: 0,
+        sort: false,
+        salary_process_status: SalaryProcessStatus.NONE,
+
+        date: date,
+      },
+      ADMIN,
+    );
+
+    const items = await Promise.all(
+      orders.items.map(async (order) => {
+        const status = order.order_status;
+        if (
+          status == OrderStatus.Finished ||
+          status == OrderStatus.Friend ||
+          status == OrderStatus.Active
+        ) {
+           await this.dao.updateSalaryProcessStatus(
+            order.id,
+            SalaryProcessStatus.CONFIRMED,
+          );
+
+          return order;
+        }
+      }),
+    );
+
+    const confirmed = items.filter((i) => i != undefined);
+    // await Promise.all(confirmed.map(async (order) => {
+    //   const details = await this.orderDetail.findByOrder(order.id)
+    //       const amount = details.reduce((a, b) => +a.price + +b.price)
+    //       await this.salaryService.updateSalaryLog({
+    //         amount: amount, 
+    //         approved_by: approver, 
+    //         date: order.order_date, 
+    //         day: 1, 
+    //         order_count: 0, 
+    //         salary_status: 0, 
+    //         user_id: 0
+    //       })
+    // }))
+    return {
+      count: confirmed.length,
+    };
+  }
   public async updatePrePaid(id: string, paid: boolean) {
     return await this.dao.updatePrePaid(id, paid);
   }
@@ -563,8 +745,9 @@ export class OrderService {
                   name: s,
                   icon: null,
                   image: null,
-                  pre_amount: 10000,
+                  pre: 10000,
                   duplicated: false,
+                  view: null,
                 },
                 merchant,
                 creater,

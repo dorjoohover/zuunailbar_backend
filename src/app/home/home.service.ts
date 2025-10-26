@@ -9,40 +9,48 @@ import { applyDefaultStatusFilter } from 'src/utils/global.service';
 @Injectable()
 export class HomeService {
   constructor(private readonly dao: HomeDao) {}
-  public async create(dto: HomesDto) {
-    await Promise.all(
-      dto.items.map(async (item) => {
-        let home;
-        try {
-          home = await this.dao.getHomeByIndex(item.index);
-        } catch (error) {
-          home = null;
-        }
-        home
-          ? await this.update(home.id, item)
-          : await this.dao.add({
-              artist_name: item.artist_name,
-              name: item.name,
-              image: item.image,
-              index: item.index,
-              id: AppUtils.uuid4(),
-              status: STATUS.Active,
-            });
-      }),
-    );
-  }
-  public async createFeature(dto: FeaturesDto) {
-    await Promise.all(
-      dto.items.map(async (item) => {
-        await this.dao.addFeature({
-          description: item.description,
-          icon: item.icon,
-          title: item.title,
+  public async create(item: HomeDto) {
+    let home;
+    try {
+      home = await this.dao.getHomeByIndex(item.index);
+    } catch (error) {
+      home = null;
+    }
+    home
+      ? await this.update(home.id, item)
+      : await this.dao.add({
+          artist_name: item.artist_name,
+          name: item.name,
+          image: item.image,
+          index: item.index,
           id: AppUtils.uuid4(),
           status: STATUS.Active,
         });
-      }),
-    );
+  }
+  public async createFeature(item: FeatureDto) {
+    let feature;
+    try {
+      feature = await this.dao.getFeatureByIndex(item.index);
+    } catch (error) {
+      feature = null;
+    }
+    if (feature) {
+      await this.updateFeature(feature.id, {
+        description: item.description,
+        icon: item.icon,
+        index: item.index,
+        title: item.title,
+      });
+      return;
+    }
+    await this.dao.addFeature({
+      description: item.description,
+      icon: item.icon,
+      index: item.index,
+      title: item.title,
+      id: AppUtils.uuid4(),
+      status: STATUS.Active,
+    });
   }
 
   public async findAll(dto: PaginationDto) {

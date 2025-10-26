@@ -28,6 +28,11 @@ export class OrderDto {
   discount_type: number;
   @ApiProperty()
   discount: number;
+  @ApiProperty()
+  duplicated?: boolean;
+  @ApiProperty()
+  branch_id?: string;
+  services?: string[];
 
   @ApiProperty({ isArray: true })
   details: OrderDetailDto[];

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { OrderDetail } from './order_detail.entity';
@@ -15,6 +14,7 @@ export class OrderDetailDao {
       'id',
       'order_id',
       'service_id',
+      'user_id',
       'service_name',
       'price',
       'status',
@@ -86,7 +86,7 @@ export class OrderDetailDao {
 
       .criteria();
     const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT * FROM "${tableName}"  ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;

@@ -14,6 +14,8 @@ import { BookingModule } from '../booking/booking.module';
 import { ScheduleModule } from '../schedule/schedule.module';
 import { AllExceptionsFilter } from 'src/core/utils/all-exceptions.filter';
 import { FileErrorLogService } from 'src/error-log.service';
+import { UserServiceModule } from '../user_service/user_service.module';
+import { SalaryLogModule } from '../salary_log/salary_log.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { FileErrorLogService } from 'src/error-log.service';
     HttpModule,
     UserModule,
     BookingModule,
+    SalaryLogModule,
+    UserServiceModule,
     forwardRef(() => ScheduleModule),
   ],
   controllers: [OrderController],

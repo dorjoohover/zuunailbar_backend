@@ -64,8 +64,9 @@ export class ServiceController {
 
   @Admin()
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: ServiceDto) {
-    return this.serviceService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: ServiceDto, @Req() { user }) {
+    BadRequest.merchantNotFound(user?.merchant, user.user.role);
+    return this.serviceService.update(id, dto, user?.merchant?.id);
   }
 
   @Admin()

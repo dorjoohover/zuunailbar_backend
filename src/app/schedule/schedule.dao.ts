@@ -116,7 +116,7 @@ export class ScheduleDao {
         .conditionIsNotNull('times')
         .criteria();
       const sql =
-        `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+        `SELECT * FROM "${tableName}" ${criteria} order by index ${query.sort === 'false' ? 'asc' : 'desc'} ` +
         `${query.limit ? `limit ${query.limit}` : ''}` +
         ` offset ${+query.skip * +(query.limit ?? 0)}`;
       const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;

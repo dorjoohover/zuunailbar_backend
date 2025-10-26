@@ -9,6 +9,8 @@ export class OrderDetailDto {
   service_id: string;
   @ApiProperty()
   service_name: string;
+  user_id: string;
+  nickname: string;
   @ApiProperty()
   price: number;
   @ApiProperty()

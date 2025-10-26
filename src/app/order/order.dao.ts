@@ -22,7 +22,6 @@ export class OrdersDao {
     try {
       return await this._db.insert(tableName, data, [
         'id',
-        'user_id',
         'customer_id',
         'duration',
         'order_date',
@@ -31,6 +30,7 @@ export class OrdersDao {
         'status',
         'pre_amount',
         'is_pre_amount_paid',
+        'salary_process_status',
         'total_amount',
         'paid_amount',
         'customer_desc',
@@ -51,6 +51,12 @@ export class OrdersDao {
   async updateOrderStatus(id: string, status: number): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "order_status"=$1 WHERE "id"=$2`,
+      [status, id],
+    );
+  }
+  async updateSalaryProcessStatus(id: string, status: number): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "salary_process_status"=$1 WHERE "id"=$2`,
       [status, id],
     );
   }
@@ -80,48 +86,46 @@ export class OrdersDao {
       [id],
     );
   }
-
   async getOrderByDateTime(
     date: string | Date,
     start_time: string,
     end_time: string,
     status: number,
-    user: string,
+    user_id: string,
   ) {
     const sql = `
-    SELECT *
-    FROM ${tableName}
-    WHERE order_status != $1
-      AND user_id = $2
-      AND order_date = $3
-      and order_status != ${OrderStatus.Friend}
-      AND start_time between $4 and $5
+    SELECT o.*
+    FROM ${tableName} o
+    JOIN order_details d ON o.id = d.order_id
+    WHERE o.order_status != $1
+      AND o.order_date = $2
+      AND o.order_status != ${OrderStatus.Friend}
+      AND o.start_time BETWEEN $3 AND $4
+      AND d.user_id = $5
   `;
 
     return this._db.select(sql, [
       status,
-      user,
       date.toString().slice(0, 10),
       start_time,
       end_time,
+      user_id,
     ]);
   }
-  async getLastOrderOfArtist(artistId: string) {
+
+  async getOrdersOfArtist(artistId: string) {
     const sql = `
     SELECT order_date, start_time, end_time
-    FROM ${tableName}
+    FROM ${tableName} o
+    inner join order_details od on od.order_id = o.id
     WHERE user_id = $1
       AND order_status NOT IN ($2, $3)
       AND order_date >= CURRENT_DATE - INTERVAL '1 day'
+      group by order_date, start_time, end_time
       ORDER BY order_date DESC, end_time DESC
-      LIMIT 1
       `;
 
-    const params = [
-      artistId,
-      OrderStatus.Cancelled,
-      OrderStatus.Finished,
-    ];
+    const params = [artistId, OrderStatus.Cancelled, OrderStatus.Finished];
 
     return await this._db.select(sql, params);
   }
@@ -201,7 +205,7 @@ export class OrdersDao {
       filter.start_date, // $1 ::date
       wanted, // $2 ::int[]
       STATUS.Active, // $3
-      OrderStatus.Started, // $4  <-- өмнө нь энд Active явж байсан (алдаа)
+      OrderStatus.Finished, // $4  <-- өмнө нь энд Active явж байсан (алдаа)
       filter.user_id, // $5
     ]);
 
@@ -213,22 +217,29 @@ export class OrdersDao {
     }
     query.friend = query.friend ? 0 : OrderStatus.Friend;
     const builder = new SqlBuilder(query);
-    const criteria = builder
+    builder
       // nemne
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
       .conditionIfNotEmpty('costumer_id', '=', query.costumer_id)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('order_status', '!=', query.friend)
-      .conditionIfNotEmpty('order_status', '=', query.order_status)
       .conditionIfNotEmpty('start_time', '=', query.times)
-      .conditionIfNotEmpty('order_date', '=', query.date)
-      .criteria();
+      .conditionIfNotEmpty(
+        'salary_process_status',
+        '=',
+        query.salary_process_status,
+      )
+      .conditionIfNotEmpty('order_date', '=', query.date);
+    if (!query.friend && query?.order_status != OrderStatus.Friend) {
+      builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);
+    }
+    builder.conditionIfNotEmpty('order_status', '=', query.order_status);
+
+    const criteria = builder.criteria();
     const sql =
       `SELECT ${columns ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
-
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

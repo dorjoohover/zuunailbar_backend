@@ -65,9 +65,18 @@ export class UserServiceService {
   public async search(services: string, user?: string) {
     return await this.dao.getByServices(services, user);
   }
-  public async findForClient(pg: PaginationDto) {
+  public async findForClient(branch_id: string, services: string[]) {
     const { count, items } = await this.dao.list(
-      applyDefaultStatusFilter(pg, CLIENT),
+      applyDefaultStatusFilter(
+        {
+          branch_id,
+          services: services.join(','),
+          skip: 0,
+          limit: -1,
+          sort: false,
+        },
+        CLIENT,
+      ),
     );
     const res = await Promise.all(
       items.map(async (item) => {

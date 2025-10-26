@@ -55,7 +55,6 @@ export class OrderController {
 
   @Post()
   create(@Body() dto: OrderDto, @Req() { user }) {
-    console.log(user)
     BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.orderService.create(dto, user.user, user.merchant.id);
   }
@@ -107,6 +106,16 @@ export class OrderController {
   @ApiParam({ name: 'limit' })
   async limit(@Param('limit') limit: number) {
     return this.orderService.updateOrderLimit(limit);
+  }
+  @Get('confirm/:date')
+  @Admin()
+  @ApiParam({ name: 'date' })
+  async confirmOrder(@Param('date') date: string, @Req() { user }) {
+    return this.orderService.confirmSalaryProcessStatus(date, user.user.id);
+  }
+  @Post('artists')
+  async artists(@Body() dto: OrderDto) {
+    return this.orderService.getArtists(dto);
   }
   @Get('check/:invoice/:id')
   @ApiParam({ name: 'id' })

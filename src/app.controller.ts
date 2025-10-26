@@ -28,7 +28,7 @@ import { join } from 'path';
 import { createReadStream, existsSync } from 'fs';
 import * as mime from 'mime-types';
 import { Response } from 'express';
-import { CLIENT } from './base/constants';
+import { CLIENT, MANAGER } from './base/constants';
 import axios from 'axios';
 
 @Controller()
@@ -58,9 +58,14 @@ export class AppController {
     return await this.authService.adminLogin(dto);
   }
   @Public()
+  @Post('/artist/login')
+  async artistLogin(@Body() dto: LoginDto) {
+    return await this.authService.adminLogin(dto, MANAGER);
+  }
+  @Public()
   @Post('/client/login')
   async clientLogin(@Body() dto: LoginDto) {
-    return await this.authService.login(dto.mobile);
+    return await this.authService.login(dto);
   }
   @ApiHeader({
     name: 'merchant-id',
@@ -72,8 +77,10 @@ export class AppController {
   async register(@Body() dto: RegisterDto, @Req() req) {
     // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
     let merchantId = req.headers['merchant-id'] as string;
+    console.log(dto);
     BadRequest.merchantNotFound(merchantId, CLIENT);
     const res = await this.authService.checkOtp(dto.otp, dto.mobile);
+    console.log(res);
     if (res) return await this.authService.register(dto, merchantId);
     throw new BadRequest().OTP_INVALID;
   }
@@ -111,7 +118,7 @@ export class AppController {
       user = await this.authService.checkMobile(dto.mobile);
     } catch (error) {}
     if (user) throw new BadRequest().registered;
-    return true;
+    return await this.authService.sendOtp(dto.mobile);
   }
   @Public()
   @Get('/file/:filename')

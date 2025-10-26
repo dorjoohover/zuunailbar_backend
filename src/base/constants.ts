@@ -66,7 +66,7 @@ export function toTimeString(hour: number | string): string {
 export function startOfISOWeek(d: Date) {
   const date = new Date(d);
   let isoDay = date.getDay() - 1;
-  if(isoDay == -1) isoDay = 6 
+  if (isoDay == -1) isoDay = 6;
   date.setDate(date.getDate() - isoDay);
   date.setHours(0, 0, 0, 0);
   return date;
@@ -208,8 +208,7 @@ export enum OrderStatus {
   Pending = 10,
   // uridchilgaa tolson
   Active = 20,
-  // uilchilgee ehelsen
-  Started = 30,
+
   // duussan
   Finished = 40,
   // tsutsalsan
@@ -231,7 +230,11 @@ export enum SALARY_LOG_STATUS {
   Pending = 10,
   Paid = 20,
 }
-
+export enum SalaryProcessStatus {
+  NONE = 10,
+  CONFIRMED = 20,
+  INCLUDED = 30,
+}
 export const SalaryLogValue = {
   [SALARY_LOG_STATUS.Pending]: 'Өгөөгүй',
   [SALARY_LOG_STATUS.Paid]: 'Өгсөн',
@@ -245,4 +248,9 @@ export enum PRODUCT_LOG_STATUS {
   Bought = 10,
   Remainder = 20,
   // Damaged = 30,
+}
+
+export enum ServiceCategory {
+  FOOT = 10,
+  HAND = 20,
 }

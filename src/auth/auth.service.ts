@@ -18,6 +18,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
   private authError = new AuthError();
+  private otps: Record<string, string> = {};
 
   async validateAdminUser(mobile: string, pass: string): Promise<any> {
     let user;
@@ -38,9 +39,9 @@ export class AuthService {
     }
   }
 
-  async adminLogin(user: any) {
+  async adminLogin(user: any, role = ADMIN) {
     const result = await this.validateAdminUser(user.mobile, user.password);
-    if (result.role > ADMIN) {
+    if (result.role > role) {
       this.authError.checkPermission;
     }
     return {
@@ -56,17 +57,9 @@ export class AuthService {
     };
   }
 
-  async login(mobile: string) {
-    // otp
-    let result;
-    try {
-      result = await this.userService.findMobile(mobile);
-    } catch (error) {
-      console.log(error);
-    }
-    if (!result) {
-      new BadRequest().notFoundClient;
-    }
+  async login(dto: LoginDto) {
+    const result = await this.validateAdminUser(dto.mobile, dto.password);
+
     return {
       accessToken: this.jwtService.sign({
         ...result,
@@ -107,14 +100,14 @@ export class AuthService {
   }
 
   generateOtp() {
-    return `${Math.random() * 100000}`.slice(2, 6);
+    const random = `${Math.round(Math.random() * 100000)}`;
+    return `${random}`.slice(1, 6);
   }
 
   async sendOtp(mobile: string) {
     try {
       const otp = this.generateOtp();
-      console.log(otp);
-      await this.userService.updateOtp(mobile, otp);
+      this.otps[mobile] = otp;
       const res = await axios.get(
         `https://sms-api.telcocom.mn/sms-api/v2/sms/telco/send?toNumber=${mobile}&sms=Таны OTP код: ${otp}\nХүндэтгэсэн &tenantId=${process.env.TELCOCOM}`,
         {
@@ -124,14 +117,16 @@ export class AuthService {
         },
       );
       const { result, message, data } = res.data;
-      console.log(result, message, data);
+      console.log(message);
+      return true;
     } catch (error) {
       console.log(error);
+      return false;
     }
   }
 
   async checkOtp(otp: string, mobile: string) {
-    return await this.userService.checkOtp(otp, MobileFormat(mobile));
+    return this.otps[mobile] && this.otps[mobile] == otp;
   }
 
   async reset(dto: ResetPasswordDto) {

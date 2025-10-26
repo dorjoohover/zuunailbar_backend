@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { SalaryLogDao } from './salary_log.dao';
-import { SalaryLogDto } from './salary_log.dto';
+import { SalaryDto, SalaryLogDto } from './salary_log.dto';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
   getDefinedKeys,
   MN_TZ,
+  mnDate,
   PRODUCT_STATUS,
   SALARY_LOG_STATUS,
   SalaryLogValue,
@@ -98,18 +99,24 @@ export class SalaryLogService {
     // 4) Excel баганууд
     const cols = [
       { header: 'Artist', key: 'artist', width: 24 },
-      { header: 'Amount', key: 'amount', width: 16 }, 
-      { header: 'Count', key: 'count', width: 16 }, 
-      { header: 'Status', key: 'status', width: 16 }, 
-      { header: 'Date', key: 'date', width: 16 }, 
+      { header: 'Amount', key: 'amount', width: 16 },
+      { header: 'Count', key: 'count', width: 16 },
+      { header: 'Status', key: 'status', width: 16 },
+      { header: 'Date', key: 'date', width: 16 },
     ];
 
     // 5) Excel рүү стримлэж буулгах
-    return this.excel.xlsxFromIterable(res, 'salary', cols as any, rows as any, {
-      sheetName: 'Salaries',
-      moneyKeys: ['amount'],
-      dateKeys: ['date'],
-    });
+    return this.excel.xlsxFromIterable(
+      res,
+      'salary',
+      cols as any,
+      rows as any,
+      {
+        sheetName: 'Salaries',
+        moneyKeys: ['amount'],
+        dateKeys: ['date'],
+      },
+    );
   }
 
   public async update(id: string, dto: SalaryLogDto) {
@@ -118,6 +125,49 @@ export class SalaryLogService {
 
   public async remove(id: string) {
     return await this.dao.updateStatus(id, STATUS.Hidden);
+  }
+
+  public async updateSalaryLog(dto: SalaryDto) {
+    const today = new Date();
+    const baseDate = new Date(dto.date);
+    const salaryDay = dto.day + 15;
+
+    let lastSalaryDate = new Date(baseDate);
+    lastSalaryDate.setDate(salaryDay);
+
+    if (today.getDate() < salaryDay) {
+      lastSalaryDate.setMonth(today.getMonth() - 1);
+      lastSalaryDate.setFullYear(today.getFullYear());
+    } else {
+      lastSalaryDate.setMonth(today.getMonth());
+      lastSalaryDate.setFullYear(today.getFullYear());
+    }
+    console.log(lastSalaryDate);
+
+    const salaries = await this.dao.getByDate(
+      dto.user_id,
+      mnDate(lastSalaryDate),
+    );
+    console.log(salaries);
+    if (salaries.length > 0) {
+      const { amount, id, order_count } = salaries[0];
+      await this.update(id, {
+        amount: +amount + +dto.amount,
+        approved_by: dto.approved_by,
+        date: dto.date,
+        order_count: +order_count + +dto.order_count,
+        user_id: dto.user_id,
+      });
+    } else {
+      await this.create({
+        amount: +dto.amount,
+        approved_by: dto.approved_by,
+        date: dto.date,
+        order_count: +dto.order_count,
+        user_id: dto.user_id,
+      });
+    }
+    console.log(salaries);
   }
 
   // cron

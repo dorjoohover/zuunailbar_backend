@@ -18,7 +18,8 @@ export class HomesDto {
 
 export class FeatureDto {
   @ApiProperty()
-  icon: number;
+  icon: string;
+  index: number;
   @ApiProperty()
   title: string;
   @ApiProperty()

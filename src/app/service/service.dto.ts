@@ -11,8 +11,8 @@ export class ServiceDto {
   description: string;
   @ApiProperty()
   min_price: number;
-  @ApiProperty()
-  pre_amount: number;
+  view: number;
+
   @ApiProperty()
   max_price: number;
   @ApiProperty()
@@ -21,5 +21,6 @@ export class ServiceDto {
   branch_id: string;
   isAll?: boolean;
   duplicated: boolean;
-  pre?: number
+  category?: number;
+  pre?: number;
 }

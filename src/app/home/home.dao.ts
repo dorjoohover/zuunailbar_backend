@@ -26,6 +26,7 @@ export class HomeDao {
       'title',
       'description',
       'icon',
+      'index',
       'status',
     ]);
   }
@@ -74,6 +75,12 @@ export class HomeDao {
       [id],
     );
   }
+  async getFeatureByIndex(id: number) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${feature}" WHERE "index"=$1`,
+      [id],
+    );
+  }
 
   async list(query) {
     if (query.id) {
@@ -106,10 +113,10 @@ export class HomeDao {
       .conditionIfNotEmpty('status', '=', query.status)
       .criteria();
     const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT * FROM "${feature}" ${criteria} order by index asc ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+    const countSql = `SELECT COUNT(*) FROM "${feature}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

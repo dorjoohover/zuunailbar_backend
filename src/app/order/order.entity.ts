@@ -1,6 +1,8 @@
+import { SalaryProcessStatus } from 'src/base/constants';
+
 export class Order {
   id: string;
-  user_id: string;
+  // user_id?: string;
   customer_id: string;
   duration: number;
   order_date: Date | string;
@@ -17,5 +19,9 @@ export class Order {
   discount_type: number;
   status: number;
   created_at?: Date;
+  salary_process_status: SalaryProcessStatus;
   updated_at?: Date;
+
+  //
+  branch_id?: string;
 }

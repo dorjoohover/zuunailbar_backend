@@ -68,6 +68,7 @@ export class UserService {
       branch_name: branch_id ? branch.name : null,
       birthday: new Date(dto.birthday),
       color: dto.color,
+      salary_day: 15,
     });
     if (dto.duration || dto.percent || dto.date) {
       await this.userSalary.create({
@@ -111,6 +112,7 @@ export class UserService {
         nickname: null,
         firstname: null,
         lastname: null,
+        salary_day: 15,
         password,
         role: CLIENT,
         device: null,
@@ -126,13 +128,6 @@ export class UserService {
     }
   }
 
-  public async updateOtp(mobile: string, otp: string) {
-    await this.dao.updateOtp(mobile, otp);
-  }
-  public async checkOtp(otp: string, mobile: string) {
-    const res = await this.findMobile(mobile);
-    return res.otp == otp;
-  }
   public async search(filter: SearchDto, merchant: string) {
     const services = filter.services;
     const value = filter.value;

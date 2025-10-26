@@ -55,11 +55,15 @@ export class AdminUserService extends BaseService {
   }
 
   public async getAdminUser(dto: string) {
-    let mobile = dto.includes('+976') ? dto : `+976${dto}`;
-    const user = await this.dao.get(mobile);
-    return {
-      password: user.password ?? '',
-      ...user,
-    };
+    try {
+      let mobile = dto.includes('+976') ? dto : `+976${dto}`;
+      const user = await this.dao.get(mobile);
+      return {
+        password: user.password ?? '',
+        ...user,
+      };
+    } catch (error) {
+      console.log(error);
+    }
   }
 }

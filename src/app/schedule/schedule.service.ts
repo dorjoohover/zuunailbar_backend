@@ -29,20 +29,21 @@ export class ScheduleService {
     const schedules = await this.dao.getByUser(dto.user_id);
     if (schedules?.length > 0) {
       await Promise.all(
-        schedules.map(async (schedule, index) => {
-          const parts = String(weekTimes[index])
+        weekTimes.map(async (weekTime, index) => {
+          const parts = String(weekTime)
             .split('|')
             .filter(Boolean)
             .map(Number)
             .filter((n) => Number.isFinite(n));
-          const bookingParts = String(schedule.times)
+          const bookingParts = String(schedules[index].times)
             .split('|')
             .filter(Boolean)
             .map(Number)
             .filter((n) => Number.isFinite(n));
-          const times = Array.from(new Set([...parts, ...bookingParts])).sort(
-            (a, b) => a - b,
-          );
+          const times = [
+            ...parts.filter((n) => !bookingParts.includes(n)),
+            ...bookingParts.filter((n) => !parts.includes(n)),
+          ];
           const start = times[0];
           const end = times[times.length - 1];
           if (times.length > 0) {
@@ -52,7 +53,7 @@ export class ScheduleService {
               end_time: times.length ? toTimeString(end) : null,
             };
             await this.dao.update(
-              { id: schedule.id, ...payload },
+              { id: schedules[index].id, ...payload },
               getDefinedKeys(payload),
             );
           }
@@ -104,7 +105,7 @@ export class ScheduleService {
     let attempts = 0;
 
     while (true) {
-      console.log(today.getDay())
+      console.log(today.getDay());
       let weekday = today.getDay() - 1;
       if (weekday == -1) weekday = 6;
       const currentHour =
