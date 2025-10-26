@@ -28,7 +28,7 @@ import { join } from 'path';
 import { createReadStream, existsSync } from 'fs';
 import * as mime from 'mime-types';
 import { Response } from 'express';
-import { CLIENT, MANAGER } from './base/constants';
+import { CLIENT, EMPLOYEE, MANAGER } from './base/constants';
 import axios from 'axios';
 
 @Controller()
@@ -60,7 +60,7 @@ export class AppController {
   @Public()
   @Post('/artist/login')
   async artistLogin(@Body() dto: LoginDto) {
-    return await this.authService.adminLogin(dto, MANAGER);
+    return await this.authService.adminLogin(dto, EMPLOYEE);
   }
   @Public()
   @Post('/client/login')
