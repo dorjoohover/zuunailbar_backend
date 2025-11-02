@@ -15,6 +15,7 @@ export class OrderDetailDao {
       'order_id',
       'service_id',
       'user_id',
+      'description',
       'service_name',
       'price',
       'status',

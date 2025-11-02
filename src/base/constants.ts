@@ -203,6 +203,13 @@ export enum STATUS {
   Pending = 20,
   Hidden = 30,
 }
+
+export enum UserLevel {
+  BRONZE = 0,
+  SILVER = 10,
+  GOLD = 20,
+}
+
 export enum OrderStatus {
   // uridchilgaa toloogui
   Pending = 10,
@@ -230,11 +237,7 @@ export enum SALARY_LOG_STATUS {
   Pending = 10,
   Paid = 20,
 }
-export enum SalaryProcessStatus {
-  NONE = 10,
-  CONFIRMED = 20,
-  INCLUDED = 30,
-}
+
 export const SalaryLogValue = {
   [SALARY_LOG_STATUS.Pending]: 'Өгөөгүй',
   [SALARY_LOG_STATUS.Paid]: 'Өгсөн',

@@ -2,15 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { isOnlyFieldPresent } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { SalaryLog } from './salary_log.entity';
+import { Integration } from './integrations.entity';
 
-const tableName = 'salary_logs';
+const tableName = 'integrations';
 
 @Injectable()
-export class SalaryLogDao {
+export class IntegrationDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: SalaryLog) {
+  async add(data: Integration) {
     return await this._db.insert(tableName, data, [
       'id',
       'user_id',
@@ -19,7 +19,6 @@ export class SalaryLogDao {
       'approved_by',
       'amount',
       'order_count',
-      'salary_status',
     ]);
   }
 
@@ -85,7 +84,7 @@ export class SalaryLogDao {
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
-      .conditionIfNotEmpty('salary_status', '=', query.salary_status)
+      .conditionIfNotEmpty('integration_status', '=', query.integration_status)
       .conditionIfNotEmpty('status', '=', query.status)
 
       .criteria();

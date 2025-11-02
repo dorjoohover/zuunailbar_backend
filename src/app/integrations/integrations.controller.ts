@@ -9,9 +9,8 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { SalaryLogService } from './salary_log.service';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
-import { SalaryLogDto } from './salary_log.dto';
+import { IntegrationDto } from './integrations.dto';
 import { Admin, Employee } from 'src/auth/guards/role/role.decorator';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
@@ -20,30 +19,31 @@ import { Cron } from '@nestjs/schedule';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { CLIENT } from 'src/base/constants';
 import { Response } from 'express';
+import { IntegrationService } from './integrations.service';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'merchant-id',
   description: 'Merchant ID',
   required: true,
 })
-@Controller('salary_log')
-export class SalaryLogController {
-  constructor(private readonly salaryLogService: SalaryLogService) {}
+@Controller('integrations')
+export class IntegrationController {
+  constructor(private readonly integrationService: IntegrationService) {}
   @Admin()
   @Post()
-  create(@Body() dto: SalaryLogDto) {
-    return this.salaryLogService.create(dto);
+  create(@Body() dto: IntegrationDto) {
+    return this.integrationService.create(dto);
   }
   // zasna
   @PQ()
   @Get()
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
-    return this.salaryLogService.findAll(pg, user.user.role);
+    return this.integrationService.findAll(pg, user.user.role);
   }
   @Employee()
   @Get('get/:id')
   findOne(@Param('id') id: string) {
-    return this.salaryLogService.findOne(id);
+    return this.integrationService.findOne(id);
   }
   @Public()
   @Get('report')
@@ -53,18 +53,18 @@ export class SalaryLogController {
     @Req() { user },
     @Res() res: Response,
   ) {
-    return await this.salaryLogService.report(pg, CLIENT, res);
+    return await this.integrationService.report(pg, CLIENT, res);
   }
 
   @Admin()
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: SalaryLogDto) {
-    return this.salaryLogService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: IntegrationDto) {
+    return this.integrationService.update(id, dto);
   }
 
   @Admin()
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.salaryLogService.remove(id);
+    return this.integrationService.remove(id);
   }
 }

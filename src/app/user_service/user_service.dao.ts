@@ -68,6 +68,12 @@ export class UserServiceDao {
       [status, id],
     );
   }
+  async updateLevel(id: string, level: number): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "level"=$1 WHERE "id"=$2`,
+      [level, id],
+    );
+  }
 
   async getByServices(services: string, user?: string) {
     return await this._db.select(

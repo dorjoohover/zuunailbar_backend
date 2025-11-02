@@ -62,7 +62,7 @@ export class OrderController {
   @Get()
   @PQ(['order_status', 'friend'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
-    return this.orderService.find(pg, user.user.role);
+    return this.orderService.find(pg, user.user.role, user.user.id);
   }
 
   @Get('get/:id')
@@ -107,11 +107,15 @@ export class OrderController {
   async limit(@Param('limit') limit: number) {
     return this.orderService.updateOrderLimit(limit);
   }
+  @Get('user_count')
+  async userCount(@Req() {user}) {
+    return this.orderService.getUserCount(user.user.id);
+  }
   @Get('confirm/:date')
   @Admin()
   @ApiParam({ name: 'date' })
   async confirmOrder(@Param('date') date: string, @Req() { user }) {
-    return this.orderService.confirmSalaryProcessStatus(date, user.user.id);
+    return this.orderService.confirmSalaryProcessStatus(user.user.id, date);
   }
   @Post('artists')
   async artists(@Body() dto: OrderDto) {

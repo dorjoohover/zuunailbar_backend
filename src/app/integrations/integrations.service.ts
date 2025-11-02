@@ -1,13 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { SalaryLogDao } from './salary_log.dao';
-import { SalaryDto, SalaryLogDto } from './salary_log.dto';
+import { IntegrationDao } from './integrations.dao';
+import { IntegrationLogDto, IntegrationDto } from './integrations.dto';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
   getDefinedKeys,
-  MN_TZ,
   mnDate,
-  PRODUCT_STATUS,
   SALARY_LOG_STATUS,
   SalaryLogValue,
   STATUS,
@@ -20,17 +18,16 @@ import { UserService } from '../user/user.service';
 import { Response } from 'express';
 
 @Injectable()
-export class SalaryLogService {
+export class IntegrationService {
   constructor(
-    private readonly dao: SalaryLogDao,
+    private readonly dao: IntegrationDao,
     private user: UserService,
     private excel: ExcelService,
   ) {}
-  public async create(dto: SalaryLogDto) {
+  public async create(dto: IntegrationDto) {
     return await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
-      salary_status: SALARY_LOG_STATUS.Pending,
       status: STATUS.Active,
     });
   }
@@ -51,7 +48,7 @@ export class SalaryLogService {
       'id',
       'user_id',
       'amount',
-      'salary_status',
+      'order_status',
       'order_count',
       'created_at',
     ];
@@ -119,7 +116,7 @@ export class SalaryLogService {
     );
   }
 
-  public async update(id: string, dto: SalaryLogDto) {
+  public async update(id: string, dto: IntegrationDto) {
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }
 
@@ -127,7 +124,7 @@ export class SalaryLogService {
     return await this.dao.updateStatus(id, STATUS.Hidden);
   }
 
-  public async updateSalaryLog(dto: SalaryDto) {
+  public async updateSalaryLog(dto: IntegrationLogDto) {
     const today = new Date();
     const baseDate = new Date(dto.date);
     const salaryDay = dto.day + 15;

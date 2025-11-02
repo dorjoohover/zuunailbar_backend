@@ -1,4 +1,4 @@
-export class SalaryLogDto {
+export class IntegrationDto {
   user_id: string;
   approved_by: string;
   date: Date;
@@ -6,12 +6,12 @@ export class SalaryLogDto {
   order_count: number;
 }
 
-export class SalaryDto {
+export class IntegrationLogDto {
   user_id: string;
   approved_by: string;
   date: Date;
   amount: number;
-  salary_status: number;
+  order_status: number;
   order_count: number;
   day: number;
 }

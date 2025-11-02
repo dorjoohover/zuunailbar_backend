@@ -20,8 +20,7 @@ export class OrderDto {
   paid_amount: number;
   pre_amount?: number;
   @ApiProperty()
-  customer_desc: string;
-  user_desc?: string;
+  description: string;
   @ApiProperty()
   branch_name: string;
   @ApiProperty()

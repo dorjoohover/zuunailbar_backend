@@ -39,6 +39,15 @@ export class AppDB {
       this.pool.on('error', (err, client) => {
         console.error('Unexpected error on idle client', err);
       });
+      this.pool.on('connect', (client) => {
+        client.query(`SET TIME ZONE 'Asia/Ulaanbaatar';`).catch((err) => {
+          console.error('Failed to set timezone', err);
+        });
+      });
+
+      this.pool.on('error', (err, client) => {
+        console.error('Unexpected error on idle client', err);
+      });
     }
 
     return this.pool;
@@ -77,7 +86,6 @@ export class AppDB {
       try {
         const result = await client.query(sql, params);
         if (result.rows.length === 0) {
-          console.log(sql)
           throw new AppDBResultNotFoundException('Select One not found!');
         } else if (result.rows.length === 1) {
           return result.rows[0];

@@ -114,6 +114,7 @@ export class ServiceDao {
     const builder = new SqlBuilder(filter);
     const criteria = builder
       .conditionIfNotEmpty('lower("name")', 'LIKE', filter.id)
+      .conditionIfNotEmpty('branch_id', '=', filter.branch_id)
       .criteria();
     return await this._db.select(
       ` SELECT "id",

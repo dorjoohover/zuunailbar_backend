@@ -16,6 +16,7 @@ export class User {
   public profile_img: string;
   public nickname: string;
   public salary_day: number;
+  public level: number;
   public experience: number;
   public branch_name: string;
   // push notification d heregtei

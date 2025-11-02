@@ -14,11 +14,12 @@ import {
   MANAGER,
   mnDate,
   OrderStatus,
-  SalaryProcessStatus,
+  SALARY_LOG_STATUS,
   STARTTIME,
   STATUS,
   toTimeString,
   ubDateAt00,
+  UserLevel,
   usernameFormatter,
   UserStatus,
 } from 'src/base/constants';
@@ -39,13 +40,15 @@ import { OrderDetailDto } from '../order_detail/order_detail.dto';
 import { BookingService } from '../booking/booking.service';
 import { ScheduleService } from '../schedule/schedule.service';
 import { UserServiceService } from '../user_service/user_service.service';
-import { unescape } from 'querystring';
-import { SalaryLogService } from '../salary_log/salary_log.service';
+import { IntegrationService } from '../integrations/integrations.service';
 
 @Injectable()
 export class OrderService {
   private orderError = new OrderError();
   private orderLimit = 7;
+  private bronze = 10;
+  private silver = 20;
+  private gold = 30;
   constructor(
     private readonly dao: OrdersDao,
     private readonly orderDetail: OrderDetailService,
@@ -57,7 +60,7 @@ export class OrderService {
     private schedule: ScheduleService,
     private qpay: QpayService,
     private userService: UserServiceService,
-    private salaryService: SalaryLogService,
+    private integrationService: IntegrationService,
   ) {}
   public async canPlaceOrder(
     dto: Order,
@@ -232,6 +235,12 @@ export class OrderService {
   public async updateOrderLimit(limit: number) {
     this.orderLimit = limit;
   }
+  public async getUserCount(user: string) {
+    const res = await this.dao.customerCheck(user);
+    return {
+      count: res,
+    };
+  }
   private async getLastOrderOfArtist(user: string) {
     const results = await this.dao.getOrdersOfArtist(user);
     return results[0];
@@ -351,7 +360,7 @@ export class OrderService {
         start_time: toTimeString(startHour),
         end_time: toTimeString(endHour),
         duration: durationHours,
-        customer_desc: dto.customer_desc ?? null,
+        description: dto.description ?? null,
         discount_type: dto.discount_type ?? null,
         discount: dto.discount ?? null,
         total_amount: dto.total_amount ?? null,
@@ -361,8 +370,6 @@ export class OrderService {
         order_status: dto.order_status ?? OrderStatus.Pending,
         status: STATUS.Active,
         branch_id: dto.branch_id,
-        user_desc: dto.user_desc ?? null,
-        salary_process_status: SalaryProcessStatus.NONE,
       } as const;
       await this.canPlaceOrder(
         {
@@ -379,15 +386,16 @@ export class OrderService {
         (dto.details ?? []).map(async (d) => {
           const service = await this.service.findOne(d.service_id);
           const artist = await this.user.findOne(d.user_id);
-          pre += service.pre;
+          pre += +(service.pre ?? 0);
           await this.orderDetail.create({
             id: AppUtils.uuid4(),
             order_id: order,
             service_id: service.id,
             service_name: service.name,
-            price: service.price,
+            price: d.price,
             duration: service.duration,
             nickname: artist.nickname,
+            description: d.description,
             user_id: artist.id ?? d.user_id,
           });
         }),
@@ -443,10 +451,28 @@ export class OrderService {
     return true;
   }
 
-  public async find(pg: PaginationDto, role: number) {
+  public async findByClient(pg: PaginationDto) {
     try {
-      const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
+      const res = await this.dao.listWithDetails(
+        applyDefaultStatusFilter({ ...pg }, CLIENT),
+      );
+      console.log(res);
+      return {
+        items: res.items,
+        count: res.count,
+      };
+    } catch (error) {
+      console.log(error);
+    }
+  }
 
+  public async find(pg: PaginationDto, role: number, id?: string) {
+    try {
+      const query = applyDefaultStatusFilter(
+        role == CLIENT ? { ...pg, customer_id: id } : pg,
+        role,
+      );
+      const res = await this.dao.list(query);
       const items = await Promise.all(
         res.items.map(async (item) => {
           const detail = await this.orderDetail.find(
@@ -481,9 +507,11 @@ export class OrderService {
           const user_name = user
             ? `${MobileFormat(user.mobile)} ${firstLetterUpper(user.nickname ?? '')}`
             : '';
-
+          let order_date = item.order_date;
+          order_date = mnDate(new Date(order_date));
           return {
             ...item,
+            order_date,
             artist_name,
             user_name,
             branch_id,
@@ -621,32 +649,49 @@ export class OrderService {
   }
 
   public async update(id: string, dto: OrderDto) {
-    const { details, ...payload } = dto;
+    const { details, branch_id, order_date, ...payload } = dto;
     await this.dao.update({ ...payload, id }, getDefinedKeys(payload));
+
+    const existingDetails = await this.orderDetail.findByOrder(id);
+
+    const existingIds = existingDetails.map((d) => d.id);
+    const newIds = details.map((d) => d.id).filter(Boolean);
+
+    const toDelete = existingDetails.filter((d) => !newIds.includes(d.id));
+
     await Promise.all(
-      details.map(async (detail) => {
-        await this.orderDetail.remove(detail.id);
-        await this.orderDetail.create({ ...detail, order_id: id });
+      details.map(async (d) => {
+        if (d.id && existingIds.includes(d.id)) {
+          await this.orderDetail.update(d.id, { ...d });
+        } else {
+          await this.orderDetail.create({
+            ...d,
+            order_id: id,
+          });
+        }
       }),
     );
+
+    if (toDelete.length > 0) {
+      await Promise.all(toDelete.map((d) => this.orderDetail.remove(d.id)));
+    }
   }
   public async updateStatus(id: string, status: OrderStatus) {
     return await this.dao.updateOrderStatus(id, status);
   }
   private isFullDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
   public async confirmSalaryProcessStatus(
-    id: string,
     approver: string,
     param?: string,
+    id?: string,
   ) {
     let date = this.isFullDate(param) ? param : undefined;
+
     const orders = await this.find(
       {
         limit: 1000,
         skip: 0,
         sort: false,
-        salary_process_status: SalaryProcessStatus.NONE,
-
         date: date,
       },
       ADMIN,
@@ -660,33 +705,113 @@ export class OrderService {
           status == OrderStatus.Friend ||
           status == OrderStatus.Active
         ) {
-           await this.dao.updateSalaryProcessStatus(
-            order.id,
-            SalaryProcessStatus.CONFIRMED,
-          );
-
+          await this.dao.updateSalaryProcessStatus(order.id, new Date());
           return order;
         }
       }),
     );
-
-    const confirmed = items.filter((i) => i != undefined);
-    // await Promise.all(confirmed.map(async (order) => {
-    //   const details = await this.orderDetail.findByOrder(order.id)
-    //       const amount = details.reduce((a, b) => +a.price + +b.price)
-    //       await this.salaryService.updateSalaryLog({
-    //         amount: amount, 
-    //         approved_by: approver, 
-    //         date: order.order_date, 
-    //         day: 1, 
-    //         order_count: 0, 
-    //         salary_status: 0, 
-    //         user_id: 0
-    //       })
-    // }))
-    return {
-      count: confirmed.length,
+    const confirmedOrders = items.filter((i) => i !== undefined);
+    type UserSalaryInfo = {
+      amount: number; // нийт цалин
+      order_date: Date; // хамгийн эртний/сүүлийн захиалгын огноо
+      day: number; // цалин авах өдөр (5 | 15)
+      order_count: number; // нийт авсан захиалгын тоо
+      order_status: number;
     };
+
+    const users: Record<string, UserSalaryInfo> = {};
+    const userCache = new Map<string, { id: string; day: number }>();
+
+    for (const order of confirmedOrders) {
+      const details = await this.orderDetail.findByOrder(order.id);
+      if (!details?.length) continue;
+
+      for (const detail of details) {
+        if (!detail.user_id) continue;
+        // 🔹 Хэрэглэгчийн мэдээлэл cache-ээс шалгах
+        let currentUser = userCache.get(detail.user_id);
+        if (!currentUser) {
+          const fetchedUser = await this.user.findOne(detail.user_id);
+          if (!fetchedUser) continue;
+
+          currentUser = { id: fetchedUser.id, day: fetchedUser.day ?? 1 };
+          userCache.set(detail.user_id, currentUser);
+        }
+
+        // 🔹 Users объект үүсгээгүй бол шинэ үүсгэнэ
+        if (!users[detail.user_id]) {
+          users[detail.user_id] = {
+            amount: 0,
+            order_date: new Date(order.order_date),
+            day: currentUser.day,
+            order_count: 0,
+            order_status: order.order_status,
+          };
+        }
+
+        const userData = users[detail.user_id];
+        console.log(detail.price);
+        const amount = +detail.price || 0;
+        const orderDate = new Date(order.order_date);
+
+        // 🔹 Цалин нэмэх
+        console.log(userData.amount, amount);
+        userData.amount += amount;
+
+        // 🔹 Захиалгын тоо нэмэх
+        userData.order_count += 1;
+
+        // 🔹 Хэрвээ хамгийн сүүлийн order_date хадгалах бол:
+        if (orderDate > userData.order_date) {
+          userData.order_date = orderDate;
+        }
+
+        // 🔹 Хэрвээ хамгийн эртний өдөр хадгалах бол:
+        if (orderDate < userData.order_date) {
+          userData.order_date = orderDate;
+        }
+      }
+
+      const customer = order.customer_id;
+      if (customer) this.checkLevel(customer);
+    }
+    // 🧾 Salary Log-г бүгдийг нэг дор шинэчилнэ
+    await Promise.all(
+      Object.entries(users).map(async ([userId, data]) => {
+        await this.integrationService.updateSalaryLog({
+          amount: data.amount,
+          approved_by: approver,
+          date: data.order_date,
+          day: data.day,
+          order_count: data.order_count,
+          order_status: data.order_status,
+          user_id: userId,
+        });
+      }),
+    );
+
+    console.log(
+      `✅ Processed ${Object.keys(users).length} users for salary update.`,
+    );
+    return {
+      count: confirmedOrders.length,
+    };
+  }
+
+  public async checkLevel(user: string) {
+    const count = await this.dao.customerCheck(user);
+    if (count >= this.gold) {
+      await this.userService.updateLevel(user, UserLevel.GOLD);
+      return;
+    }
+    if (count >= this.silver) {
+      await this.userService.updateLevel(user, UserLevel.SILVER);
+      return;
+    }
+    if (count >= this.bronze) {
+      await this.userService.updateLevel(user, UserLevel.BRONZE);
+      return;
+    }
   }
   public async updatePrePaid(id: string, paid: boolean) {
     return await this.dao.updatePrePaid(id, paid);
@@ -763,14 +888,13 @@ export class OrderService {
             order_date: date,
             details: services as any,
             branch_name: artist.branch_name,
-            customer_desc: null,
+            description: null,
             discount: null,
             discount_type: null,
             order_status: OrderStatus.Finished,
             paid_amount: 0,
             start_time: hour,
             total_amount: 0,
-            user_desc: description,
             user_id: user.id,
           },
           user.id,

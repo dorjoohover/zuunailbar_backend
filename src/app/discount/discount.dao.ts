@@ -65,10 +65,14 @@ export class DiscountDao {
     );
   }
   async getByService(id: string) {
-    return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "service_id"=$1`,
-      [id],
-    );
+    try {
+      return await this._db.selectOne(
+        `SELECT * FROM "${tableName}" WHERE "service_id"=$1`,
+        [id],
+      );
+    } catch (error) {
+      return null;
+    }
   }
 
   async list(query) {

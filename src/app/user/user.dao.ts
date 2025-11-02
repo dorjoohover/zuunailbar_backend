@@ -169,6 +169,7 @@ export class UserDao {
     const builder = new SqlBuilder(filter);
     builder
       .conditionIfNotEmpty('merchant_id', '=', filter.merchant)
+      .conditionIfNotEmpty('branch_id', '=', filter.branch_id)
       .conditionIfNotEmpty('status', '=', filter.status)
       .conditionIfNotEmpty(
         'role',

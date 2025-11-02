@@ -18,7 +18,7 @@ import { DiscountModule } from './app/discount/discount.module';
 import { CategoryModule } from './app/category/category.module';
 import { BrandModule } from './app/brand/brand.module';
 import { ScheduleModule } from './app/schedule/schedule.module';
-import { SalaryLogModule } from './app/salary_log/salary_log.module';
+import { IntegrationModule } from './app/integrations/integrations.module';
 import { ProductModule } from './app/product/product.module';
 import { OrderModule } from './app/order/order.module';
 import { OrderDetailModule } from './app/order_detail/order_detail.module';
@@ -58,7 +58,7 @@ import { UserSalariesModule } from './app/user_salaries/user_salaries.module';
     CategoryModule,
     BrandModule,
     ScheduleModule,
-    SalaryLogModule,
+    IntegrationModule,
     ProductModule,
     OrderModule,
     OrderDetailModule,

@@ -18,6 +18,7 @@ export class OrderDetailService {
       ...dto,
       id: AppUtils.uuid4(),
       status: STATUS.Active,
+      description: dto.description,
     });
   }
 

@@ -30,10 +30,10 @@ export class OrdersDao {
         'status',
         'pre_amount',
         'is_pre_amount_paid',
-        'salary_process_status',
+        'salary_date',
         'total_amount',
         'paid_amount',
-        'customer_desc',
+        'description',
         'order_status',
         'user_desc',
       ]);
@@ -54,11 +54,13 @@ export class OrdersDao {
       [status, id],
     );
   }
-  async updateSalaryProcessStatus(id: string, status: number): Promise<number> {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "salary_process_status"=$1 WHERE "id"=$2`,
-      [status, id],
-    );
+  async updateSalaryProcessStatus(id: string, date?: Date): Promise<number> {
+    const query = `
+    UPDATE "${tableName}"
+    SET "salary_date" = $1
+    WHERE "id" = $2
+  `;
+    return this._db._update(query, [date ?? null, id]);
   }
   async updatePrePaid(id: string, paid: boolean): Promise<number> {
     return await this._db._update(
@@ -118,7 +120,7 @@ export class OrdersDao {
     SELECT order_date, start_time, end_time
     FROM ${tableName} o
     inner join order_details od on od.order_id = o.id
-    WHERE user_id = $1
+    WHERE od.user_id = $1
       AND order_status NOT IN ($2, $3)
       AND order_date >= CURRENT_DATE - INTERVAL '1 day'
       group by order_date, start_time, end_time
@@ -129,6 +131,7 @@ export class OrdersDao {
 
     return await this._db.select(sql, params);
   }
+
   async getOrders(userId: string) {
     const today = ubDateAt00(); // moment эсвэл өөр date util
     const year = today.getUTCFullYear();
@@ -151,9 +154,10 @@ export class OrdersDao {
     const sql = `
     SELECT *
     FROM ${tableName}
+    inner join order_details od on od.order_id = orders.id
     WHERE order_status = $1
     AND order_status != ${OrderStatus.Friend}
-      AND user_id = $2
+      AND od.user_id = $2
       AND order_date >= $3
       AND order_date < $4
   `;
@@ -211,7 +215,8 @@ export class OrdersDao {
 
     return row?.taken_hours ?? [];
   }
-  async list(query, columns?: string) {
+
+  async listWithDetails(query) {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -222,13 +227,9 @@ export class OrdersDao {
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
       .conditionIfNotEmpty('costumer_id', '=', query.costumer_id)
-      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('o.status', '=', query.status)
       .conditionIfNotEmpty('start_time', '=', query.times)
-      .conditionIfNotEmpty(
-        'salary_process_status',
-        '=',
-        query.salary_process_status,
-      )
+      .conditionIfNotEmpty('salary_date', '=', query.salary_date)
       .conditionIfNotEmpty('order_date', '=', query.date);
     if (!query.friend && query?.order_status != OrderStatus.Friend) {
       builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);
@@ -237,12 +238,67 @@ export class OrdersDao {
 
     const criteria = builder.criteria();
     const sql =
-      `SELECT ${columns ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT * FROM "${tableName}" o inner join order_details od on od.order_id = o.id  ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
+    console.log(sql, builder.values, builder.values);
+    return { count, items };
+  }
+
+  async customerCheck(customer_id: string): Promise<number> {
+    const sql = `
+    SELECT COUNT(*) AS count
+    FROM "${tableName}"
+    WHERE order_status NOT IN ($1, $2, $3, $4)
+      AND customer_id = $5
+  `;
+
+    const params = [
+      OrderStatus.Cancelled,
+      OrderStatus.Friend,
+      OrderStatus.Absent,
+      OrderStatus.Pending,
+      customer_id,
+    ];
+
+    const result = await this._db.select(sql, params);
+
+    // Таны select нь array буцаадаг бол (жишээ нь [{ count: '3' }]) — тэгвэл:
+    const count = Number(result?.[0]?.count ?? 0);
+
+    return count;
+  }
+  async list(query, columns?: string) {
+    if (query.id) {
+      query.id = `%${query.id}%`;
+    }
+    query.friend = query.friend ? 0 : OrderStatus.Friend;
+    const builder = new SqlBuilder(query);
+    builder
+      // nemne
+      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('customer_id', '=', query.customer_id)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('start_time', '=', query.times)
+      .conditionIfNotEmpty('salary_date', '=', query.salary_date)
+      .conditionIfNotEmpty('order_date', '=', query.date);
+    if (!query.friend && query?.order_status != OrderStatus.Friend) {
+      builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);
+    }
+    builder.conditionIfNotEmpty('order_status', '=', query.order_status);
+
+    const criteria = builder.criteria();
+    const sql =
+      `SELECT ${columns ?? '*'} FROM "${tableName}"   ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `${query.limit ? `limit ${query.limit}` : ''}` +
+      ` offset ${+query.skip * +(query.limit ?? 0)}`;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+    const count = await this._db.count(countSql, builder.values);
+    const items = await this._db.select(sql, builder.values);
+    console.log(items)
     return { count, items };
   }
 
