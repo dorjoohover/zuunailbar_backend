@@ -100,8 +100,8 @@ export class AuthService {
   }
 
   generateOtp() {
-    const random = `${Math.round(Math.random() * 100000)}`;
-    return `${random}`.slice(1, 6);
+    const random = Math.floor(10000 + Math.random() * 90000);
+    return random.toString();
   }
 
   async sendOtp(mobile: string) {

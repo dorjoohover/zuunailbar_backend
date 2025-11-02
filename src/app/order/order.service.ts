@@ -207,18 +207,15 @@ export class OrderService {
             };
           }),
         );
-        console.log(occupiedSlots);
         schedules.forEach((slot) => {
           const { index, times } = slot; // day = 0–6, times = "10|11|12"
 
           // тухайн slot-ууд orders-тэй давхцаж байгааг filter
           const freeTimes = times.filter((hour) => {
-            console.log(hour);
             const res = !occupiedSlots.some(
               (o) =>
                 o.day == index && hour >= o.start_time && hour < o.end_time,
             );
-            console.log(res);
             return res;
           });
           if (freeTimes.length > 0) {
