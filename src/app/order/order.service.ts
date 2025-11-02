@@ -214,10 +214,12 @@ export class OrderService {
           // тухайн slot-ууд orders-тэй давхцаж байгааг filter
           const freeTimes = times.filter((hour) => {
             console.log(hour);
-            return !occupiedSlots.some(
+            const res = !occupiedSlots.some(
               (o) =>
-                o.day === index && hour >= o.start_time && hour < o.end_time,
+                o.day == index && hour >= o.start_time && hour < o.end_time,
             );
+            console.log(res);
+            return res;
           });
           if (freeTimes.length > 0) {
             slotsByDay[index] = freeTimes;
