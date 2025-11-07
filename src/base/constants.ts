@@ -11,26 +11,16 @@ export const E_M = 35;
 export const CLIENT = 50;
 export const STARTTIME = 7;
 export const ENDTIME = 22;
-export const isOnlyFieldPresent = (query, field) => {
-  const removeKeys = ['size', 'page', 'limit', 'skip', 'sort'];
-  const filteredKeys = Object.keys(query).filter(
-    (key) => !removeKeys.includes(key),
-  );
-  return filteredKeys.length === 1 && filteredKeys[0] === field;
-};
-export const isAnyFieldPresent = (query) => {
-  const removeKeys = ['size', 'page', 'limit', 'skip', 'sort'];
-  const filteredKeys = Object.keys(query).filter(
-    (key) => !removeKeys.includes(key),
-  );
-  return filteredKeys;
-};
 
-export function getDefinedKeys(obj: Record<string, any>): string[] {
-  return Object.entries(obj)
-
-    .filter(([_, value]) => value !== undefined && value !== null)
-    .map(([key]) => key);
+export function getDefinedKeys(
+  obj: Record<string, any>,
+  isNull = false,
+): string[] {
+  let value = Object.entries(obj);
+  if (!isNull)
+    value = value.filter(([_, value]) => value !== undefined && value !== null);
+  const result = value.map(([key]) => key);
+  return result;
 }
 export const MN_TZ = 'Asia/Ulaanbaatar' as const;
 export const usernameFormatter = (user: User) => {
@@ -41,51 +31,18 @@ export const usernameFormatter = (user: User) => {
     }`
   );
 };
-export function mnDayRange(d: Date) {
-  const p = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Ulaanbaatar',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(d);
-  const pick = (t: string) => Number(p.find((x) => x.type === t)?.value);
-  const y = pick('year'),
-    m = pick('month'),
-    day = pick('day');
-  return {
-    start: new Date(Date.UTC(y, m - 1, day, 0, 0, 0)),
-    end: new Date(Date.UTC(y, m - 1, day + 1, 0, 0, 0)),
-  };
-}
 
 export const saltOrRounds = 1;
 export function toTimeString(hour: number | string): string {
   const h = String(hour).padStart(2, '0');
   return `${h}:00:00`;
 }
-export function startOfISOWeek(d: Date) {
-  const date = new Date(d);
-  let isoDay = date.getDay() - 1;
-  if (isoDay == -1) isoDay = 6;
-  date.setDate(date.getDate() - isoDay);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
+
 export const firstLetterUpper = (value: string) => {
   if (value.length == 0) return value;
   return `${value.substring(0, 1).toUpperCase()}${value.substring(1)}`;
 };
 
-const fmtUB = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Ulaanbaatar',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hour12: false,
-});
 function getUBOffsetMinutes(d: Date): number {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Ulaanbaatar',
@@ -116,28 +73,6 @@ export function ubDateAt00(d: Date | string | number = new Date()): Date {
   // UB 00:00 → UTC millis
   const utcMs = Date.UTC(Y, M - 1, D, 0, 0, 0) - offsetMin * 60_000;
   return new Date(utcMs);
-}
-export function getMnParts(d = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: MN_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).formatToParts(d);
-  const pick = (t: string) => Number(parts.find((p) => p.type === t)?.value);
-  const y = pick('year'),
-    m = pick('month'),
-    day = pick('day');
-  return {
-    y,
-    m,
-    day,
-    ymd: `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-  };
 }
 export enum AdminUserStatus {
   Active = 10,
@@ -253,7 +188,8 @@ export enum PRODUCT_LOG_STATUS {
   // Damaged = 30,
 }
 
-export enum ServiceCategory {
-  FOOT = 10,
-  HAND = 20,
+export enum SERVICE_VIEW {
+  SPECIAL = 10,
+  DEFAULT = 0,
+  FEATURED = 20,
 }

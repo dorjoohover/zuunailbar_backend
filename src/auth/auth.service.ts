@@ -109,7 +109,7 @@ export class AuthService {
       const otp = this.generateOtp();
       this.otps[mobile] = otp;
       const res = await axios.get(
-        `https://sms-api.telcocom.mn/sms-api/v2/sms/telco/send?toNumber=${mobile}&sms=Таны OTP код: ${otp}\n
+        `${process.env.TELCOCOM_URL}?toNumber=${mobile}&sms=Таны OTP код: ${otp}\n
                              Хүндэтгэсэн &tenantId=${process.env.TELCOCOM}`,
         {
           headers: {

@@ -1,13 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  isOnlyFieldPresent,
-  mnDate,
-  mnDayRange,
-  OrderStatus,
-  ScheduleStatus,
-  STATUS,
-  ubDateAt00,
-} from 'src/base/constants';
+import { OrderStatus, STATUS, ubDateAt00 } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Order } from './order.entity';

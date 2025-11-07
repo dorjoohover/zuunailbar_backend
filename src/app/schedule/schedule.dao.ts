@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isOnlyFieldPresent, ScheduleStatus, STATUS } from 'src/base/constants';
+import { ScheduleStatus, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Schedule } from './schedule.entity';
@@ -18,9 +18,7 @@ export class ScheduleDao {
       'index',
       'start_time',
       'end_time',
-      'branch_id',
-      'status',
-      'type',
+      'meta',
       'times',
       'schedule_status',
     ]);
@@ -30,20 +28,6 @@ export class ScheduleDao {
     return await this._db.update(tableName, data, attr, [
       new SqlCondition('id', '=', data.id),
     ]);
-  }
-
-  async updateTags(data: any): Promise<number> {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "tags"=$1 WHERE "id"=$2`,
-      [data.tags, data.id],
-    );
-  }
-
-  async updateFee(id: string, fee: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
-      [fee, id],
-    );
   }
 
   async updateStatus(id: string, status: number): Promise<number> {
@@ -71,26 +55,6 @@ export class ScheduleDao {
     );
   }
 
-  // async getAvailableTimes(d: Date) {
-  //   const day = new Date(d).toISOString().slice(0, 10); // 'YYYY-MM-DD'
-  //   const sql = `
-  // WITH s AS (
-  //   SELECT user_id, unnest(string_to_array("times",'|')::int[]) AS h
-  //   FROM "${tableName}"
-  //   WHERE "date"::date = $1::date
-  //     AND status = ${STATUS.Active}
-  //     AND schedule_status = ${ScheduleStatus.Active}
-  // )
-  // SELECT user_id, array_to_string(array_agg(DISTINCT h ORDER BY h), '|') AS times
-  // FROM s
-  // GROUP BY user_id
-  // ORDER BY user_id;
-  // `;
-  //   const rows = await this._db.select(sql, [day]);
-  //   // rows: [{ user_id: 'id', times: '10|20|21' }, { user_id: 'id1', times: '9|13|14' }]
-  //   return rows as Array<{ user_id: string; times: string }>;
-  // }
-
   async list(query) {
     try {
       if (query.id) {
@@ -104,17 +68,15 @@ export class ScheduleDao {
       }
 
       const builder = new SqlBuilder(query);
-      const criteria = builder
+      builder
         .conditionIfNotEmpty('id', 'LIKE', query.id)
         .conditionIfNotEmpty('approved_by', '=', query.approved_by)
         .conditionIfNotEmpty('branch_id', '=', query.branch_id)
-        .conditionIfNotEmpty('status', '=', query.status)
         .conditionIfNotEmpty('schedule_status', '=', query.schedule_status)
-        .conditionIfNotEmpty('date', '=', query.date)
         .conditionIfNotEmpty('user_id', '=', query.user_id)
-        .conditionIfNotEmpty('index', '=', query.index)
-        .conditionIsNotNull('times')
-        .criteria();
+        .conditionIfNotEmpty('index', '=', query.index);
+      if (query.times) builder.conditionIsNotNull('times');
+      const criteria = builder.criteria();
       const sql =
         `SELECT * FROM "${tableName}" ${criteria} order by index ${query.sort === 'false' ? 'asc' : 'desc'} ` +
         `${query.limit ? `limit ${query.limit}` : ''}` +
@@ -151,71 +113,5 @@ export class ScheduleDao {
       {},
     );
     return items;
-  }
-
-  async getMerchantsByTag(value: string) {
-    return await this._db.select(
-      `SELECT * FROM "${tableName}" m 
-             WHERE $1 = ANY(m."tags")`,
-      [value],
-    );
-  }
-
-  async terminalList(merchantId: string) {
-    return this._db.select(
-      `SELECT "id", "udid", "name" FROM "TERMINALS" WHERE "merchantId"=$1 order by "id" asc`,
-      [merchantId],
-    );
-  }
-
-  async updateTerminalStatus(id: string, status: number) {
-    return await this._db._update(
-      `UPDATE "TERMINALS" SET "status"=$1 WHERE "id"=$2`,
-      [status, id],
-    );
-  }
-
-  async updateDeviceStatus(udid: string, status: number) {
-    return await this._db._update(
-      `UPDATE "DEVICES" SET "status"=$1 WHERE "udid"=$2`,
-      [status, udid],
-    );
-  }
-  async getTerminal(terminalId: string) {
-    return await this._db.selectOne(`SELECT * FROM "TERMINALS" WHERE "id"=$1`, [
-      terminalId,
-    ]);
-  }
-  async findByUserDayTime(user: string, day: number, time: number) {
-    // User-ийн өгөгдлийг авна
-    const res = await this._db.select(
-      `SELECT * FROM "${tableName}" 
-     WHERE "user_id" = $1
-       AND "status" = $2
-       AND "schedule_status" = $3
-       AND "index" = $4`,
-      [user, STATUS.Active, ScheduleStatus.Active, day],
-    );
-
-    if (!res || res.length === 0) return null;
-
-    // times field-ийг pipe '|'-ээр салгаж array болгох
-    const availableTimes: number[] = [];
-    for (const record of res) {
-      if (record.times) {
-        const timesArray = record.times.split('|').map((t) => parseInt(t, 10));
-        availableTimes.push(...timesArray);
-      }
-    }
-
-    // тухайн time байгаа эсэхийг boolean-аар шалгах
-    const isTimeAvailable = availableTimes.includes(time);
-
-    return { availableTimes, isTimeAvailable };
-  }
-  async getDevice(udid: string) {
-    return await this._db.selectOne(`SELECT * FROM "DEVICES" WHERE "udid"=$1`, [
-      udid,
-    ]);
   }
 }

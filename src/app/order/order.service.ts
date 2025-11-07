@@ -101,31 +101,24 @@ export class OrderService {
       this.orderError.invalidHour;
     const date = ubDateAt00(dto.order_date);
     date.setHours(+(start_time ?? 0), 0, 0);
-    console.log(dto.branch_id);
-    const booking = await this.booking.findByDateTime(
-      dto.order_date as string,
-      start_time,
-      merchant,
-      dto.branch_id,
-    );
-    console.log(booking, dto, start_time, details);
+    let day = date.getDay() - 1;
+    if (day == -1) day = 6;
+
+    const booking = await this.booking.list({
+      branch_id: dto.branch_id,
+      index: day,
+    });
     if (
-      (booking == null || !booking.isTimeAvailable) &&
+      (booking.items.length == 0 || booking.items?.[0]?.times == null) &&
       dto.order_status != OrderStatus.Friend
     )
       this.orderError.nonWorkingHour;
-    await Promise.all(
-      details.map(async (detail) => {
-        const schedule = await this.schedule.findByUserDateTime(
-          detail.user_id,
-          dto.order_date as string,
-          start_time,
-        );
-        console.log(schedule);
-        if (schedule == null || !schedule.isTimeAvailable)
-          this.orderError.artistTimeUnavailable;
-      }),
-    );
+    const artist = await this.booking.list({
+      branch_id: dto.branch_id,
+      index: day,
+    });
+    if (artist.items.length == 0 || artist.items?.[0]?.times == null)
+      this.orderError.artistTimeUnavailable;
 
     await Promise.all(
       details.map(async (detail) => {
@@ -311,20 +304,20 @@ export class OrderService {
       targetDate = target.date;
 
       // 4. Эхний artist-ийн боломжит цагийг авах
-      const artistSchedule = await this.schedule.getAvailableTime(
-        firstArtist,
-        targetDate,
-      );
+      // const artistSchedule = await this.schedule.getAvailableTime(
+      //   firstArtist,
+      //   targetDate,
+      // );
       // 5. Branch-ийн боломжит цагийг авах
-      const branchBooking = await this.booking.getAvailableTime(
-        dto.branch_id,
-        targetDate,
-      );
+      // const branchBooking = await this.booking.getAvailableTime(
+      //   dto.branch_id,
+      //   targetDate,
+      // );
 
       // 6. Давхцсан цагийг гаргах (intersection)
-      availableTimes = (artistSchedule?.times || []).filter((t) =>
-        branchBooking?.times?.includes(t),
-      );
+      // availableTimes = (artistSchedule?.times || []).filter((t) =>
+      //   branchBooking?.times?.includes(t),
+      // );
       if (target.time) {
         availableTimes = availableTimes.filter((a) => a >= target.time);
       }
@@ -828,85 +821,85 @@ export class OrderService {
     await this.dao.updateStatus(id, STATUS.Hidden);
   }
 
-  public async excelAdd() {
-    const res = await this.excel.readExcel('client');
-    const artist = await this.user.findOne('2c25b08bc5fc4f86a22bf947c9db5f54');
-    const merchant = '3f86c0b23a5a4ef89a745269e7849640';
-    const creater = await this.user.findOne('05e0434bbf4c4dd587a11c3709c889c3');
-    await Promise.all(
-      res.map(async (r) => {
-        const mobile = String(r[1]).trim();
-        let user;
-        try {
-          user = await this.user.findMobile(mobile);
-        } catch (error) {
-          user = await this.user.register(
-            { mobile, password: 'string' },
-            merchant,
-          );
-        }
-        console.log(user.id);
-        const service = String(r[4])?.split(';');
-        const description = String(r[3]);
-        const date = parse(
-          r[5]?.replace(/\s+/g, ' '),
-          'MMM d yyyy h:mma',
-          new Date(),
-        );
-        const hour = date.getHours();
+  // public async excelAdd() {
+  //   const res = await this.excel.readExcel('client');
+  //   const artist = await this.user.findOne('2c25b08bc5fc4f86a22bf947c9db5f54');
+  //   const merchant = '3f86c0b23a5a4ef89a745269e7849640';
+  //   const creater = await this.user.findOne('05e0434bbf4c4dd587a11c3709c889c3');
+  //   await Promise.all(
+  //     res.map(async (r) => {
+  //       const mobile = String(r[1]).trim();
+  //       let user;
+  //       try {
+  //         user = await this.user.findMobile(mobile);
+  //       } catch (error) {
+  //         user = await this.user.register(
+  //           { mobile, password: 'string' },
+  //           merchant,
+  //         );
+  //       }
+  //       console.log(user.id);
+  //       const service = String(r[4])?.split(';');
+  //       const description = String(r[3]);
+  //       const date = parse(
+  //         r[5]?.replace(/\s+/g, ' '),
+  //         'MMM d yyyy h:mma',
+  //         new Date(),
+  //       );
+  //       const hour = date.getHours();
 
-        const services = await Promise.all(
-          service.map(async (s) => {
-            let ser;
-            try {
-              ser = (await this.service.findByName(s)).id;
-            } catch (error) {
-              ser = await this.service.create(
-                {
-                  branch_id: artist.branch_id,
-                  description: null,
-                  duration: 30,
-                  min_price: 10000,
-                  max_price: 10000,
-                  name: s,
-                  icon: null,
-                  image: null,
-                  pre: 10000,
-                  duplicated: false,
-                  view: null,
-                },
-                merchant,
-                creater,
-              );
-            }
-            return {
-              service_id: ser,
-            };
-          }),
-        );
-        const res = await this.create(
-          {
-            order_date: date,
-            details: services as any,
-            branch_name: artist.branch_name,
-            description: null,
-            discount: null,
-            discount_type: null,
-            order_status: OrderStatus.Finished,
-            paid_amount: 0,
-            start_time: hour,
-            total_amount: 0,
-            user_id: user.id,
-          },
-          user.id,
-          merchant,
-        );
-        console.log(res);
+  //       const services = await Promise.all(
+  //         service.map(async (s) => {
+  //           let ser;
+  //           try {
+  //             ser = (await this.service.findByName(s)).id;
+  //           } catch (error) {
+  //             ser = await this.service.create(
+  //               {
+  //                 branch_id: artist.branch_id,
+  //                 description: null,
+  //                 duration: 30,
+  //                 min_price: 10000,
+  //                 max_price: 10000,
+  //                 name: s,
+  //                 icon: null,
+  //                 image: null,
+  //                 pre: 10000,
+  //                 para: false,
+  //                 view: null,
+  //               },
+  //               merchant,
+  //               creater,
+  //             );
+  //           }
+  //           return {
+  //             service_id: ser,
+  //           };
+  //         }),
+  //       );
+  //       const res = await this.create(
+  //         {
+  //           order_date: date,
+  //           details: services as any,
+  //           branch_name: artist.branch_name,
+  //           description: null,
+  //           discount: null,
+  //           discount_type: null,
+  //           order_status: OrderStatus.Finished,
+  //           paid_amount: 0,
+  //           start_time: hour,
+  //           total_amount: 0,
+  //           user_id: user.id,
+  //         },
+  //         user.id,
+  //         merchant,
+  //       );
+  //       console.log(res);
 
-        // console.log(mobile, mnDate(date), hour);
-      }),
-    );
-  }
+  //       // console.log(mobile, mnDate(date), hour);
+  //     }),
+  //   );
+  // }
   public async checkCallback(user: string, id: string, order_id: string) {
     const res = await this.qpay.getInvoice(id);
 

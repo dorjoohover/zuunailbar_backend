@@ -54,7 +54,8 @@ export class BookingController {
   @Get('employee')
   @PQ(BookingController.fields)
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
-    return this.bookingService.findAll(pg, user.user.role);
+    const res = this.bookingService.findAll(pg, user.user.role);
+    return res;
   }
 
   @SAP()

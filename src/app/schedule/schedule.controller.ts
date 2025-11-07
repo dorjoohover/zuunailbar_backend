@@ -40,13 +40,7 @@ export class ScheduleController {
   @Employee()
   @Post()
   create(@Body() dto: ScheduleDto, @Req() { user }) {
-    if (!dto.branch_id)
-      BadRequest.branchNotFound(dto.branch_id ?? user.branch, user.user.role);
-    return this.scheduleService.create(
-      dto,
-      dto.branch_id ?? user.branch.id,
-      user.user.id,
-    );
+    return this.scheduleService.create(dto, user.user.id);
   }
 
   @Get()
@@ -71,6 +65,12 @@ export class ScheduleController {
   @Get('get/:id')
   findOne(@Param('id') id: string) {
     return this.scheduleService.findOne(id);
+  }
+  @SAP()
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: ScheduleDto) {
+    console.log(dto);
+    return this.scheduleService.update(id, dto);
   }
 
   @SAP()

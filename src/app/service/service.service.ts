@@ -10,6 +10,8 @@ import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { User } from '../user/user.entity';
 import { UserServiceService } from '../user_service/user_service.service';
 import { BranchService } from '../branch/branch.service';
+import { ServiceCategoryService } from '../service_category/service_category.service';
+import { BranchServiceService } from '../branch_service/branch_service.service';
 
 @Injectable()
 export class ServiceService {
@@ -17,40 +19,42 @@ export class ServiceService {
     private readonly dao: ServiceDao,
     private readonly discount: DiscountService,
     private readonly branchService: BranchService,
+    @Inject(forwardRef(() => BranchServiceService))
+    private readonly branchServiceService: BranchServiceService,
+    private readonly categoryService: ServiceCategoryService,
     @Inject(forwardRef(() => UserServiceService))
     private readonly userService: UserServiceService,
   ) {}
   public async create(dto: ServiceDto, merchant: string, user: User) {
-    if (dto.isAll) {
-      const branches = await this.branchService.findByMerchant(merchant);
-      await Promise.all(
-        branches.map(async (branch) => {
-          await this.dao.add({
-            ...dto,
-            id: AppUtils.uuid4(),
-            branch_id: branch.id,
-            merchant_id: merchant,
-            created_by: user.id,
-            category: dto.category ?? null,
-            pre: dto.pre ?? 0,
-            status: STATUS.Active,
-            view: dto.view == 0 ? null : dto.view,
-          });
-        }),
-      );
-      return;
-    }
-    BadRequest.branchNotFound(dto.branch_id, user.role);
+    const branches = await this.branchService.findByMerchant(merchant);
+    const category = await this.categoryService.getById(dto.category_id);
+    const meta = {
+      name: category?.name,
+    };
     const res = await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
-      pre: dto.pre ?? 0,
-      merchant_id: merchant,
+      meta,
       created_by: user.id,
+      merchant_id: merchant,
       status: STATUS.Active,
-      category: dto.category ?? null,
-      view: dto.view == 0 ? null : dto.view,
     });
+    await Promise.all(
+      branches.map(async (branch) => {
+        await this.branchServiceService.create(
+          {
+            branch_id: branch.id,
+            created_by: user.id,
+            duration: dto.duration,
+            max_price: dto.max_price,
+            min_price: dto.min_price,
+            pre: dto.pre,
+            service_id: res,
+          },
+          user,
+        );
+      }),
+    );
     return res;
   }
 
@@ -84,22 +88,7 @@ export class ServiceService {
     res.items = items;
     return res;
   }
-  public async search(filter: SearchDto, merchant: string) {
-    const user = filter.user_id;
 
-    let res = await this.dao.search({
-      ...filter,
-      merchant,
-      status: STATUS.Active,
-    });
-    if (user) {
-      const services = await this.userService.search('', user);
-      res = services
-        .map((s) => res.find((r) => r.id == s.service_id))
-        .filter((d) => d != undefined);
-    }
-    return res;
-  }
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }
@@ -108,29 +97,43 @@ export class ServiceService {
   }
 
   public async update(id: string, dto: ServiceDto, merchant: string) {
-    const { isAll, ...body } = dto;
-    if (isAll) {
-      const branches = await this.branchService.findByMerchant(merchant);
-      await Promise.all(
-        branches.map(async (branch) => {
-          const { branch_id, ...payload } = body;
-          await this.dao.update(
-            {
-              ...payload,
-              id,
-              branch_id: branch.id,
-              view: payload.view == 0 ? null : payload.view,
-            },
-            getDefinedKeys(body),
-          );
-        }),
-      );
-    } else {
-      await this.dao.update(
-        { ...body, id, view: body.view == 0 ? null : body.view },
-        getDefinedKeys(body),
-      );
+    const { ...body } = dto;
+
+    await this.dao.update(
+      {
+        ...body,
+        id,
+        view: body.view == 0 ? null : body.view,
+      },
+      getDefinedKeys(body),
+    );
+    const branches = await this.branchService.findByMerchant(merchant);
+    const service = await this.dao.getById(id);
+    if (!service) throw new BadRequest().notFound('Үйлчилгээ');
+    let category = null;
+    if (dto.category_id) {
+      const res = await this.categoryService.getById(dto.category_id);
+      if (!res) throw new BadRequest().notFound('Ангилал');
     }
+    await Promise.all(
+      branches.map(async (branch) => {
+        await this.branchServiceService.updateByServiceAndBranch({
+          meta: {
+            parallel: service.parallel,
+            serviceName: service.name,
+            description: service.description ?? '',
+            categoryName: service.meta?.name,
+            branchName: '',
+          },
+          branch_id: branch.id,
+          service_id: id,
+          min_price: service.min_price,
+          max_price: service.max_price,
+          pre: service.pre,
+          duration: service.duration,
+        });
+      }),
+    );
   }
 
   public async remove(id: string) {

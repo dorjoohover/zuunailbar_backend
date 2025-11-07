@@ -1,33 +1,53 @@
 import { Injectable } from '@nestjs/common';
+import { STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Service } from './service.entity';
+import { BranchService } from './branch_service.entity';
 
-const tableName = 'services';
+const tableName = 'branch_services';
 
 @Injectable()
-export class ServiceDao {
+export class BranchServiceDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Service) {
+  async add(data: BranchService) {
     return await this._db.insert(tableName, data, [
       'id',
-      'merchant_id',
-      'category_id',
-      'name',
+      'branch_id',
+      'service_id',
       'min_price',
       'max_price',
-      'duration',
-      'image',
-      'icon',
-      'description',
-      'parallel',
       'pre',
-      'status',
-      'created_by',
+      'duration',
+      'custom_name',
+      'custom_description',
       'view',
       'index',
       'meta',
+      'created_by',
+      'status',
+    ]);
+  }
+
+  async addMany(data: BranchService[]) {
+    // Нэг ч мөр байхгүй бол шууд
+    if (!data?.length) return [];
+
+    return await this._db.insertMany(tableName, data, [
+      'id',
+      'branch_id',
+      'service_id',
+      'min_price',
+      'max_price',
+      'pre',
+      'duration',
+      'custom_name',
+      'custom_description',
+      'view',
+      'index',
+      'meta',
+      'created_by',
+      'status',
     ]);
   }
 
@@ -36,7 +56,6 @@ export class ServiceDao {
       new SqlCondition('id', '=', data.id),
     ]);
   }
-
   async updateStatus(id: string, status: number): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
@@ -50,45 +69,34 @@ export class ServiceDao {
       [id],
     );
   }
-  async findName(name: string) {
+
+  async getByUserId(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "name" like %$1%`,
-      [name],
+      `SELECT * FROM "${tableName}" WHERE "user_id"=$1`,
+      [id],
     );
   }
 
-  async list(query, column?: string) {
+  async list(query, columns?: string) {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
-    if (query.name) {
-      query.name = `%${query.name}%`;
-    }
-
     const builder = new SqlBuilder(query);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('merchant_id', '=', query.merchant_id)
+
+    builder
+      .conditionIfNotEmpty('id', '=', query.id)
+      .conditionIfNotEmpty('service_id', '=', query.service_id)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
-      .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('view', '=', query.view)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
-      .criteria();
+      .conditionIfNotEmpty('status', '=', query.status);
+
+    const criteria = builder.criteria();
     const sql =
-      `SELECT ${column ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${columns ?? '*'} FROM "${tableName}" ${criteria} order by ${query.order_by ?? 'created_at'} ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
-  }
-
-  async pairs(query) {
-    const items = await this._db.select(
-      `SELECT "id" as "key", CONCAT("id", '-', "name") as "value" FROM "${tableName}" order by "id" asc`,
-      {},
-    );
-    return items;
   }
 }

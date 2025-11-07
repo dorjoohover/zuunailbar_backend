@@ -39,12 +39,14 @@ import { TasksService } from './task.service';
 import { FileErrorLogService } from './error-log.service';
 import { ExcelService } from './excel.service';
 import { UserSalariesModule } from './app/user_salaries/user_salaries.module';
+import { BranchServiceModule } from './app/branch_service/branch_service.module';
+import { ServiceCategoryModule } from './app/service_category/service_category.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: `.env.${process.env.NODE_ENV || 'local'}`,
+      envFilePath: `.env`,
       load: [configuration, databaseConfig],
     }),
     CronModule.forRoot(),
@@ -75,6 +77,8 @@ import { UserSalariesModule } from './app/user_salaries/user_salaries.module';
     CostModule,
     UserProductModule,
     UserSalariesModule,
+    BranchServiceModule,
+    ServiceCategoryModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,168 +1,79 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { BookingDao } from './booking.dao';
-import { BookingDto } from './booking.dto';
+import { BookingDto, BookingListType } from './booking.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
 import {
-  CLIENT,
   getDefinedKeys,
-  mnDate,
   ScheduleStatus,
-  STATUS,
   toTimeString,
-  ubDateAt00,
 } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
-import { ScheduleService } from '../schedule/schedule.service';
-import { Booking } from './booking.entity';
+import { BadRequest } from 'src/common/error';
 
 @Injectable()
 export class BookingService {
-  constructor(
-    private readonly dao: BookingDao,
-    @Inject(forwardRef(() => ScheduleService))
-    private readonly schedule: ScheduleService,
-  ) {}
+  constructor(private readonly dao: BookingDao) {}
   public async create(dto: BookingDto, merchant: string, user: string) {
-    const weekTimes = Array.from({ length: 7 }, (_, i) => dto.times?.[i] ?? '');
-    const bookings = await this.dao.getLastWeek(merchant, dto.branch_id);
-    if (bookings?.length > 0) {
-      await Promise.all(
-        weekTimes.map(async (weekTime, index) => {
-          const parts = weekTime
-            .split('|')
-            .filter(Boolean)
-            .map(Number)
-            .filter((n) => Number.isFinite(n));
-          if (parts.length == 0) return;
-          const bookingParts = String(bookings[index].times)
-            .split('|')
-            .filter(Boolean)
-            .map(Number)
-            .filter((n) => Number.isFinite(n));
+    if (!dto.times || dto.times.length == 0)
+      throw new BadRequest().notFound('Цаг');
+    const times = dto.times.map((time) => Number(time));
+    const start = Math.min(...times);
+    const end = Math.max(...times);
 
-          const times = [
-            ...parts.filter((n) => !bookingParts.includes(n)),
-            ...bookingParts.filter((n) => !parts.includes(n)),
-          ];
-          const start = times[0];
-          const end = times[times.length - 1];
-          if (times.length > 0) {
-            const payload = {
-              times: times.length ? times.join('|') : null, // "" хадгална
-              start_time: times.length ? toTimeString(start) : null,
-              end_time: times.length ? toTimeString(end) : null,
-            };
-            await this.dao.update(
-              { id: bookings[index].id, ...payload },
-              getDefinedKeys(payload),
-            );
-          }
-        }),
-      );
-      return;
-    }
-    await Promise.all(
-      weekTimes.map(async (timeLine, idx) => {
-        const parts = String(timeLine)
-          .split('|')
-          .filter(Boolean)
-          .map(Number)
-          .filter((n) => Number.isFinite(n))
-          .sort((a, b) => a - b);
-
-        const start = parts[0];
-        const end = parts[parts.length - 1];
-
-        await this.dao.add({
-          ...dto,
-          id: AppUtils.uuid4(),
-          branch_id: dto.branch_id,
-          approved_by: user,
-          booking_status: ScheduleStatus.Active,
-          status: STATUS.Active,
-          index: idx,
-          times: parts.length ? parts.join('|') : null,
-          start_time: parts.length ? toTimeString(start) : null,
-          end_time: parts.length ? toTimeString(end) : null,
-          merchant_id: merchant,
-        });
-      }),
-    );
+    await this.dao.add({
+      ...dto,
+      id: AppUtils.uuid4(),
+      branch_id: dto.branch_id,
+      approved_by: user,
+      booking_status: ScheduleStatus.Active,
+      index: dto.index,
+      times: dto.times?.join('|'),
+      start_time: toTimeString(start),
+      end_time: toTimeString(end),
+      merchant_id: merchant,
+    });
   }
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
-  public async getAvailableTime(branch_id: string, date?: Date) {
-    let today = date ? new Date(date) : new Date();
-    const isSpecificDate = !!date; // true бол зөвхөн тухайн өдөр шалгах
-    let attempts = 0;
-    while (true) {
-      let weekday = today.getDay() - 1;
-      if (weekday == -1) weekday = 6;
-      const currentHour =
-        today.getHours() + Math.floor((today.getMinutes() + 59.9) / 60);
-      console.log(weekday);
-      // Тухайн өдрийн боломжит цагийг DAO-оос авна
-      const pg = { branch_id, index: weekday };
-      const result = await this.dao.list({
-        ...pg,
-        status: STATUS.Active,
-        limit: 100,
-        sort: 1,
-        skip: 0,
-      });
-      console.log(result, 'result');
-      if (result?.items?.length) {
-        const res = result.items[0];
-        const times = res.times
-          .split('|')
-          .map(Number)
-          .filter((a) => a >= currentHour);
-
-        if (times.length > 0) {
-          return {
-            weekday,
-            date: today,
-            times,
-          };
-        }
-      }
-
-      if (isSpecificDate) {
-        return null;
-      }
-
-      today = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-      today.setHours(0, 0, 0, 0);
-      attempts += 1;
-
-      if (attempts >= 7) {
-        return null;
-      }
-    }
+  public async list(filter: BookingListType) {
+    return await this.dao.list(filter);
   }
 
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }
-
-  public async findByDateTime(
-    date: string,
-    time: number,
-    merchant: string,
-    branch_id: string,
-  ) {
-    const jsDay = ubDateAt00(date).getDay();
-    const day = jsDay === 0 ? 7 : jsDay;
-    return await this.dao.findByDateTime(day - 1, time, merchant, branch_id);
+  public async findByBranchId(id: string) {
+    return await this.dao.list({
+      branch_id: id,
+    });
   }
 
   public async update(id: string, dto: BookingDto) {
-    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+    const times = dto.times ? dto.times?.join('|') : null;
+    let start_time = null,
+      end_time = null;
+    if (dto.times) {
+      const times = dto.times.map((time) => Number(time));
+      const start = Math.min(...times);
+      const end = Math.max(...times);
+      start_time = toTimeString(start);
+      end_time = toTimeString(end);
+    }
+
+    return await this.dao.update(
+      { ...dto, start_time, end_time, times, id },
+      getDefinedKeys({ ...dto, start_time, end_time, times }, true),
+    );
   }
 
-  public async remove(id: string) {
-    return await this.dao.updateStatus(id, ScheduleStatus.Hidden);
+  public async remove(branch_id: string) {
+    const bookings = await this.findByBranchId(branch_id);
+    await Promise.all(
+      bookings.items.map(async (booking) => {
+        await this.dao.deleteBooking(booking.id);
+      }),
+    );
   }
 }

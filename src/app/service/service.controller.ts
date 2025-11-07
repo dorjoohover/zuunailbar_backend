@@ -50,12 +50,7 @@ export class ServiceController {
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.serviceService.findAll(pg, user.user.role);
   }
-  @Public()
-  @Get('search')
-  @SQ(['id', 'limit', 'page'])
-  search(@Filter() sd: SearchDto) {
-    return this.serviceService.search(sd, '3f86c0b23a5a4ef89a745269e7849640');
-  }
+
   @Get('admin')
   @SAQ()
   findOne(@Query('id') id: string) {

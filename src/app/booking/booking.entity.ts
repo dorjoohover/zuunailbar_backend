@@ -5,7 +5,6 @@ export class Booking {
   public branch_id: string;
   public start_time: string;
   public end_time: string;
-  public status: number;
   public index: number;
   public booking_status: number;
   public times: string;

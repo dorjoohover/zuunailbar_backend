@@ -6,27 +6,22 @@ import { BaseModule } from 'src/base/base.module';
 import { UserDao } from './user.dao';
 import { BranchModule } from '../branch/branch.module';
 import { UserServiceModule } from '../user_service/user_service.module';
-import { UserServiceService } from '../user_service/user_service.service';
-import { UserServiceDao } from '../user_service/user_service.dao';
-import { ServiceService } from '../service/service.service';
-import { ServiceDao } from '../service/service.dao';
-import { DiscountService } from '../discount/discount.service';
-import { DiscountDao } from '../discount/discount.dao';
 import { UserSalariesModule } from '../user_salaries/user_salaries.module';
+import { DiscountModule } from '../discount/discount.module';
+import { ServiceModule } from '../service/service.module';
 
 @Module({
-  imports: [AppDbModule, BaseModule, BranchModule, UserSalariesModule],
-  controllers: [UserController],
-  providers: [
-    UserService,
-    UserDao,
-    UserServiceService,
-    UserServiceDao,
-    ServiceService,
-    ServiceDao,
-    DiscountService,
-    DiscountDao,
+  imports: [
+    AppDbModule,
+    BaseModule,
+    BranchModule,
+    UserSalariesModule,
+    DiscountModule,
+    forwardRef(() => UserServiceModule),
+    forwardRef(() => ServiceModule),
   ],
+  controllers: [UserController],
+  providers: [UserService, UserDao],
   exports: [UserService],
 })
 export class UserModule {}

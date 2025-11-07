@@ -2,21 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Brand } from './brand.entity';
+import { ServiceCategory } from './service_category.entity';
 
-const tableName = 'brands';
+const tableName = 'service_categories';
 
 @Injectable()
-export class BrandDao {
+export class ServiceCategoryDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Brand) {
+  async add(data: ServiceCategory) {
     return await this._db.insert(tableName, data, [
       'id',
       'name',
       'merchant_id',
       'status',
-      'order_days',
     ]);
   }
 

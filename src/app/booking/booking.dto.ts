@@ -2,14 +2,22 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class BookingDto {
   @ApiProperty()
-  date: Date;
-
+  branch_id?: string;
   @ApiProperty()
-  branch_id: string;
+  index: number;
 
   // @ApiProperty()
   // status: number;
 
   @ApiProperty()
-  times: string[];
+  times?: number[];
+}
+
+export interface BookingListType {
+  id?: string;
+  approved_by?: string;
+  branch_id?: string;
+  merchant_id?: string;
+  booking_status?: number;
+  index?: number;
 }

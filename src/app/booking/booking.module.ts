@@ -7,7 +7,7 @@ import { BookingDao } from './booking.dao';
 import { ScheduleModule } from '../schedule/schedule.module';
 
 @Module({
-  imports: [AppDbModule, BaseModule, forwardRef(() => ScheduleModule)],
+  imports: [AppDbModule, BaseModule],
   controllers: [BookingController],
   providers: [BookingService, BookingDao],
   exports: [BookingService],
