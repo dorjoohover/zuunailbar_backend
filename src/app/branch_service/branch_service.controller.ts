@@ -19,7 +19,7 @@ import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 @ApiBearerAuth('access-token')
-@Controller('user_service')
+@Controller('branch_service')
 export class BranchServiceController {
   constructor(private readonly branchServiceService: BranchServiceService) {}
   private static readonly clientFields = ['service_id', 'user_id'];

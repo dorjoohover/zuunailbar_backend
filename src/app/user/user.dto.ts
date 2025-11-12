@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { UserStatus } from 'src/base/constants';
 
 export class UserDto {
   @ApiProperty()
@@ -32,4 +33,8 @@ export class UserDto {
   description: string;
   @ApiProperty()
   device: string;
+
+  @ApiProperty()
+  user_status?: number;
+  level?: number;
 }

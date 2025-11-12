@@ -69,7 +69,7 @@ export class ServiceDao {
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('merchant_id', '=', query.merchant_id)
-      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
+      .conditionIfNotEmpty('category_id', '=', query.category_id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('view', '=', query.view)
       .conditionIfNotEmpty('name', 'LIKE', query.name)

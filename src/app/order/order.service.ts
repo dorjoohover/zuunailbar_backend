@@ -143,6 +143,7 @@ export class OrderService {
   }
 
   public async getArtists(dto: OrderDto) {
+    console.log(dto);
     const userService = await this.userService.findForClient(
       dto.branch_id,
       dto.services,
@@ -153,11 +154,11 @@ export class OrderService {
         CLIENT,
       )
     )?.items;
+    console.log(bookingRes);
     const bookings = {};
     bookingRes.map((b) => {
       bookings[+b.index] = b.times?.split('|').map(Number);
     });
-    console.log(bookings);
     const services = [];
     userService.items.map((u) => {
       if (
@@ -166,6 +167,7 @@ export class OrderService {
       )
         services.push(u.service_id);
     });
+    console.log(services);
     const artistsWithSlots = await Promise.all(
       userService.items.map(async (us) => {
         const schedulesItems = await this.schedule.findAll(
@@ -206,8 +208,7 @@ export class OrderService {
           // тухайн slot-ууд orders-тэй давхцаж байгааг filter
           const freeTimes = times.filter((hour) => {
             const res = !occupiedSlots.some(
-              (o) =>
-                o.day == index && hour >= o.start_time && hour < o.end_time,
+              (o) => o.day == index && hour >= o.start_time,
             );
             return res;
           });
@@ -365,6 +366,7 @@ export class OrderService {
         status: STATUS.Active,
         branch_id: dto.branch_id,
       } as const;
+      console.log(payload);
       await this.canPlaceOrder(
         {
           ...payload,
@@ -450,7 +452,6 @@ export class OrderService {
       const res = await this.dao.listWithDetails(
         applyDefaultStatusFilter({ ...pg }, CLIENT),
       );
-      console.log(res);
       return {
         items: res.items,
         count: res.count,
@@ -462,58 +463,54 @@ export class OrderService {
 
   public async find(pg: PaginationDto, role: number, id?: string) {
     try {
+      console.log(pg);
       const query = applyDefaultStatusFilter(
         role == CLIENT ? { ...pg, customer_id: id } : pg,
         role,
       );
       const res = await this.dao.list(query);
-      const items = await Promise.all(
-        res.items.map(async (item) => {
-          const detail = await this.orderDetail.find(
-            { ...pg, order_id: item.id },
-            role,
-          );
+      const items = (
+        await Promise.all(
+          res.items.map(async (item) => {
+            const detail = await this.orderDetail.find(
+              { ...pg, order_id: item.id },
+              role,
+            );
 
-          const users = Array.from(
-            new Map(
-              (detail.items ?? [])
-                .filter((d) => d.user)
-                .map((d) => [d.user.id, d.user]),
-            ).values(),
-          );
+            if (
+              pg.user_id &&
+              !detail.items.some((d) => d.user_id !== pg.user_id)
+            ) {
+              return undefined;
+            }
 
-          const firstArtist = users[0];
-          const hasArtists = users.length > 0;
+            // Давхар user-уудыг арилгах
+            const users = Array.from(
+              new Map(
+                (detail.items ?? [])
+                  .filter((d) => d.user)
+                  .map((d) => [d.user.id, d.user]),
+              ).values(),
+            );
 
-          const artist_name = hasArtists
-            ? users
-                .map(
-                  (u) =>
-                    `${firstLetterUpper(u.nickname ?? '')} ${MobileFormat(u.mobile)}`,
-                )
-                .join(' | ')
-            : '';
+            const firstArtist = users[0];
 
-          const color = firstArtist?.color ?? null;
-          const branch_id = firstArtist?.branch_id ?? null;
+            const branch_id = firstArtist?.branch_id ?? null;
 
-          const user = await this.user.findOne(item.customer_id);
-          const user_name = user
-            ? `${MobileFormat(user.mobile)} ${firstLetterUpper(user.nickname ?? '')}`
-            : '';
-          let order_date = item.order_date;
-          order_date = mnDate(new Date(order_date));
-          return {
-            ...item,
-            order_date,
-            artist_name,
-            user_name,
-            branch_id,
-            color,
-            details: detail.items,
-          };
-        }),
-      );
+            const user = await this.user.findOne(item.customer_id);
+
+            const order_date = mnDate(new Date(item.order_date));
+
+            return {
+              ...item,
+              order_date,
+              customer: user,
+              branch_id,
+              details: detail.items,
+            };
+          }),
+        )
+      ).filter((d): d is NonNullable<typeof d> => d !== undefined); // ⬅️ энд шүүнэ
       return {
         items,
         count: res.count,
@@ -791,7 +788,23 @@ export class OrderService {
       count: confirmedOrders.length,
     };
   }
-
+  public async level() {
+    return {
+      [UserLevel.BRONZE]: this.bronze,
+      [UserLevel.SILVER]: this.silver,
+      [UserLevel.GOLD]: this.gold,
+    };
+  }
+  public async updateLevel(dto: Record<UserLevel, number>) {
+    await Promise.all(
+      Object.entries(dto).map(([k, value], i) => {
+        let key = k as unknown as UserLevel;
+        if (key == UserLevel.BRONZE) this.bronze = value;
+        if (key == UserLevel.SILVER) this.silver = value;
+        if (key == UserLevel.GOLD) this.gold = value;
+      }),
+    );
+  }
   public async checkLevel(user: string) {
     const count = await this.dao.customerCheck(user);
     if (count >= this.gold) {

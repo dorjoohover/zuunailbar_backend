@@ -34,6 +34,7 @@ export class BranchServiceService {
       const res = await this.dao.add({
         id: AppUtils.uuid4(),
         ...dto,
+        index: service.index,
         meta,
         created_by: u.id,
       });
@@ -44,7 +45,18 @@ export class BranchServiceService {
   }
 
   public async findAll(pg: PaginationDto) {
-    const res = await this.dao.list(applyDefaultStatusFilter(pg, CLIENT));
+    const { id, status, limit, sort, skip, branch_id, service_id, order_by } =
+      pg;
+    const res = await this.dao.list({
+      limit: limit == -1 ? 100 : limit,
+      sort,
+      skip: skip ?? 0,
+      status,
+      id,
+      branch_id,
+      order_by,
+      service_id,
+    });
 
     return res;
   }

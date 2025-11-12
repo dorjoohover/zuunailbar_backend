@@ -11,6 +11,7 @@ import {
   MANAGER,
   saltOrRounds,
   STATUS,
+  UserLevel,
   UserStatus,
 } from 'src/base/constants';
 import { BadRequest, NoPermissionException } from 'src/common/error';
@@ -69,7 +70,7 @@ export class UserService {
       birthday: new Date(dto.birthday),
       color: dto.color,
       salary_day: 15,
-      level: null,
+      level: dto.level ?? null,
     });
     if (dto.duration || dto.percent || dto.date) {
       await this.userSalary.create({
@@ -210,6 +211,12 @@ export class UserService {
 
   public async updateStatus(id: string) {
     return await this.dao.updateStatus(id, STATUS.Hidden);
+  }
+  public async updateUserStatus(id: string, status: UserStatus) {
+    return await this.dao.updateUserStatus(id, status);
+  }
+  public async updateLevel(id: string, level: UserLevel) {
+    return await this.dao.updateLevel(id, level);
   }
   public async updatePercent(id: string, percent: number) {
     return await this.dao.updatePercent(id, percent);

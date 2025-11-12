@@ -172,6 +172,7 @@ export class ProductService {
   }
   public async updateQuantity(id: string, qty: number) {
     const { quantity } = await this.findOne(id);
+    console.log(quantity, 'q')
     if (quantity + qty < 0) new BadRequest().STOCK_INSUFFICIENT;
     const body = {
       id,

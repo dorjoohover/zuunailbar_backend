@@ -21,13 +21,13 @@ export class OrdersDao {
         'end_time',
         'status',
         'pre_amount',
+        'branch_id',
         'is_pre_amount_paid',
         'salary_date',
         'total_amount',
         'paid_amount',
         'description',
         'order_status',
-        'user_desc',
       ]);
     } catch (error) {
       console.log(error);
@@ -275,10 +275,20 @@ export class OrdersDao {
       .conditionIfNotEmpty('customer_id', '=', query.customer_id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('start_time', '=', query.times)
-      .conditionIfNotEmpty('salary_date', '=', query.salary_date)
-      .conditionIfNotEmpty('order_date', '=', query.date);
+      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
+      .conditionIfNotEmpty('salary_date', '=', query.salary_date);
+
     if (!query.friend && query?.order_status != OrderStatus.Friend) {
       builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);
+    }
+    if (query.date) {
+      query.end_date
+        ? builder.conditionIfDateBetweenValues(
+            query.date,
+            query.end_date,
+            'order_date',
+          )
+        : builder.conditionIfNotEmpty('order_date', '=', query.date);
     }
     builder.conditionIfNotEmpty('order_status', '=', query.order_status);
 
@@ -290,7 +300,6 @@ export class OrdersDao {
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
-    console.log(items)
     return { count, items };
   }
 

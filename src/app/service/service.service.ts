@@ -31,6 +31,7 @@ export class ServiceService {
     const meta = {
       name: category?.name,
     };
+    console.log(dto);
     const res = await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
@@ -125,6 +126,7 @@ export class ServiceService {
             categoryName: service.meta?.name,
             branchName: '',
           },
+          index: service.index,
           branch_id: branch.id,
           service_id: id,
           min_price: service.min_price,

@@ -108,7 +108,7 @@ export class OrderController {
     return this.orderService.updateOrderLimit(limit);
   }
   @Get('user_count')
-  async userCount(@Req() {user}) {
+  async userCount(@Req() { user }) {
     return this.orderService.getUserCount(user.user.id);
   }
   @Get('confirm/:date')
@@ -160,6 +160,20 @@ export class OrderController {
   @Patch('status/:id/:status')
   updateStatus(@Param('id') id: string, @Param('status') status: string) {
     return this.orderService.updateStatus(id, +status);
+  }
+  @Admin()
+  @Patch('level')
+  updateLevel(@Body() dto: any) {
+    return this.orderService.updateLevel(dto);
+  }
+  @Admin()
+  @Get('level')
+  async getLevel() {
+    const items = await this.orderService.level();
+    console.log(items);
+    return {
+      items,
+    };
   }
   @Admin()
   @Delete(':id')

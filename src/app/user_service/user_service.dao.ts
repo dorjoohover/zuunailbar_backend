@@ -36,7 +36,15 @@ export class UserServiceDao {
       'status',
     ]);
   }
+  async deleteMany(ids: string[]) {
+    if (!ids.length) return;
 
+    // Жишээ SQL, PostgreSQL
+    const sql = `DELETE FROM ${tableName} WHERE id = ANY($1)`;
+    const params = [ids];
+
+    return await this._db.delete(sql, params);
+  }
   async update(data: any, attr: string[]): Promise<number> {
     return await this._db.update(tableName, data, attr, [
       new SqlCondition('id', '=', data.id),

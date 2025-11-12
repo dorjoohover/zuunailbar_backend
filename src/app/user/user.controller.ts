@@ -93,9 +93,20 @@ export class UserController {
   }
 
   @SAP()
-  @Patch(':id')
+  @Patch('update/:id')
   update(@Param('id') id: string, @Body() dto: UserDto) {
     return this.userService.update(id, dto);
+  }
+  @SAP()
+  @Patch('status/:id')
+  updateStatus(@Param('id') id: string, @Body() dto: UserDto) {
+    if (dto.user_status)
+      return this.userService.updateUserStatus(id, dto.user_status);
+  }
+  @SAP()
+  @Patch('level/:id')
+  updateLevel(@Param('id') id: string, @Body() dto: UserDto) {
+    if (dto.level) return this.userService.updateLevel(id, dto.level);
   }
 
   @Delete(':id')

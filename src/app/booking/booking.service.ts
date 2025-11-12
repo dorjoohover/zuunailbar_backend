@@ -38,7 +38,9 @@ export class BookingService {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
   public async list(filter: BookingListType) {
-    return await this.dao.list(filter);
+    return await this.dao.list({
+      ...filter,
+    });
   }
 
   public async findOne(id: string) {

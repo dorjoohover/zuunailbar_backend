@@ -38,7 +38,10 @@ export class UserProductService {
     const results = await Promise.all(
       dto.items.map(async (item) => {
         const product = await this.productService.findOne(item.product_id);
-        console.log(product.quantity)
+        console.log(product.quantity, item.quantity);
+        console.log(+product.quantity);
+        console.log(+(item.quantity ?? '0'));
+        console.log(+product.quantity < +(item.quantity ?? '0'));
         if (+product.quantity == 0) this.badRequestError.STOCK_EMPTY;
         if (+product.quantity < +(item.quantity ?? '0'))
           this.badRequestError.STOCK_INSUFFICIENT;

@@ -25,6 +25,7 @@ export class UserServiceService {
   ) {}
   public async create(dto: UserServiceDto, u: User) {
     try {
+      let services = dto.services;
       let user: User;
       u.role == EMPLOYEE
         ? (user = u)
@@ -39,10 +40,19 @@ export class UserServiceService {
         },
         CLIENT,
       );
-      if (userServices.items.length > 0) await this.deleteByUser(user.id);
+      if (userServices.items.length > 0) {
+        const dtoServices = dto.services;
 
+        const toDelete = userServices.items
+          .filter((s) => !dtoServices.includes(s.service_id))
+          .map((s) => s.id);
+        if (toDelete.length > 0) await this.dao.deleteMany(toDelete);
+        services = dtoServices.filter(
+          (id) => !userServices.items.some((s) => s.service_id === id),
+        );
+      }
       const payload = await Promise.all(
-        dto.services.map(async (s) => {
+        services.map(async (s) => {
           const service = await this.service.findOne(s);
           return {
             ...dto,
@@ -121,16 +131,13 @@ export class UserServiceService {
   }
 
   public async updateStatus(id: string, status: number) {
-    return await this.dao.update({ id, status, updated_at: mnDate() }, [
-      'id',
-      'status',
-      'updated_at',
-    ]);
+    return await this.dao.update({ id, status }, ['id', 'status']);
   }
   public async deleteByUser(id: string) {
-    return await this.dao.updateByUser(
-      { id, status: STATUS.Hidden, updated_at: mnDate() },
-      ['id', 'status', 'updated_at'],
-    );
+    console.log(id, 'asdf');
+    return await this.dao.updateByUser({ user_id: id, status: STATUS.Hidden }, [
+      'user_id',
+      'status',
+    ]);
   }
 }

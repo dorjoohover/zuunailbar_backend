@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { UserStatus } from 'src/base/constants';
+import { UserLevel, UserStatus } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { User } from './user.entity';
@@ -52,24 +52,22 @@ export class UserDao {
     }
   }
 
-  async updateTags(data: any): Promise<number> {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "tags"=$1 WHERE "id"=$2`,
-      [data.tags, data.id],
-    );
-  }
-
-  async updateFee(id: string, fee: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
-      [fee, id],
-    );
-  }
-
   async updateStatus(id: string, status: number): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
       [status, id],
+    );
+  }
+  async updateUserStatus(id: string, status: number): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "user_status"=$1 WHERE "id"=$2`,
+      [status, id],
+    );
+  }
+  async updateLevel(id: string, level: UserLevel): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "level"=$1 WHERE "id"=$2`,
+      [level, id],
     );
   }
 
@@ -130,13 +128,14 @@ export class UserDao {
       .conditionIfNotEmpty('firstname', 'LIKE', query.firstname)
       .conditionIfNotEmpty('lastname', 'LIKE', query.lastname)
       .conditionIfNotEmpty('birthday', '=', query.birthday)
+      .conditionIfNotEmpty('level', '=', query.level)
       // .conditionIfNotEmpty('mobile', 'LIKE', query.mobile)
       // .conditionIfNotEmpty('nickname', 'LIKE', query.nickname)
       .conditionIfNotEmpty(
         'role',
         query.role == 35 ? '<=' : '=',
         query.role == 35 ? 40 : query.role,
-      )
+      ) 
       .conditionIfNotEmpty(
         'role',
         query.role == 35 ? '>=' : '=',
@@ -211,45 +210,5 @@ export class UserDao {
       {},
     );
     return items;
-  }
-
-  async getMerchantsByTag(value: string) {
-    return await this._db.select(
-      `SELECT * FROM "${tableName}" m 
-             WHERE $1 = ANY(m."tags")`,
-      [value],
-    );
-  }
-
-  async terminalList(merchantId: string) {
-    return this._db.select(
-      `SELECT "id", "udid", "name" FROM "TERMINALS" WHERE "merchantId"=$1 order by "id" asc`,
-      [merchantId],
-    );
-  }
-
-  async updateTerminalStatus(id: string, status: number) {
-    return await this._db._update(
-      `UPDATE "TERMINALS" SET "status"=$1 WHERE "id"=$2`,
-      [status, id],
-    );
-  }
-
-  async updateDeviceStatus(udid: string, status: number) {
-    return await this._db._update(
-      `UPDATE "DEVICES" SET "status"=$1 WHERE "udid"=$2`,
-      [status, udid],
-    );
-  }
-  async getTerminal(terminalId: string) {
-    return await this._db.selectOne(`SELECT * FROM "TERMINALS" WHERE "id"=$1`, [
-      terminalId,
-    ]);
-  }
-
-  async getDevice(udid: string) {
-    return await this._db.selectOne(`SELECT * FROM "DEVICES" WHERE "udid"=$1`, [
-      udid,
-    ]);
-  }
+  } 
 }

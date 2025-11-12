@@ -105,7 +105,9 @@ export enum SCHEDULE_TYPE {
   Employee = 10,
   Branch = 20,
 }
-
+export enum SERVICE_TYPE {
+  
+}
 export const round = (value: number, round = 1000) => {
   return Math.floor(value / round) * round;
 };
