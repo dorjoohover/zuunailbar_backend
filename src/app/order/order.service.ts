@@ -143,7 +143,8 @@ export class OrderService {
   }
 
   public async getArtists(dto: OrderDto) {
-    console.log(dto);
+  try {
+      console.log(dto);
     const userService = await this.userService.findForClient(
       dto.branch_id,
       dto.services,
@@ -226,6 +227,9 @@ export class OrderService {
     );
     const filteredArtists = artistsWithSlots?.filter(Boolean);
     return { items: filteredArtists, coount: this.orderLimit };
+  } catch (error) {
+    console.log(error)
+  }
   }
   public async updateOrderLimit(limit: number) {
     this.orderLimit = limit;
