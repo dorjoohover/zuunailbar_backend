@@ -233,8 +233,6 @@ export class OrderService {
                 );
               });
             });
-            console.log(freeTimes);
-            console.log(slotsByDay[index]);
             if (freeTimes.length > 0) {
               slotsByDay[index] = freeTimes;
             }
@@ -394,15 +392,14 @@ export class OrderService {
         status: STATUS.Active,
         branch_id: dto.branch_id,
       } as const;
-      console.log(payload);
-      await this.canPlaceOrder(
-        {
-          ...payload,
-        },
-        user,
-        dto.details,
-        merchant,
-      );
+      // await this.canPlaceOrder(
+      //   {
+      //     ...payload,
+      //   },
+      //   user,
+      //   dto.details,
+      //   merchant,
+      // );
 
       const order = await this.dao.add(payload);
       let pre = 0;
