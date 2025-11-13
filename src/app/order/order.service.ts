@@ -169,8 +169,18 @@ export class OrderService {
           services.push(u.service_id);
       });
       console.log(services);
+      const uniqueUsers = Object.values(
+        userService.items.reduce(
+          (acc, us) => {
+            const uid = us.user.id;
+            if (!acc[uid]) acc[uid] = us; // зөвхөн анхныг нь хадгална
+            return acc;
+          },
+          {} as Record<string, (typeof userService.items)[number]>,
+        ),
+      );
       const artistsWithSlots = await Promise.all(
-        userService.items.map(async (us) => {
+        uniqueUsers.map(async (us: any) => {
           const schedulesItems = await this.schedule.findAll(
             { limit: 100, skip: 0, sort: false, user_id: us.user.id },
             CLIENT,
@@ -188,6 +198,7 @@ export class OrderService {
               end_time: +o.end_time?.slice(0, 2),
             };
           });
+
           const slotsByDay: Record<string, number[]> = {};
           const schedules = await Promise.all(
             schedulesItems.items.map(async (schedule) => {
@@ -203,21 +214,24 @@ export class OrderService {
               };
             }),
           );
-          schedules.forEach((slot) => {
-            const { index, times } = slot; // day = 0–6, times = "10|11|12"
 
-            // тухайн slot-ууд orders-тэй давхцаж байгааг filter
+          schedules.forEach((slot) => {
+            const { index, times } = slot;
+
             const freeTimes = times?.filter((hour) => {
               const res = !occupiedSlots.some(
                 (o) => o.day == index && hour >= o.start_time,
               );
               return res;
             });
+
             if (freeTimes && freeTimes.length > 0) {
               slotsByDay[index] = freeTimes;
             }
           });
+
           if (Object.keys(slotsByDay).length === 0) return null;
+
           return {
             ...us,
             slots: slotsByDay,
