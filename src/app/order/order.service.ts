@@ -191,7 +191,7 @@ export class OrderService {
         const schedules = await Promise.all(
           schedulesItems.items.map(async (schedule) => {
             const { index, times } = schedule;
-            const slotTimes = times.split('|').map(Number);
+            const slotTimes = times?.split('|').map(Number);
             const overlaps = slotTimes.filter((t) =>
               bookings[index].includes(t),
             );
@@ -251,7 +251,7 @@ export class OrderService {
 
     if (artist) {
       artistDateTime = new Date(artist.order_date);
-      const [hour, minute] = artist.end_time.split(':').map(Number);
+      const [hour, minute] = artist.end_time?.split(':').map(Number);
       artistDateTime.setHours(hour, minute, 0, 0); // цаг, минут, секунд, мс
     }
     // dtoDate байхгүй бол өнөөдөр
@@ -274,7 +274,7 @@ export class OrderService {
       return artistDateTime >= referenceDate
         ? {
             date: artistDateTime,
-            time: artist.end_time.split(':').map(Number)[0],
+            time: artist.end_time?.split(':').map(Number)[0],
           }
         : {
             date: referenceDate,
