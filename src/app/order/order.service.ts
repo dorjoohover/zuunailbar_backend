@@ -73,7 +73,7 @@ export class OrderService {
     if (user.status == UserStatus.Banned) this.orderError.bannedUser;
     let artists;
     const userIds = [...new Set(details.map((i) => i.user_id).filter(Boolean))];
-
+    console.log(userIds)
     try {
       console.log('detail', details);
       artists = await Promise.all(
