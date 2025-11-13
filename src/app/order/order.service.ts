@@ -358,6 +358,7 @@ export class OrderService {
 
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
+      console.log(new Date(), 'start');
       const duplicated = dto.duplicated;
       const totalMinutes = duplicated
         ? Math.max(...dto.details.map((a) => a.duration))
@@ -373,6 +374,7 @@ export class OrderService {
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
 
       const orderDate = mnDate(dto.order_date);
+      console.log(new Date(), 'orderDate');
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
@@ -402,12 +404,14 @@ export class OrderService {
       // );
 
       const order = await this.dao.add(payload);
+      console.log(new Date(), 'order');
       let pre = 0;
       await Promise.all(
-        (dto.details ?? []).map(async (d) => {
+        (dto.details ?? []).map(async (d, i) => {
           const service = await this.service.findOne(d.service_id);
           const artist = await this.user.findOne(d.user_id);
           pre += +(service.pre ?? 0);
+          console.log(i, 'i', new Date());
           await this.orderDetail.create({
             id: AppUtils.uuid4(),
             order_id: order,
@@ -419,6 +423,7 @@ export class OrderService {
             description: d.description,
             user_id: artist.id ?? d.user_id,
           });
+          console.log('adsf', 'i', new Date());
         }),
       );
       if (pre > 0) {
