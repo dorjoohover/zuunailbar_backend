@@ -426,6 +426,7 @@ export class OrderService {
           console.log('adsf', 'i', new Date());
         }),
       );
+      console.log(pre, 'pre');
       if (pre > 0) {
         const invoice = await this.qpay.createInvoice(
           pre,
@@ -433,6 +434,7 @@ export class OrderService {
           user.id,
           dto.branch_name,
         );
+        console.log(invoice, 'invoice');
 
         return {
           id: order,
@@ -444,8 +446,10 @@ export class OrderService {
           },
         };
       } else {
+        console.log('first', new Date());
         await this.updatePrePaid(order, true);
         await this.dao.updateOrderStatus(order, OrderStatus.Active);
+        console.log('second', new Date());
         return { id: order };
       }
     } catch (error) {
