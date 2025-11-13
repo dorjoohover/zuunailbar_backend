@@ -29,13 +29,27 @@ export class QpayService {
     this.accessToken = data.access_token;
     this.refreshToken = data.refresh_token;
     this.expiresIn = new Date(Date.now() + data.expires_in * 1000);
+    console.log(
+      'Access token refreshed:',
+      this.accessToken.slice(0, 20),
+      '...',
+      new Date(),
+    );
   }
 
   private async ensureValidToken() {
-    if (!this.accessToken || new Date() > this.expiresIn) {
-      if (this.refreshToken) {
+    const now = new Date();
+
+    if (!this.accessToken || now > this.expiresIn) {
+      const diff = this.expiresIn
+        ? now.getTime() - this.expiresIn.getTime()
+        : 0;
+
+      if (this.refreshToken && diff < 24 * 60 * 60 * 1000) {
+        console.log('Token expired → Refreshing...');
         await this.refreshAccessToken();
       } else {
+        console.log('24 цаг өнгөрсөн → Re-authenticating...');
         await this.authenticate();
       }
     }
@@ -46,11 +60,9 @@ export class QpayService {
     endpoint: string,
     data: any = {},
   ): Promise<T> {
-    console.log('ensure', new Date());
     await this.ensureValidToken(); // check expiry first
 
     try {
-      console.log('first', new Date());
       const response = await firstValueFrom(
         this.httpService.request({
           method,
@@ -61,7 +73,6 @@ export class QpayService {
           },
         }),
       );
-      console.log('response', new Date());
       return response.data;
     } catch (error) {
       console.log(error.response.data.message);
@@ -84,25 +95,21 @@ export class QpayService {
     }
   }
   private async authenticate() {
-    try {
-      const response = await this.httpService
-        .post(
-          `${this.baseUrl}auth/token`,
-          {},
-          {
-            auth: {
-              username: process.env.QPAY_CLIENT_ID,
-              password: process.env.QPAY_CLIENT_SECRET,
-            },
+    const response = await this.httpService
+      .post(
+        `${this.baseUrl}auth/token`,
+        {},
+        {
+          auth: {
+            username: process.env.QPAY_CLIENT_ID,
+            password: process.env.QPAY_CLIENT_SECRET,
           },
-        )
-        .toPromise();
-      this.accessToken = response.data.access_token;
-      this.refreshToken = response.data.refresh_token;
-      this.expiresIn = new Date(Date.now() + response.data.expires_in * 1000);
-    } catch (error) {
-      console.log(error);
-    }
+        },
+      )
+      .toPromise();
+    this.accessToken = response.data.access_token;
+    this.refreshToken = response.data.refresh_token;
+    this.expiresIn = new Date(Date.now() + response.data.expires_in * 1000);
   }
 
   // ✅ Invoice үүсгэх
