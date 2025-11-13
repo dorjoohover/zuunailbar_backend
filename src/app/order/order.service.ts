@@ -73,7 +73,7 @@ export class OrderService {
     if (user.status == UserStatus.Banned) this.orderError.bannedUser;
     let artists;
     const userIds = [...new Set(details.map((i) => i.user_id).filter(Boolean))];
-    console.log(userIds)
+    console.log(userIds);
     try {
       console.log('detail', details);
       artists = await Promise.all(
@@ -399,8 +399,16 @@ export class OrderService {
 
       const order = await this.dao.add(payload);
       let pre = 0;
+      let nextUserId = dto.details.find(
+        (d) => d.user_id !== undefined,
+      )?.user_id;
+
+      const filledDetails = dto.details.map((d) => ({
+        ...d,
+        user_id: d.user_id !== undefined ? d.user_id : nextUserId,
+      }));
       await Promise.all(
-        (dto.details ?? []).map(async (d) => {
+        (filledDetails ?? []).map(async (d) => {
           const service = await this.service.findOne(d.service_id);
           const artist = await this.user.findOne(d.user_id);
           pre += +(service.pre ?? 0);
