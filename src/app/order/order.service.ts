@@ -73,6 +73,7 @@ export class OrderService {
     if (user.status == UserStatus.Banned) this.orderError.bannedUser;
     let artists;
     try {
+      console.log('detail', details);
       artists = await Promise.all(
         details.map(async (d) => (await this.user.findOne(d.user_id)).role),
       );
