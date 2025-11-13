@@ -244,7 +244,8 @@ export class OrderService {
                 );
               });
             });
-
+            console.log(freeTimes);
+            console.log(slotsByDay[index]);
             if (freeTimes.length > 0) {
               slotsByDay[index] = freeTimes;
             }
