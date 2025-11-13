@@ -81,7 +81,7 @@ export class OrderService {
     }
     if (
       artists == null ||
-      artists.filter((artist) => artist <= EMPLOYEE && artist >= MANAGER)
+      artists?.filter((artist) => artist <= EMPLOYEE && artist >= MANAGER)
         .length == 0
     )
       this.orderError.userNotFound;
@@ -192,7 +192,7 @@ export class OrderService {
           schedulesItems.items.map(async (schedule) => {
             const { index, times } = schedule;
             const slotTimes = times?.split('|').map(Number);
-            const overlaps = slotTimes.filter((t) =>
+            const overlaps = slotTimes?.filter((t) =>
               bookings[index].includes(t),
             );
 
@@ -206,7 +206,7 @@ export class OrderService {
           const { index, times } = slot; // day = 0–6, times = "10|11|12"
 
           // тухайн slot-ууд orders-тэй давхцаж байгааг filter
-          const freeTimes = times.filter((hour) => {
+          const freeTimes = times?.filter((hour) => {
             const res = !occupiedSlots.some(
               (o) => o.day == index && hour >= o.start_time,
             );
@@ -224,7 +224,7 @@ export class OrderService {
         };
       }),
     );
-    const filteredArtists = artistsWithSlots.filter(Boolean);
+    const filteredArtists = artistsWithSlots?.filter(Boolean);
     return { items: filteredArtists, coount: this.orderLimit };
   }
   public async updateOrderLimit(limit: number) {
@@ -320,7 +320,7 @@ export class OrderService {
       //   branchBooking?.times?.includes(t),
       // );
       if (target.time) {
-        availableTimes = availableTimes.filter((a) => a >= target.time);
+        availableTimes = availableTimes?.filter((a) => a >= target.time);
       }
     }
     return {
@@ -488,7 +488,7 @@ export class OrderService {
             const users = Array.from(
               new Map(
                 (detail.items ?? [])
-                  .filter((d) => d.user)
+                  ?.filter((d) => d.user)
                   .map((d) => [d.user.id, d.user]),
               ).values(),
             );
@@ -510,7 +510,7 @@ export class OrderService {
             };
           }),
         )
-      ).filter((d): d is NonNullable<typeof d> => d !== undefined); // ⬅️ энд шүүнэ
+      )?.filter((d): d is NonNullable<typeof d> => d !== undefined); // ⬅️ энд шүүнэ
       return {
         items,
         count: res.count,
@@ -546,10 +546,10 @@ export class OrderService {
 
     // 2) user/customer-уудыг багцлаад авах (боломжтой бол findManyByIds ашигла)
     const userIds = Array.from(
-      new Set(items.map((x) => x.user_id).filter(Boolean)),
+      new Set(items.map((x) => x.user_id)?.filter(Boolean)),
     );
     const customerIds = Array.from(
-      new Set(items.map((x) => x.customer_id).filter(Boolean)),
+      new Set(items.map((x) => x.customer_id)?.filter(Boolean)),
     );
 
     const [usersArr, customersArr] = await Promise.all([
@@ -558,10 +558,10 @@ export class OrderService {
     ]);
 
     const usersMap = new Map(
-      usersArr.filter(Boolean).map((u: any) => [u.id, u]),
+      usersArr?.filter(Boolean).map((u: any) => [u.id, u]),
     );
     const customersMap = new Map(
-      customersArr.filter(Boolean).map((c: any) => [c.id, c]),
+      customersArr?.filter(Boolean).map((c: any) => [c.id, c]),
     );
 
     // 3) мөрүүдээ бэлдэх
@@ -634,7 +634,7 @@ export class OrderService {
     for (let i = 0; i < takenHours.length; i++) takenLookup[takenHours[i]] = 1;
 
     const remaining = times
-      .filter((h) => !takenLookup[h])
+      ?.filter((h) => !takenLookup[h])
       .sort((a, b) => a - b);
     return remaining;
   }
@@ -646,9 +646,9 @@ export class OrderService {
     const existingDetails = await this.orderDetail.findByOrder(id);
 
     const existingIds = existingDetails.map((d) => d.id);
-    const newIds = details.map((d) => d.id).filter(Boolean);
+    const newIds = details.map((d) => d.id)?.filter(Boolean);
 
-    const toDelete = existingDetails.filter((d) => !newIds.includes(d.id));
+    const toDelete = existingDetails?.filter((d) => !newIds.includes(d.id));
 
     await Promise.all(
       details.map(async (d) => {
@@ -701,7 +701,7 @@ export class OrderService {
         }
       }),
     );
-    const confirmedOrders = items.filter((i) => i !== undefined);
+    const confirmedOrders = items?.filter((i) => i !== undefined);
     type UserSalaryInfo = {
       amount: number; // нийт цалин
       order_date: Date; // хамгийн эртний/сүүлийн захиалгын огноо
