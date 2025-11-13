@@ -72,10 +72,12 @@ export class OrderService {
     if (dto.order_status == OrderStatus.Friend) return;
     if (user.status == UserStatus.Banned) this.orderError.bannedUser;
     let artists;
+    const userIds = [...new Set(details.map((i) => i.user_id).filter(Boolean))];
+
     try {
       console.log('detail', details);
       artists = await Promise.all(
-        details.map(async (d) => (await this.user.findOne(d.user_id)).role),
+        userIds.map(async (d) => (await this.user.findOne(d)).role),
       );
     } catch (error) {
       artists = null;
