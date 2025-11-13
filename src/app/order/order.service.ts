@@ -189,8 +189,10 @@ export class OrderService {
 
           const occupiedSlots = orders.map((o) => {
             const date = new Date(o.order_date);
+            console.log(date);
             let day = date.getDay() - 1;
             if (day === -1) day = 6;
+            console.log(day);
             return {
               day,
               date,
@@ -223,6 +225,7 @@ export class OrderService {
             // Тухайн өдрийн slot-уудыг filter
             const freeTimes = times.filter((hour) => {
               // occupiedSlots-д тухайн өдөр index-тэй, start_time-оос өмнөх цагтай давхцаж байгаа эсэх
+              console.log(hour, index, occupiedSlots);
               return !occupiedSlots.some(
                 (o) => o.day === index && o.start_time === hour,
               );
