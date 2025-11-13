@@ -226,19 +226,8 @@ export class OrderService {
             const freeTimes = times.filter((hour) => {
               // occupiedSlots-д тухайн өдөр index-тэй, start_time-оос өмнөх цагтай давхцаж байгаа эсэх
               return !occupiedSlots.some((o) => {
-                console.log(
-                  o.date,
-                  o.day,
-                  hour,
-                  o.start_time,
-                  index,
-                  o.start_time + 1,
-                  o.day === +index &&
-                    o.start_time >= hour &&
-                    hour < o.start_time + 1,
-                );
                 return (
-                  o.day === index &&
+                  o.day === +index &&
                   o.start_time >= hour &&
                   hour < o.start_time + 1
                 );
