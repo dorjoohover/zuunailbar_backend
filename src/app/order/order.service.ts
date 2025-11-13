@@ -227,6 +227,7 @@ export class OrderService {
               // occupiedSlots-д тухайн өдөр index-тэй, start_time-оос өмнөх цагтай давхцаж байгаа эсэх
               return !occupiedSlots.some((o) => {
                 console.log(
+                  o.date,
                   o.day,
                   hour,
                   o.start_time,
