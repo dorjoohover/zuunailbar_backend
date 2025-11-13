@@ -46,9 +46,11 @@ export class QpayService {
     endpoint: string,
     data: any = {},
   ): Promise<T> {
+    console.log('ensure', new Date());
     await this.ensureValidToken(); // check expiry first
 
     try {
+      console.log('first', new Date());
       const response = await firstValueFrom(
         this.httpService.request({
           method,
@@ -59,6 +61,7 @@ export class QpayService {
           },
         }),
       );
+      console.log('response', new Date());
       return response.data;
     } catch (error) {
       console.log(error.response.data.message);

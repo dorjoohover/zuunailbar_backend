@@ -434,7 +434,7 @@ export class OrderService {
           user.id,
           dto.branch_name,
         );
-        console.log(invoice, 'invoice');
+        console.log(new Date(), 'invoice');
 
         return {
           id: order,
