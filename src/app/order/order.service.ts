@@ -233,7 +233,7 @@ export class OrderService {
                   o.start_time,
                   index,
                   o.start_time + 1,
-                  o.day === index &&
+                  o.day === +index &&
                     o.start_time >= hour &&
                     hour < o.start_time + 1,
                 );
