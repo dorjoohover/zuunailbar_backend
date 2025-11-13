@@ -225,15 +225,14 @@ export class OrderService {
             // Тухайн өдрийн slot-уудыг filter
             const freeTimes = times.filter((hour) => {
               // occupiedSlots-д тухайн өдөр index-тэй, start_time-оос өмнөх цагтай давхцаж байгаа эсэх
-              return !occupiedSlots.some(
-                (o) =>
-                {
-                  console.log(o.day, hour, o.start_time)
-                  return o.day === index &&
+              return !occupiedSlots.some((o) => {
+                console.log(o.day, hour, o.start_time);
+                return (
+                  o.day === index &&
                   o.start_time >= hour &&
-                  hour < o.start_time + 1,
-                }
-              );
+                  hour < o.start_time + 1
+                );
+              });
             });
 
             if (freeTimes.length > 0) {
