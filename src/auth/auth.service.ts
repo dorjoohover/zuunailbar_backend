@@ -108,6 +108,7 @@ export class AuthService {
     try {
       const otp = this.generateOtp();
       this.otps[mobile] = otp;
+      console.log(otp);
       const res = await axios.get(
         `${process.env.TELCOCOM_URL}?toNumber=${mobile}&sms=Таны OTP код: ${otp}\n
                              Хүндэтгэсэн &tenantId=${process.env.TELCOCOM}`,
@@ -117,8 +118,9 @@ export class AuthService {
           },
         },
       );
+      console.log(res);
       const { result, message, data } = res.data;
-      console.log(message);
+      console.log(message, data, result);
       return true;
     } catch (error) {
       console.log(error);

@@ -90,7 +90,9 @@ export class AppController {
     // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
     // send otp
     try {
-      await this.authService.checkMobile(mobile);
+      console.log(mobile);
+      const res = await this.authService.checkMobile(mobile);
+      if (res) await this.authService.sendOtp(mobile);
       return true;
     } catch (error) {
       return false;

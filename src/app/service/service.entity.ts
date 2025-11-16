@@ -1,4 +1,4 @@
-import { STATUS } from "src/base/constants";
+import { STATUS } from 'src/base/constants';
 
 export class ServiceCategoryMeta {
   public name: string;
@@ -14,8 +14,6 @@ export class Service {
   public image: string;
   public icon: string;
   public description?: string;
-  // parallel awch boloh eseh
-  public parallel?: boolean;
   //uridchilgaa uneer
   public pre?: number;
   public status: STATUS;

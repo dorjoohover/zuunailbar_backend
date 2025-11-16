@@ -37,7 +37,4 @@ export class ServiceDto {
     example: SERVICE_VIEW.DEFAULT,
   })
   view: number;
-
-  @ApiProperty({ description: 'Давхцсан үйлчилгээ эсэх' })
-  parallel: boolean;
 }

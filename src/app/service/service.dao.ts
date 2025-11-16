@@ -21,7 +21,6 @@ export class ServiceDao {
       'image',
       'icon',
       'description',
-      'parallel',
       'pre',
       'status',
       'created_by',

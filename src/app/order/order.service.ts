@@ -315,7 +315,7 @@ export class OrderService {
     const firstArtist = Object.values(dto.serviceArtist).find(
       (artist): artist is string => !!artist,
     );
-    const duplicated = Object.values.length > 0;
+    const parallel = Object.values.length > 0;
 
     let availableTimes: number[] = [];
     let targetDate: Date | undefined;
@@ -359,8 +359,8 @@ export class OrderService {
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
       console.log(new Date(), 'start');
-      const duplicated = dto.duplicated;
-      const totalMinutes = duplicated
+      const parallel = dto.parallel;
+      const totalMinutes = parallel
         ? Math.max(...dto.details.map((a) => a.duration))
         : (dto.details ?? []).reduce((sum, it) => sum + (it.duration ?? 0), 0);
 
@@ -410,8 +410,7 @@ export class OrderService {
         (dto.details ?? []).map(async (d, i) => {
           const service = await this.service.findOne(d.service_id);
           const artist = await this.user.findOne(d.user_id);
-          pre += +(service.pre ?? 0);
-          console.log(i, 'i', new Date());
+          if (+(service.pre ?? '0') > pre) pre = +service.pre;
           await this.orderDetail.create({
             id: AppUtils.uuid4(),
             order_id: order,

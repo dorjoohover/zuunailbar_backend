@@ -28,7 +28,7 @@ export class OrderDto {
   @ApiProperty()
   discount: number;
   @ApiProperty()
-  duplicated?: boolean;
+  parallel?: boolean;
   @ApiProperty()
   branch_id?: string;
   services?: string[];

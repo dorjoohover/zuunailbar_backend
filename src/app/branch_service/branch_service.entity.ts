@@ -1,5 +1,4 @@
 export class BranchServiceMeta {
-  public parallel: boolean;
   public serviceName: string;
   public branchName: string;
   public description: string;

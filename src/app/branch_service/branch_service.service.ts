@@ -25,7 +25,6 @@ export class BranchServiceService {
       const branch = await this.branchService.findOne(dto.branch_id);
       if (!branch) throw new BadRequest().notFound('Салбар');
       const meta = {
-        parallel: service.parallel,
         branchName: branch.name,
         serviceName: service.name,
         description: service.description ?? '',

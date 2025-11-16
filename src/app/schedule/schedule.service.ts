@@ -46,6 +46,7 @@ export class ScheduleService {
       start_time: toTimeString(start),
       end_time: toTimeString(end),
       user_id: dto.user_id,
+      branch_id: artist.branch_id,
       meta,
     });
   }

@@ -120,7 +120,6 @@ export class ServiceService {
       branches.map(async (branch) => {
         await this.branchServiceService.updateByServiceAndBranch({
           meta: {
-            parallel: service.parallel,
             serviceName: service.name,
             description: service.description ?? '',
             categoryName: service.meta?.name,
