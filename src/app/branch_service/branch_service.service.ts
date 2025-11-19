@@ -95,6 +95,7 @@ export class BranchServiceService {
               pre: dto.pre,
               meta,
               id: item.id,
+              index: dto.index,
               updated_at: mnDate(),
             },
             [...getDefinedKeys(dto), 'updated_at'],
