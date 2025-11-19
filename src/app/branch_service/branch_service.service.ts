@@ -71,34 +71,39 @@ export class BranchServiceService {
     ]);
   }
   public async updateByServiceAndBranch(dto: BranchServiceDto) {
-    const items = await this.dao.list({
-      branch_id: dto.branch_id,
-      service_id: dto.service_id,
-      status: STATUS.Active,
-    });
-    await Promise.all(
-      items.items.map(async (item) => {
-        const prevMeta = {
-          branchName: item.meta.branchName,
-        };
-        const meta = {
-          ...dto.meta,
-          ...prevMeta,
-        };
-        await this.dao.update(
-          {
-            duration: dto.duration,
-            max_price: dto.max_price,
-            min_price: dto.min_price,
-            pre: dto.pre,
-            meta,
-            id: item.id,
-            updated_at: mnDate(),
-          },
-          [...getDefinedKeys(dto), 'updated_at'],
-        );
-      }),
-    );
+    try {
+      console.log(dto);
+      const items = await this.dao.list({
+        branch_id: dto.branch_id,
+        service_id: dto.service_id,
+        status: STATUS.Active,
+      });
+      await Promise.all(
+        items.items.map(async (item) => {
+          const prevMeta = {
+            branchName: item.meta.branchName,
+          };
+          const meta = {
+            ...dto.meta,
+            ...prevMeta,
+          };
+          await this.dao.update(
+            {
+              duration: dto.duration,
+              max_price: dto.max_price,
+              min_price: dto.min_price,
+              pre: dto.pre,
+              meta,
+              id: item.id,
+              updated_at: mnDate(),
+            },
+            [...getDefinedKeys(dto), 'updated_at'],
+          );
+        }),
+      );
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   public async updateStatus(id: string, status: number) {
