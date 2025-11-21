@@ -83,8 +83,15 @@ export class UserController {
     return this.userService.findOne(id);
   }
   @Get('me')
-  findMe(@Req() { user }) {
-    return user;
+  async findMe(@Req() { user }) {
+    const id = user.user.id;
+
+    const res = await this.findOne(id);
+    return {
+      user: res,
+      merchant: user.merchant,
+      branch: user.branch,
+    };
   }
   @SAP(['device'])
   @Get('device/:device')

@@ -44,6 +44,9 @@ export class UserDao {
 
   async update(data: any, attr: string[]): Promise<number> {
     try {
+      console.log(tableName, data, attr, [
+        new SqlCondition('id', '=', data.id),
+      ]);
       return await this._db.update(tableName, data, attr, [
         new SqlCondition('id', '=', data.id),
       ]);
@@ -96,6 +99,12 @@ export class UserDao {
     return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "id"=$1 and status != ${UserStatus.Deleted} `,
       [id],
+    );
+  }
+  async getByMail(mail: string) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "mail"=$1 and status != ${UserStatus.Deleted} `,
+      [mail],
     );
   }
 

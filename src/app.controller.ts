@@ -112,14 +112,31 @@ export class AppController {
   }
   @Public()
   @Post('/send/otp')
+  async registerOtp(@Body() dto: OtpDto) {
+    // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
+    let user = null;
+    try {
+      user = await this.authService.checkMobile(dto.mobile);
+    } catch (error) {}
+    if (user) throw new BadRequest().registered;
+    return await this.authService.sendOtp(dto.mobile);
+  }
+  @Public()
+  @Post('/forget/otp')
   async sendOtp(@Body() dto: OtpDto) {
     // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
     let user = null;
     try {
       user = await this.authService.checkMobile(dto.mobile);
     } catch (error) {}
-    if (user?.mail) await this.authService.sentOtpMail(user.mail);
-    return await this.authService.sendOtp(dto.mobile);
+    if (!user) throw new BadRequest().unregistered;
+    if (user?.mail) {
+      await this.authService.sentOtpMail(user.mail);
+      return 'mail';
+    }
+
+    await this.authService.sendOtp(dto.mobile);
+    return 'phone';
   }
   @Public()
   @Get('/file/:filename')

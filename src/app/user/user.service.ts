@@ -189,26 +189,30 @@ export class UserService {
     return await this.dao.getByDevice(id);
   }
   public async resetPassword(mobile: string, password: string) {
-    const user = await this.dao.getByMobile(mobile);
+    let user = await this.dao.getByMobile(mobile);
+    if (!user) user = await this.dao.getByMail(mobile);
     if (!user) return;
     const pass = await this.hash(password);
     const body = { id: user.id, password: pass };
     await this.dao.update(body, getDefinedKeys(body));
   }
   public async update(id: string, dto: UserDto) {
-    let body = dto;
-    body.id = id;
-    if (body.password) {
-      body.password = await bcrypt.hash(dto.password, saltOrRounds);
-    }
-    if (body.branch_id) {
-      try {
+    try {
+      console.log(dto);
+      let body = dto;
+      body.id = id;
+      if (body.password) {
+        body.password = await bcrypt.hash(dto.password, saltOrRounds);
+      }
+      if (body.branch_id) {
         body.branch_name = (
           await this.branchService.findOne(body.branch_id)
         ).name;
-      } catch (error) {}
+      }
+      return await this.dao.update(body, getDefinedKeys(body));
+    } catch (error) {
+      console.log(error);
     }
-    return await this.dao.update(body, getDefinedKeys(body));
   }
 
   public async updateStatus(id: string) {

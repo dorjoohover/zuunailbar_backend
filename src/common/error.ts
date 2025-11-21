@@ -19,6 +19,12 @@ export class BadRequest {
       HttpStatus.BAD_REQUEST,
     );
   }
+  get unregistered() {
+    throw new HttpException(
+      'Бүртгэлгүй хэрэглэгч байна',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
   get notFoundClient() {
     throw new HttpException('Хэрэглэгч олдсонгүй.', HttpStatus.BAD_REQUEST);
   }

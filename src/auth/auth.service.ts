@@ -283,6 +283,7 @@ export class AuthService {
       const text = `Таны OTP код: ${otp}\n
                              Хүндэтгэсэн`;
       const url = `${process.env.TELCOCOM_URL}?tenantId=${process.env.TELCOCOM}&fromNumber=${process.env.FROM_NUMBER}&toNumber=${mobile}&sms=${text}`;
+      console.log(url);
       const res = await axios.get(url, {
         headers: {
           'telco-auth-token': process.env.TELCOCOM_TOKEN,
