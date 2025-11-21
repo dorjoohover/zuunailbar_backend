@@ -118,7 +118,7 @@ export class AppController {
     try {
       user = await this.authService.checkMobile(dto.mobile);
     } catch (error) {}
-    if (user) throw new BadRequest().registered;
+    if (user?.mail) await this.authService.sentOtpMail(user.mail);
     return await this.authService.sendOtp(dto.mobile);
   }
   @Public()

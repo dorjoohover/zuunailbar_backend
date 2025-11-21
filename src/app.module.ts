@@ -41,6 +41,7 @@ import { ExcelService } from './excel.service';
 import { UserSalariesModule } from './app/user_salaries/user_salaries.module';
 import { BranchServiceModule } from './app/branch_service/branch_service.module';
 import { ServiceCategoryModule } from './app/service_category/service_category.module';
+import { EmailModule } from './auth/email.module';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { ServiceCategoryModule } from './app/service_category/service_category.m
     UserSalariesModule,
     BranchServiceModule,
     ServiceCategoryModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [

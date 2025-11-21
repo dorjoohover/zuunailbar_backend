@@ -20,6 +20,7 @@ export class UserDao {
         'firstname',
         'added_by',
         'lastname',
+        'mail',
         'salary_day',
         'mobile',
         'birthday',
@@ -135,7 +136,7 @@ export class UserDao {
         'role',
         query.role == 35 ? '<=' : '=',
         query.role == 35 ? 40 : query.role,
-      ) 
+      )
       .conditionIfNotEmpty(
         'role',
         query.role == 35 ? '>=' : '=',
@@ -210,5 +211,5 @@ export class UserDao {
       {},
     );
     return items;
-  } 
+  }
 }

@@ -10,6 +10,7 @@ export class UserDto {
   mobile: string;
   @ApiProperty()
   birthday: string;
+  mail: string;
   @ApiProperty()
   password: string;
   id: string;
