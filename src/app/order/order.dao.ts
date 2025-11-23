@@ -94,29 +94,28 @@ export class OrdersDao {
     WHERE o.order_status != $1
       AND o.order_date = $2
       AND o.order_status != ${OrderStatus.Friend}
-      AND o.start_time BETWEEN $3 AND $4
-      AND d.user_id = $5
+      AND d.start_time  = $3
+      AND d.user_id = $4
   `;
 
     return this._db.select(sql, [
       status,
       date.toString().slice(0, 10),
       start_time,
-      end_time,
       user_id,
     ]);
   }
 
   async getOrdersOfArtist(artistId: string) {
     const sql = `
-    SELECT order_date, start_time, end_time
+    SELECT order_date, od.start_time as start_time, od.end_time as end_time
     FROM ${tableName} o
     inner join order_details od on od.order_id = o.id
     WHERE od.user_id = $1
       AND order_status NOT IN ($2, $3)
       AND order_date >= CURRENT_DATE - INTERVAL '1 day'
-      group by order_date, start_time, end_time
-      ORDER BY order_date DESC, end_time DESC
+      group by order_date, od.start_time, od.end_time
+      ORDER BY order_date DESC, od.end_time DESC
       `;
 
     const params = [artistId, OrderStatus.Cancelled, OrderStatus.Finished];

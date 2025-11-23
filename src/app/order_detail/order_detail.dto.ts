@@ -16,4 +16,6 @@ export class OrderDetailDto {
   price: number;
   @ApiProperty()
   duration: number;
+  start_time: string;
+  end_time: string;
 }

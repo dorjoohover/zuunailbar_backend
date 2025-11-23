@@ -10,7 +10,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         transport: {
           service: 'gmail',
           auth: {
-            user: process.env.EMAIL_USERNAME,
+            user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,
           },
         },

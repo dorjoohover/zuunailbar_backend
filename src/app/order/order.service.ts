@@ -144,7 +144,6 @@ export class OrderService {
 
   public async getArtists(dto: OrderDto) {
     try {
-      console.log(dto);
       const userService = await this.userService.findForClient(
         dto.branch_id,
         dto.services,
@@ -155,20 +154,12 @@ export class OrderService {
           CLIENT,
         )
       )?.items;
-      console.log(bookingRes);
       const bookings = {};
       bookingRes.map((b) => {
         bookings[+b.index] = b.times?.split('|').map(Number);
       });
-      const services = [];
-      userService.items.map((u) => {
-        if (
-          dto.services.includes(u.service_id) &&
-          !services.includes(u.service_id)
-        )
-          services.push(u.service_id);
-      });
-      console.log(services);
+      const services = Array.from(new Set(dto.services));
+
       const uniqueUsers = Object.values(
         userService.items.reduce(
           (acc, us) => {
@@ -180,73 +171,74 @@ export class OrderService {
         ),
       );
       const artistsWithSlots = await Promise.all(
-        uniqueUsers.map(async (us: any) => {
-          const schedulesItems = await this.schedule.findAll(
-            { limit: 100, skip: 0, sort: false, user_id: us.user.id },
-            CLIENT,
-          );
-          const orders = await this.dao.getOrdersOfArtist(us.user.id);
+      uniqueUsers.map(async (us: any) => {
+        const artistId = us.user.id;
 
-          const occupiedSlots = orders.map((o) => {
-            const date = new Date(o.order_date);
-            console.log(date);
-            let day = date.getDay() - 1;
-            if (day === -1) day = 6;
-            console.log(day);
-            return {
-              day,
-              date,
-              start_time: +o.start_time?.slice(0, 2),
-              end_time: +o.end_time?.slice(0, 2),
-            };
-          });
+        // Artist services only (important fix)
+        const artistServices = userService.items
+          .filter((x) => x.user.id === artistId)
+          .map((x) => x.service_id);
 
-          const slotsByDay: Record<string, number[]> = {};
-          const schedules = await Promise.all(
-            schedulesItems.items.map(async (schedule) => {
-              const { index, times } = schedule;
-              const slotTimes = times?.split('|').map(Number);
-              const overlaps = slotTimes?.filter((t) =>
-                bookings[index].includes(t),
+        // 6. Weekly schedules of this artist
+        const schedulesItems = await this.schedule.findAll(
+          { limit: 100, skip: 0, sort: false, user_id: artistId },
+          CLIENT,
+        );
+
+        // 7. Orders of this artist (for daily occupied time)
+        const orders = await this.dao.getOrdersOfArtist(artistId);
+
+        const occupiedSlots = orders.map((o) => {
+          const date = new Date(o.order_date);
+          let day = date.getDay() - 1;
+          if (day === -1) day = 6;
+
+          return {
+            day,
+            start_time: +o.start_time.slice(0, 2),
+            end_time: +o.end_time.slice(0, 2),
+          };
+        });
+
+        // 8. Available slots per day
+        const slotsByDay: Record<string, number[]> = {};
+
+        await Promise.all(
+          schedulesItems.items.map(async (schedule) => {
+            const { index, times } = schedule;
+            const slotTimes = times?.split("|").map(Number) ?? [];
+
+            // Branch booking overlap fix
+            const overlaps = slotTimes.filter((t) =>
+              bookings[String(index)]?.includes(t)
+            );
+
+            if (!overlaps.length) return;
+
+            // Artist orders overlap
+            const freeTimes = overlaps.filter((hour) => {
+              return !occupiedSlots.some(
+                (o) => o.day === +index && hour >= o.start_time && hour < o.end_time
               );
-
-              return {
-                index,
-                times: overlaps,
-              };
-            }),
-          );
-
-          schedules.forEach((slot) => {
-            const { index, times } = slot; // index = 0–6 (өдөр), times = [10,11,12]
-
-            if (!times || times.length === 0) return;
-
-            // Тухайн өдрийн slot-уудыг filter
-            const freeTimes = times.filter((hour) => {
-              // occupiedSlots-д тухайн өдөр index-тэй, start_time-оос өмнөх цагтай давхцаж байгаа эсэх
-              return !occupiedSlots.some((o) => {
-                return (
-                  o.day === +index &&
-                  o.start_time >= hour &&
-                  hour < o.start_time + 1
-                );
-              });
             });
+
             if (freeTimes.length > 0) {
               slotsByDay[index] = freeTimes;
             }
-          });
+          })
+        );
 
-          if (Object.keys(slotsByDay).length === 0) return null;
+        if (Object.keys(slotsByDay).length === 0) return null;
 
-          return {
-            ...us,
-            slots: slotsByDay,
-            services,
-          };
-        }),
-      );
+        // 9. Parallel mode support
+        return {
+          ...us,
+          artistId,
+          slots: slotsByDay,
+          services: artistServices, // ✔ only this artist’s services
+        };
+      })
+    );
       const filteredArtists = artistsWithSlots?.filter(Boolean);
       return { items: filteredArtists, coount: this.orderLimit };
     } catch (error) {
@@ -368,13 +360,13 @@ export class OrderService {
       const durationHours = Math.ceil(totalMinutes / 60);
 
       const startHour = +dto.start_time.toString().slice(0, 2);
-      const endHourRaw = +startHour + durationHours;
 
+      const endHourRaw = +startHour + durationHours;
+      console.log(startHour);
       const dayShift = Math.floor(endHourRaw / 24); // хэдэн өдөр давсан бэ
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
 
       const orderDate = mnDate(dto.order_date);
-      console.log(new Date(), 'orderDate');
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
@@ -394,38 +386,43 @@ export class OrderService {
         status: STATUS.Active,
         branch_id: dto.branch_id,
       } as const;
-      // await this.canPlaceOrder(
-      //   {
-      //     ...payload,
-      //   },
-      //   user,
-      //   dto.details,
-      //   merchant,
-      // );
+      await this.canPlaceOrder(
+        {
+          ...payload,
+        },
+        user,
+        dto.details,
+        merchant,
+      );
 
       const order = await this.dao.add(payload);
-      console.log(new Date(), 'order');
       let pre = 0;
-      await Promise.all(
-        (dto.details ?? []).map(async (d, i) => {
-          const service = await this.service.findOne(d.service_id);
-          const artist = await this.user.findOne(d.user_id);
-          if (+(service.pre ?? '0') > pre) pre = +service.pre;
-          await this.orderDetail.create({
-            id: AppUtils.uuid4(),
-            order_id: order,
-            service_id: service.id,
-            service_name: service.name,
-            price: d.price,
-            duration: service.duration,
-            nickname: artist.nickname,
-            description: d.description,
-            user_id: artist.id ?? d.user_id,
-          });
-          console.log('adsf', 'i', new Date());
-        }),
-      );
-      console.log(pre, 'pre');
+      let startDate = startHour;
+
+      for (const d of dto.details ?? []) {
+        const service = await this.service.findOne(d.service_id);
+        const artist = await this.user.findOne(d.user_id);
+
+        if (+(service.pre ?? '0') > pre) pre = +service.pre;
+
+        const duration = Math.ceil(+d.duration / 60);
+        const endDate = startDate + duration;
+        await this.orderDetail.create({
+          id: AppUtils.uuid4(),
+          start_time: toTimeString(startDate),
+          end_time: toTimeString(endDate),
+          order_id: order,
+          service_id: service.id,
+          service_name: service.name,
+          price: d.price,
+          duration: service.duration,
+          nickname: artist.nickname,
+          description: d.description,
+          user_id: artist.id ?? d.user_id,
+        });
+
+        if (dto.parallel !== true) startDate = endDate;
+      }
       if (pre > 0) {
         const invoice = await this.qpay.createInvoice(
           pre,

@@ -84,8 +84,8 @@ export class UserDao {
 
   async getByMobile(mobile: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "mobile"=$1 or "mobile" = $2`,
-      [mobile, MobileFormat(mobile)],
+      `SELECT * FROM "${tableName}" WHERE "mobile"=$1 or "mobile" = $2 or "mail" = $3`,
+      [mobile, MobileFormat(mobile), mobile],
     );
   }
   async getByDevice(device: string) {

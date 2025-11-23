@@ -150,7 +150,7 @@ export class AuthService {
                     <tr>
                       <!-- LOGO -->
                       <td style="width:80%; vertical-align:middle;">
-                        <img src="https://raw.githubusercontent.com/usukhbaya12/images/refs/heads/main/zunailbar-white.png"
+                        <img src="https://zunailbar.mn/_next/image?url=%2Flogo%2Fzu-white.png&amp;w=128&amp;q=7"
                           width="130"
                           alt="Zunailbar Logo"
                           style="display:block; border:0;">
@@ -181,7 +181,6 @@ export class AuthService {
                 </td>
               </tr>
 
-              <!-- BODY -->
               <tr>
                 <td style="background:#fafafa; padding:20px 40px 10px 40px;">
                   <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -200,7 +199,6 @@ export class AuthService {
                       </td>
                     </tr>
 
-                    <!-- OTP BOX -->
                     <tr>
                       <td style="text-align:center; padding:25px 0;">
                         <div style="
@@ -219,13 +217,7 @@ export class AuthService {
                       </td>
                     </tr>
 
-                    <tr>
-                      <td style="font-size:14px; line-height:1.6; color:#333; text-align:center;">
-                        <p style="margin:0 0 15px 0;">
-                          Энэхүү код нь **10 минутын хугацаанд хүчинтэй**.
-                        </p>
-                      </td>
-                    </tr>
+                 
 
                     <tr>
                       <td style="font-size:14px; line-height:1.6; color:#333;">

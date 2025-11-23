@@ -170,7 +170,6 @@ export class OrderController {
   @Get('level')
   async getLevel() {
     const items = await this.orderService.level();
-    console.log(items);
     return {
       items,
     };
