@@ -114,4 +114,9 @@ export class ScheduleDao {
     );
     return items;
   }
+  async deleteSchedule(id: string): Promise<number> {
+    return await this._db._update(`delete from "${tableName}" WHERE "id"=$1`, [
+      id,
+    ]);
+  }
 }

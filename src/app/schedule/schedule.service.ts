@@ -89,4 +89,15 @@ export class ScheduleService {
   public async remove(id: string) {
     return await this.dao.updateStatus(id, ScheduleStatus.Hidden);
   }
+  public async removeByIndex(user_id: string, index: number) {
+    const schedules = await this.dao.list({
+      index,
+      user_id,
+    });
+    await Promise.all(
+      schedules.items.map(async (schedule) => {
+        await this.dao.deleteSchedule(schedule.id);
+      }),
+    );
+  }
 }
