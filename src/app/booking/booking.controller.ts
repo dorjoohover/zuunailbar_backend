@@ -71,8 +71,16 @@ export class BookingController {
   }
 
   @SAP()
-  @Delete(':id')
+  @Delete('id/:id')
   remove(@Param('id') id: string) {
     return this.bookingService.remove(id);
+  }
+  @SAP()
+  @Delete('index/:branch/:index')
+  deleteByIndex(
+    @Param('branch') branch: string,
+    @Param('index') index: number,
+  ) {
+    return this.bookingService.removeByIndex(branch, index);
   }
 }

@@ -78,4 +78,15 @@ export class BookingService {
       }),
     );
   }
+  public async removeByIndex(branch_id: string, index: number) {
+    const bookings = await this.dao.list({
+      index,
+      branch_id,
+    });
+    await Promise.all(
+      bookings.items.map(async (booking) => {
+        await this.dao.deleteBooking(booking.id);
+      }),
+    );
+  }
 }
