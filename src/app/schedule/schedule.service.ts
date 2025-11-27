@@ -27,7 +27,9 @@ export class ScheduleService {
       throw new BadRequest().notFound('Цаг');
     if (!dto.user_id) throw new BadRequest().notFound('Артист');
     const artist = await this.userService.findOne(dto.user_id);
+
     if (!artist) throw new BadRequest().notFound('Артист');
+    console.log(artist)
     const times = dto.times.map((time) => Number(time));
     const start = Math.min(...times);
     const end = Math.max(...times);
