@@ -18,6 +18,7 @@ export class ScheduleDao {
       'index',
       'start_time',
       'end_time',
+      'branch_id',
       'meta',
       'times',
       'schedule_status',
