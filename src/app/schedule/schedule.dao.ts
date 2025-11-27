@@ -81,7 +81,7 @@ export class ScheduleDao {
       const sql =
         `SELECT * FROM "${tableName}" ${criteria} order by index ${query.sort === 'false' ? 'asc' : 'desc'} ` +
         `${query.limit ? `limit ${query.limit}` : ''}` +
-        ` offset ${+query.skip * +(query.limit ?? 0)}`;
+        ` offset ${+(query.skip ?? 0) * +(query.limit ?? 0)}`;
       const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
       const count = await this._db.count(countSql, builder.values);
       const items = await this._db.select(sql, builder.values);

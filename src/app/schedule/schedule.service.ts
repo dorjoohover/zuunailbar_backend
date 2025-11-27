@@ -95,7 +95,6 @@ export class ScheduleService {
       index,
       user_id,
     });
-    console.log(schedules);
     await Promise.all(
       schedules.items.map(async (schedule) => {
         await this.dao.deleteSchedule(schedule.id);
