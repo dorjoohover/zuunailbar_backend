@@ -171,74 +171,77 @@ export class OrderService {
         ),
       );
       const artistsWithSlots = await Promise.all(
-      uniqueUsers.map(async (us: any) => {
-        const artistId = us.user.id;
+        uniqueUsers.map(async (us: any) => {
+          const artistId = us.user.id;
 
-        // Artist services only (important fix)
-        const artistServices = userService.items
-          .filter((x) => x.user.id === artistId)
-          .map((x) => x.service_id);
+          // Artist services only (important fix)
+          const artistServices = userService.items
+            .filter((x) => x.user.id === artistId)
+            .map((x) => x.service_id);
 
-        // 6. Weekly schedules of this artist
-        const schedulesItems = await this.schedule.findAll(
-          { limit: 100, skip: 0, sort: false, user_id: artistId },
-          CLIENT,
-        );
+          // 6. Weekly schedules of this artist
+          const schedulesItems = await this.schedule.findAll(
+            { limit: 100, skip: 0, sort: false, user_id: artistId },
+            CLIENT,
+          );
 
-        // 7. Orders of this artist (for daily occupied time)
-        const orders = await this.dao.getOrdersOfArtist(artistId);
+          // 7. Orders of this artist (for daily occupied time)
+          const orders = await this.dao.getOrdersOfArtist(artistId);
 
-        const occupiedSlots = orders.map((o) => {
-          const date = new Date(o.order_date);
-          let day = date.getDay() - 1;
-          if (day === -1) day = 6;
+          const occupiedSlots = orders.map((o) => {
+            const date = new Date(o.order_date);
+            let day = date.getDay() - 1;
+            if (day === -1) day = 6;
 
-          return {
-            day,
-            start_time: +o.start_time.slice(0, 2),
-            end_time: +o.end_time.slice(0, 2),
-          };
-        });
+            return {
+              day,
+              start_time: +o.start_time.slice(0, 2),
+              end_time: +o.end_time.slice(0, 2),
+            };
+          });
 
-        // 8. Available slots per day
-        const slotsByDay: Record<string, number[]> = {};
+          // 8. Available slots per day
+          const slotsByDay: Record<string, number[]> = {};
 
-        await Promise.all(
-          schedulesItems.items.map(async (schedule) => {
-            const { index, times } = schedule;
-            const slotTimes = times?.split("|").map(Number) ?? [];
+          await Promise.all(
+            schedulesItems.items.map(async (schedule) => {
+              const { index, times } = schedule;
+              const slotTimes = times?.split('|').map(Number) ?? [];
 
-            // Branch booking overlap fix
-            const overlaps = slotTimes.filter((t) =>
-              bookings[String(index)]?.includes(t)
-            );
-
-            if (!overlaps.length) return;
-
-            // Artist orders overlap
-            const freeTimes = overlaps.filter((hour) => {
-              return !occupiedSlots.some(
-                (o) => o.day === +index && hour >= o.start_time && hour < o.end_time
+              // Branch booking overlap fix
+              const overlaps = slotTimes.filter((t) =>
+                bookings[String(index)]?.includes(t),
               );
-            });
 
-            if (freeTimes.length > 0) {
-              slotsByDay[index] = freeTimes;
-            }
-          })
-        );
+              if (!overlaps.length) return;
 
-        if (Object.keys(slotsByDay).length === 0) return null;
+              // Artist orders overlap
+              const freeTimes = overlaps.filter((hour) => {
+                return !occupiedSlots.some(
+                  (o) =>
+                    o.day === +index &&
+                    hour >= o.start_time &&
+                    hour < o.end_time,
+                );
+              });
 
-        // 9. Parallel mode support
-        return {
-          ...us,
-          artistId,
-          slots: slotsByDay,
-          services: artistServices, // ✔ only this artist’s services
-        };
-      })
-    );
+              if (freeTimes.length > 0) {
+                slotsByDay[index] = freeTimes;
+              }
+            }),
+          );
+
+          if (Object.keys(slotsByDay).length === 0) return null;
+
+          // 9. Parallel mode support
+          return {
+            ...us,
+            artistId,
+            slots: slotsByDay,
+            services: artistServices, // ✔ only this artist’s services
+          };
+        }),
+      );
       const filteredArtists = artistsWithSlots?.filter(Boolean);
       return { items: filteredArtists, coount: this.orderLimit };
     } catch (error) {
@@ -367,6 +370,11 @@ export class OrderService {
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
 
       const orderDate = mnDate(dto.order_date);
+      let pre = 0;
+      for (const detail of dto.details ?? []) {
+        const service = await this.service.findOne(detail.service_id);
+        if (+(service.pre ?? '0') > pre) pre = +service.pre;
+      }
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
@@ -380,7 +388,7 @@ export class OrderService {
         discount: dto.discount ?? null,
         total_amount: dto.total_amount ?? null,
         paid_amount: dto.paid_amount ?? null,
-        pre_amount: dto.pre_amount ?? 10000,
+        pre_amount: pre ?? 0,
         is_pre_amount_paid: true,
         order_status: dto.order_status ?? OrderStatus.Pending,
         status: STATUS.Active,
@@ -396,14 +404,11 @@ export class OrderService {
       );
 
       const order = await this.dao.add(payload);
-      let pre = 0;
       let startDate = startHour;
 
       for (const d of dto.details ?? []) {
         const service = await this.service.findOne(d.service_id);
         const artist = await this.user.findOne(d.user_id);
-
-        if (+(service.pre ?? '0') > pre) pre = +service.pre;
 
         const duration = Math.ceil(+d.duration / 60);
         const endDate = startDate + duration;
@@ -493,7 +498,6 @@ export class OrderService {
 
   public async find(pg: PaginationDto, role: number, id?: string) {
     try {
-      console.log(pg);
       const query = applyDefaultStatusFilter(
         role == CLIENT ? { ...pg, customer_id: id } : pg,
         role,

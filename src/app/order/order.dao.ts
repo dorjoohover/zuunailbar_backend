@@ -266,7 +266,6 @@ export class OrdersDao {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
-    console.log(query);
     query.friend = query.friend ? 0 : OrderStatus.Friend;
     const builder = new SqlBuilder(query);
     builder
