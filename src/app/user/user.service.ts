@@ -50,7 +50,7 @@ export class UserService {
         ? (res = null)
         : (res = 0);
     }
-
+    const salary_day = 5;
     if (res != null) throw new BadRequest().registered;
     let branch;
     if (branch_id) branch = await this.branchService.findOne(branch_id);
@@ -69,7 +69,7 @@ export class UserService {
       branch_name: branch_id ? branch.name : null,
       birthday: new Date(dto.birthday),
       color: dto.color,
-      salary_day: 15,
+      salary_day: salary_day,
       level: dto.level ?? null,
       mail: dto.mail ?? null,
       percent: dto.percent,
@@ -77,7 +77,7 @@ export class UserService {
     if (dto.duration || dto.percent || dto.date) {
       await this.userSalary.create({
         user_id: result,
-        duration: dto.duration,
+        duration: dto.duration ?? salary_day,
         percent: dto.percent,
         status: STATUS.Active,
         date: dto.date ?? new Date(),
