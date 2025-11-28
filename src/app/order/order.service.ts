@@ -410,7 +410,7 @@ export class OrderService {
         const service = await this.service.findOne(d.service_id);
         const artist = await this.user.findOne(d.user_id);
 
-        const duration = Math.ceil(+d.duration / 60);
+        const duration = Math.ceil(+service.duration / 60);
         const endDate = startDate + duration;
         await this.orderDetail.create({
           id: AppUtils.uuid4(),
