@@ -279,6 +279,7 @@ export class OrdersDao {
 
     if (!query.friend && query?.order_status != OrderStatus.Friend) {
       builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);
+      builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Cancelled);
     }
     if (query.date) {
       query.end_date
