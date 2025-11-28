@@ -355,26 +355,28 @@ export class OrderService {
     try {
       console.log(new Date(), 'start');
       const parallel = dto.parallel;
-      const totalMinutes = parallel
-        ? Math.max(...dto.details.map((a) => a.duration))
-        : (dto.details ?? []).reduce((sum, it) => sum + (it.duration ?? 0), 0);
 
       // artists.length == 0 || artists?.[0] == '0' && artists =
-      const durationHours = Math.ceil(totalMinutes / 60);
+
+      const orderDate = mnDate(dto.order_date);
+      let pre = 0;
+      let duration = 0;
+      for (const detail of dto.details ?? []) {
+        const service = await this.service.findOne(detail.service_id);
+        if (+(service.pre ?? '0') > pre) pre = +service.pre;
+        let d = +(service.duration ?? '0');
+        if (parallel) {
+          if (duration < d) duration = 0;
+        } else {
+          duration += d;
+        }
+      }
+      const durationHours = Math.ceil(duration / 60);
 
       const startHour = +dto.start_time.toString().slice(0, 2);
 
       const endHourRaw = +startHour + durationHours;
-      console.log(startHour);
-      const dayShift = Math.floor(endHourRaw / 24); // хэдэн өдөр давсан бэ
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
-
-      const orderDate = mnDate(dto.order_date);
-      let pre = 0;
-      for (const detail of dto.details ?? []) {
-        const service = await this.service.findOne(detail.service_id);
-        if (+(service.pre ?? '0') > pre) pre = +service.pre;
-      }
 
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
