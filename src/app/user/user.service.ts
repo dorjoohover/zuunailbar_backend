@@ -72,6 +72,7 @@ export class UserService {
       salary_day: 15,
       level: dto.level ?? null,
       mail: dto.mail ?? null,
+      percent: dto.percent,
     });
     if (dto.duration || dto.percent || dto.date) {
       await this.userSalary.create({
@@ -123,6 +124,7 @@ export class UserService {
         device: null,
         branch_name: null,
         color: null,
+        percent: null,
       });
       return {
         id,

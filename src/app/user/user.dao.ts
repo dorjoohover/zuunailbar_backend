@@ -19,6 +19,7 @@ export class UserDao {
         'branch_id',
         'firstname',
         'added_by',
+        'percent',
         'lastname',
         'nickname',
         'mail',
