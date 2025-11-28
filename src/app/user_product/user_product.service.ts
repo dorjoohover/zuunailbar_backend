@@ -69,8 +69,18 @@ export class UserProductService {
   }
 
   public async update(id: string, dto: UpdateUserProductDto) {
-    return await this.dao.update({ ...dto, id, updated_at: mnDate() }, [
-      ...getDefinedKeys(dto),
+    let payload = { ...dto, id, updated_at: mnDate() } as any;
+    if (dto.user_id) {
+      const user = await this.userService.findOne(dto.user_id);
+      payload.user_name = usernameFormatter(user);
+    }
+    if (dto.product_id) {
+      const product = await this.productService.findOne(dto.product_id);
+      payload.product_name = product.name;
+    }
+
+    return await this.dao.update(payload, [
+      ...getDefinedKeys(payload),
       'updated_at',
     ]);
   }

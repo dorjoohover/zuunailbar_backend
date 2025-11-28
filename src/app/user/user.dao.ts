@@ -29,7 +29,6 @@ export class UserDao {
         'birthday',
         'password',
         'experience',
-        'nickname',
         'profile_img',
         'role',
         'status',

@@ -21,6 +21,7 @@ export class User {
   public level: number;
   public experience: number;
   public percent: number;
+
   public branch_name: string;
   // push notification d heregtei
   public device_token?: string;
