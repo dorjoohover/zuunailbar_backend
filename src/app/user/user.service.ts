@@ -80,7 +80,7 @@ export class UserService {
         duration: dto.duration,
         percent: dto.percent,
         status: STATUS.Active,
-        date: dto.date,
+        date: dto.date ?? new Date(),
       });
     }
   }
