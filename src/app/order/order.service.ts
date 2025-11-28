@@ -389,7 +389,7 @@ export class OrderService {
         total_amount: dto.total_amount ?? null,
         paid_amount: dto.paid_amount ?? null,
         pre_amount: pre ?? 0,
-        is_pre_amount_paid: true,
+        is_pre_amount_paid: pre == 0,
         order_status: dto.order_status ?? OrderStatus.Pending,
         status: STATUS.Active,
         branch_id: dto.branch_id,
