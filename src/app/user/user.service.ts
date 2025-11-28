@@ -75,6 +75,7 @@ export class UserService {
       percent: dto.percent,
     });
     if (dto.duration || dto.percent || dto.date) {
+      console.log(dto.duration, dto.percent, dto.date);
       await this.userSalary.create({
         user_id: result,
         duration: dto.duration ?? salary_day,
