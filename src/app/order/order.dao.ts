@@ -277,10 +277,12 @@ export class OrdersDao {
       .conditionIfNotEmpty('start_time', '=', query.times)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('salary_date', '=', query.salary_date);
-
-    if (!query.friend && query?.order_status != OrderStatus.Friend) {
+    if (!query?.order_status) {
       builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);
       builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Cancelled);
+    }
+    if (!query.friend && query?.order_status != OrderStatus.Friend) {
+      builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);
     }
     if (query.date) {
       query.end_date
