@@ -375,6 +375,7 @@ export class OrderService {
         const service = await this.service.findOne(detail.service_id);
         if (+(service.pre ?? '0') > pre) pre = +service.pre;
       }
+
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
@@ -394,6 +395,7 @@ export class OrderService {
         status: STATUS.Active,
         branch_id: dto.branch_id,
       } as const;
+      console.log(payload);
       await this.canPlaceOrder(
         {
           ...payload,
