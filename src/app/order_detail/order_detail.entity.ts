@@ -6,6 +6,8 @@ export class OrderDetail {
   public user_id: string;
   public nickname: string;
   public description: string;
+  public start_time: string;
+  public end_time: string;
   public price: number;
   public status: number;
   public created_at?: Date;

@@ -45,7 +45,8 @@ export class OrderDetailService {
   }
 
   public async update(id: string, dto: OrderDetailDto) {
-    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+    const { start_time, end_time, ...body } = dto;
+    return await this.dao.update({ ...body, id }, getDefinedKeys(body));
   }
 
   public async remove(id: string) {
