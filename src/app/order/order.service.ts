@@ -691,14 +691,14 @@ export class OrderService {
     await Promise.all(
       details.map(async (d) => {
         console.log(d.id);
-        if (d.id && existingIds.includes(d.id)) {
-          await this.orderDetail.update(d.id, { ...d });
-        } else {
-          await this.orderDetail.create({
-            ...d,
-            order_id: id,
-          });
-        }
+        // if (d.id && existingIds.includes(d.id)) {
+        await this.orderDetail.update(d.id, { ...d });
+        // } else {
+        //   await this.orderDetail.create({
+        //     ...d,
+        //     order_id: id,
+        //   });
+        // }
       }),
     );
 
