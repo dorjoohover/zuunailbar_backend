@@ -366,7 +366,7 @@ export class OrderService {
         if (+(service.pre ?? '0') > pre) pre = +service.pre;
         let d = +(service.duration ?? '0');
         if (parallel) {
-          if (duration < d) duration = 0;
+          duration = duration < d ? d : duration;
         } else {
           duration += d;
         }
@@ -683,22 +683,20 @@ export class OrderService {
 
     const existingDetails = await this.orderDetail.findByOrder(id);
     const existingIds = existingDetails.map((d) => d.id);
-    console.log(existingDetails, existingIds);
     const newIds = details.map((d) => d.id)?.filter(Boolean);
 
     const toDelete = existingDetails?.filter((d) => !newIds.includes(d.id));
 
     await Promise.all(
       details.map(async (d) => {
-        console.log(d.id);
-        // if (d.id && existingIds.includes(d.id)) {
-        await this.orderDetail.update(d.id, { ...d });
-        // } else {
-        //   await this.orderDetail.create({
-        //     ...d,
-        //     order_id: id,
-        //   });
-        // }
+        if (d.id && existingIds.includes(d.id)) {
+          await this.orderDetail.update(d.id, { ...d });
+        } else {
+          await this.orderDetail.create({
+            ...d,
+            order_id: id,
+          });
+        }
       }),
     );
 
