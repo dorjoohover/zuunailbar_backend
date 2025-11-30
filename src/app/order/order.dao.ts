@@ -96,6 +96,7 @@ export class OrdersDao {
       AND o.order_status != ${OrderStatus.Friend}
       AND d.start_time  = $3
       AND d.user_id = $4
+      AND o.status = $5
   `;
 
     return this._db.select(sql, [
@@ -103,6 +104,7 @@ export class OrdersDao {
       date.toString().slice(0, 10),
       start_time,
       user_id,
+      STATUS.Active,
     ]);
   }
 
