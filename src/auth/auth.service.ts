@@ -120,88 +120,37 @@ export class AuthService {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OTP баталгаажуулалт</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body, p, div, a {
-      font-family: 'Montserrat', sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-    .btn {
-      display:inline-block;
-      padding:10px 16px;
-      border-radius:99px;
-      font-weight:600;
-      font-size:14px;
-      text-decoration:none;
-      color:#ffffff !important;
-      background: linear-gradient(135deg, #FB7185 0%, #F43F5E 100%);
-    }
-    .btn:hover {
-      background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%);
-    }
-    .container {
-      max-width:600px;
-      margin:0 auto;
-      background:#fff;
-      border-radius:8px;
-      overflow:hidden;
-      box-shadow:0 4px 20px rgba(0,0,0,0.05);
-    }
-    .header {
-      background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
-      padding:20px 40px;
-      text-align:left;
-    }
-    .body {
-      padding:30px 40px;
-      color:#333;
-    }
-    .otp-code {
-      font-size:36px;
-      font-weight:bold;
-      letter-spacing:8px;
-      text-align:center;
-      color:#E11D48;
-      margin:20px 0;
-    }
-    .footer {
-      background:#f5f5f5;
-      padding:20px;
-      text-align:center;
-      font-size:12px;
-      color:#777;
-      border-top:1px solid #eee;
-    }
+    body { font-family: 'Montserrat', sans-serif; margin:0; padding:0; background:#fff0f3; }
+    .container { max-width:600px; margin:0 auto; padding:20px; }
+    .card { background:#fff; border-radius:12px; overflow:hidden; border:1px solid #F43F5E; }
+    .header { background: #FB7185; padding:20px 30px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #F43F5E; }
+    .btn { display:inline-block; padding:10px 16px; border-radius:99px; font-weight:600; font-size:14px; text-decoration:none; color:#fff !important; background: linear-gradient(135deg, #FB7185 0%, #F43F5E 100%); }
+    .btn:hover { background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%); }
+    .body { padding:30px 30px; color:#881337; text-align:center; }
+    .otp { font-size:36px; font-weight:bold; letter-spacing:8px; color:#E11D48; margin:20px 0; font-family:monospace; }
+    .footer { background:#ffe4ec; padding:20px; font-size:12px; color:#881337; border-top:1px solid #F43F5E; text-align:center; }
   </style>
 </head>
-<body style="background:#f9f9f9; padding:20px 0;">
-
+<body>
   <div class="container">
-    <!-- HEADER -->
-    <div class="header">
-      <img src="https://zunailbar.mn/_next/image?url=%2Flogo%2Fzu-white.png&w=128&q=7" width="120" alt="Zunailbar Logo">
-    </div>
-
-    <!-- BODY -->
-    <div class="body">
-      <p>Өдрийн мэнд,</p>
-      <p>Та доорх <strong>баталгаажуулах кодыг</strong> оруулна уу:</p>
-
-      <!-- OTP input-style for autofill -->
-      <input type="text" name="verification_code" value="${otp}" autocomplete="one-time-code" readonly
-             class="otp-code" style="border:none; background:transparent; text-align:center; width:100%;">
-
-      <p>Хэрвээ та энэ үйлдлийг өөрөө хийгээгүй бол энэхүү и-мэйлийг үл тооно уу.</p>
-      <p>Хүндэтгэсэн,<br/><b>Zunailbar Salon</b></p>
-    </div>
-
-    <!-- FOOTER -->
-    <div class="footer">
-      © ${new Date().getFullYear()} Zunailbar Salon — Бүх эрх хуулиар хамгаалагдсан.
+    <div class="card">
+      <div class="header">
+        <img src="https://zunailbar.mn/_next/image?url=%2Flogo%2Fzu-white.png&w=128&q=7" width="120" alt="Zunailbar Logo">
+      </div>
+      <div class="body">
+        <p>Өдрийн мэнд,</p>
+        <p>Та доорх <strong>баталгаажуулах кодыг</strong> оруулна уу:</p>
+        <p style="color:transparent; user-select:none;">
+  <span style="color:#E11D48 ;">${otp}</span>
+</p>
+        <p>Хүндэтгэсэн,<br/><b>Zunailbar Salon</b></p>
+      </div>
+      <div class="footer">
+        © ${new Date().getFullYear()} Zunailbar Salon — Бүх эрх хуулиар хамгаалагдсан.
+      </div>
     </div>
   </div>
-
 </body>
 </html>
 `,
