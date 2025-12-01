@@ -128,7 +128,7 @@ export class AuthService {
     .btn { display:inline-block; padding:10px 16px; border-radius:99px; font-weight:600; font-size:14px; text-decoration:none; color:#fff !important; background: linear-gradient(135deg, #FB7185 0%, #F43F5E 100%); }
     .btn:hover { background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%); }
     .body { padding:30px 30px; color:#881337; text-align:center; }
-    .otp { font-size:36px; font-weight:bold; letter-spacing:8px; color:#D4AF37; margin:20px 0; font-family:monospace; }
+    .otp { font-size:36px; font-weight:bold; letter-spacing:8px; color:#E11D48; margin:20px 0; font-family:monospace; }
     .footer { background:#ffe4ec; padding:20px; font-size:12px; color:#881337; border-top:1px solid #F43F5E; text-align:center; }
   </style>
 </head>
@@ -137,13 +137,11 @@ export class AuthService {
     <div class="card">
       <div class="header">
         <img src="https://zunailbar.mn/_next/image?url=%2Flogo%2Fzu-white.png&w=128&q=7" width="120" alt="Zunailbar Logo">
-        <a href="https://zunailbar.mn" class="btn">Зочлох</a>
       </div>
       <div class="body">
         <p>Өдрийн мэнд,</p>
         <p>Та доорх <strong>баталгаажуулах кодыг</strong> оруулна уу:</p>
-        <p class="otp">OTP: <span>${otp}</span></p>
-        <p>Хэрвээ та энэ үйлдлийг өөрөө хийгээгүй бол ignore хийнэ үү.</p>
+        <p class="otp"><span>${otp}</span></p>
         <p>Хүндэтгэсэн,<br/><b>Zunailbar Salon</b></p>
       </div>
       <div class="footer">
