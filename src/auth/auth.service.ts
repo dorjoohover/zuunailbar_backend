@@ -191,31 +191,10 @@ export class AuthService {
                       </td>
                     </tr>
 
-                    <tr>
-                      <td style="font-size:14px; line-height:1.6; color:#333; text-align:justify;">
-                        <p style="margin:0 0 15px 0;">
-                          Та Zunailbar Salon платформд нэвтрэх/бүртгүүлэх гэж байна. Доорх **баталгаажуулах кодыг** оруулна уу.
-                        </p>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td style="text-align:center; padding:25px 0;">
-                        <div style="
-                          font-size:32px;
-                          font-weight:700;
-                          letter-spacing:8px;
-                          color:#D4AF37;
-                          background:#ffffff;
-                          display:inline-block;
-                          padding:12px 24px;
-                          border-radius:8px;
-                          border:1px solid #e5e5e5;
-                          ">
-                          ${otp}
-                        </div>
-                      </td>
-                    </tr>
+                  <p>Та доорх баталгаажуулах кодыг оруулна уу:</p>
+<p style="font-size:32px; font-weight:bold; letter-spacing:8px; color:#D4AF37;">
+  ${otp}
+</p>
 
                  
 
