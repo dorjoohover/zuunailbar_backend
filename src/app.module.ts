@@ -42,6 +42,8 @@ import { UserSalariesModule } from './app/user_salaries/user_salaries.module';
 import { BranchServiceModule } from './app/branch_service/branch_service.module';
 import { ServiceCategoryModule } from './app/service_category/service_category.module';
 import { EmailModule } from './auth/email.module';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { SystemLogger } from './system-logger.service';
 
 @Module({
   imports: [
@@ -84,6 +86,11 @@ import { EmailModule } from './auth/email.module';
   ],
   controllers: [AppController],
   providers: [
+    SystemLogger,
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
     FileService,
     FirebaseService,
     FileErrorLogService,
