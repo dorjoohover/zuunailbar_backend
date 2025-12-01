@@ -121,48 +121,28 @@ export class AuthService {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OTP баталгаажуулалт</title>
   <style>
-    body {
-      font-family: 'Montserrat', sans-serif;
-      margin:0; padding:0; background:#f9f9f9;
-    }
-    .container {
-      max-width:600px; margin:0 auto; padding:20px;
-    }
-    .card {
-      background:#fff; border-radius:8px; overflow:hidden;
-    }
-    .header {
-      background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
-      padding:20px 40px; display:flex; justify-content:space-between; align-items:center;
-    }
-    .btn {
-      display:inline-block; padding:10px 16px; border-radius:99px;
-      font-weight:600; font-size:14px; text-decoration:none;
-      color:#fff; background: linear-gradient(135deg, #FB7185 0%, #F43F5E 100%);
-    }
-    .btn:hover {
-      background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%);
-    }
-    .body { padding:30px 40px; color:#333; text-align:center; }
-    .otp {
-      font-size:36px; font-weight:bold; letter-spacing:8px;
-      color:#D4AF37; margin:20px 0;
-    }
-    .footer { background:#f5f5f5; padding:20px; font-size:12px; color:#777; border-top:1px solid #eee; text-align:center; }
+    body { font-family: 'Montserrat', sans-serif; margin:0; padding:0; background:#fff0f3; }
+    .container { max-width:600px; margin:0 auto; padding:20px; }
+    .card { background:#fff; border-radius:12px; overflow:hidden; border:1px solid #F43F5E; }
+    .header { background: #FB7185; padding:20px 30px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #F43F5E; }
+    .btn { display:inline-block; padding:10px 16px; border-radius:99px; font-weight:600; font-size:14px; text-decoration:none; color:#fff !important; background: linear-gradient(135deg, #FB7185 0%, #F43F5E 100%); }
+    .btn:hover { background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%); }
+    .body { padding:30px 30px; color:#881337; text-align:center; }
+    .otp { font-size:36px; font-weight:bold; letter-spacing:8px; color:#D4AF37; margin:20px 0; font-family:monospace; }
+    .footer { background:#ffe4ec; padding:20px; font-size:12px; color:#881337; border-top:1px solid #F43F5E; text-align:center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
       <div class="header">
-        <img src="https://zunailbar.mn/_next/image?url=%2Flogo%2Fzu-white.png&w=128&q=7" width="130" alt="Zunailbar Logo">
+        <img src="https://zunailbar.mn/_next/image?url=%2Flogo%2Fzu-white.png&w=128&q=7" width="120" alt="Zunailbar Logo">
         <a href="https://zunailbar.mn" class="btn">Зочлох</a>
       </div>
       <div class="body">
         <p>Өдрийн мэнд,</p>
-        <p>Та доорх <strong>OTP баталгаажуулах кодыг</strong> оруулна уу:</p>
-        <!-- iOS QuickType тохиргоо -->
-        <p class="otp" style="user-select:text; font-family:monospace;">OTP: <span>${otp}</span></p>
+        <p>Та доорх <strong>баталгаажуулах кодыг</strong> оруулна уу:</p>
+        <p class="otp">OTP: <span>${otp}</span></p>
         <p>Хэрвээ та энэ үйлдлийг өөрөө хийгээгүй бол ignore хийнэ үү.</p>
         <p>Хүндэтгэсэн,<br/><b>Zunailbar Salon</b></p>
       </div>
