@@ -142,7 +142,7 @@ export class AuthService {
         <p>Өдрийн мэнд,</p>
         <p>Та доорх <strong>баталгаажуулах кодыг</strong> оруулна уу:</p>
         <p style="color:transparent; user-select:none;">
-  <span style="color:#FB7185;font-weight:bold; font-size:32px"><strong>${otp}</strong></span>
+  <span style="color:#FB7185; font-size:32px"><strong>${otp}</strong></span>
 </p>
         <p>Хүндэтгэсэн,<br/><b>Zunailbar Salon</b></p>
       </div>
