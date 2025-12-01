@@ -120,122 +120,56 @@ export class AuthService {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OTP баталгаажуулалт</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
-
   <style>
-    body, h1, h2, h3, p, a, div {
+    body {
       font-family: 'Montserrat', sans-serif;
+      margin:0; padding:0; background:#f9f9f9;
     }
+    .container {
+      max-width:600px; margin:0 auto; padding:20px;
+    }
+    .card {
+      background:#fff; border-radius:8px; overflow:hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
+      padding:20px 40px; display:flex; justify-content:space-between; align-items:center;
+    }
+    .btn {
+      display:inline-block; padding:10px 16px; border-radius:99px;
+      font-weight:600; font-size:14px; text-decoration:none;
+      color:#fff; background: linear-gradient(135deg, #FB7185 0%, #F43F5E 100%);
+    }
+    .btn:hover {
+      background: linear-gradient(135deg, #F43F5E 0%, #E11D48 100%);
+    }
+    .body { padding:30px 40px; color:#333; text-align:center; }
+    .otp {
+      font-size:36px; font-weight:bold; letter-spacing:8px;
+      color:#D4AF37; margin:20px 0;
+    }
+    .footer { background:#f5f5f5; padding:20px; font-size:12px; color:#777; border-top:1px solid #eee; text-align:center; }
   </style>
 </head>
-
-<body style="margin:0; padding:0; min-width:100%; margin-top:10px;">
-  <center style="width:100%; table-layout:fixed; padding-bottom:20px;">
-    <div style="max-width:600px; margin:0 auto;">
-
-      <table width="600" cellspacing="0" cellpadding="0" border="0" align="center">
-        <tr>
-          <td>
-
-            <!-- HEADER -->
-            <table align="center" cellpadding="0" cellspacing="0" border="0"
-              style="width:100%; max-width:600px; background-color:#ffffff; border-collapse:collapse;">
-              <tr>
-                <td style="
-                    background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
-                    padding:20px 40px;
-                    text-align:left;">
-
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <!-- LOGO -->
-                      <td style="width:80%; vertical-align:middle;">
-                        <img src="https://zunailbar.mn/_next/image?url=%2Flogo%2Fzu-white.png&amp;w=128&amp;q=7"
-                          width="130"
-                          alt="Zunailbar Logo"
-                          style="display:block; border:0;">
-                      </td>
-
-                      <!-- BUTTON -->
-                      <td style="width:20%; text-align:right; vertical-align:middle;">
-                        <table cellspacing="0" cellpadding="0" border="0" align="right">
-                          <tr>
-                            <td style="border-radius:99px; background:#ffffff; mso-padding-alt:10px 16px;">
-                              <a href="https://zunailbar.mn"
-                                style="padding:10px 16px;
-                                       color:#D4AF37 !important;
-                                       font-size:14px;
-                                       font-weight:600;
-                                       text-decoration:none;
-                                       display:inline-block;">
-                                Зочлох
-                              </a>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-
-                    </tr>
-                  </table>
-
-                </td>
-              </tr>
-
-              <tr>
-                <td style="background:#fafafa; padding:20px 40px 10px 40px;">
-                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-
-                    <tr>
-                      <td style="font-size:14px; color:#333;">
-                        Өдрийн мэнд,
-                      </td>
-                    </tr>
-
-                  <p>Та доорх баталгаажуулах кодыг оруулна уу:</p>
-<p style="font-size:32px; font-weight:bold; letter-spacing:8px; color:#D4AF37;">
-  ${otp}
-</p>
-
-                 
-
-                    <tr>
-                      <td style="font-size:14px; line-height:1.6; color:#333;">
-                        <p style="margin:0 0 15px 0;">
-                          Хэрвээ та энэ үйлдлийг өөрөө хийгээгүй бол энэхүү и-мэйлийг үл тооно уу.
-                        </p>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td style="font-size:14px; line-height:1.6; color:#333;">
-                        <p style="margin:0 0 15px 0;">
-                          Хүндэтгэсэн,<br/>
-                          <b>Zunailbar Salon</b>
-                        </p>
-                      </td>
-                    </tr>
-
-                  </table>
-                </td>
-              </tr>
-
-              <!-- FOOTER -->
-              <tr>
-                <td style="background:#f5f5f5; padding:20px; text-align:center; font-size:12px; color:#777; border-top:1px solid #eee;">
-                  <p style="margin:0; line-height:1.5;">
-                    © ${new Date().getFullYear()} Zunailbar Salon — Бүх эрх хуулиар хамгаалагдсан.
-                  </p>
-                </td>
-              </tr>
-
-            </table>
-
-          </td>
-        </tr>
-      </table>
-
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <img src="https://zunailbar.mn/_next/image?url=%2Flogo%2Fzu-white.png&w=128&q=7" width="130" alt="Zunailbar Logo">
+        <a href="https://zunailbar.mn" class="btn">Зочлох</a>
+      </div>
+      <div class="body">
+        <p>Өдрийн мэнд,</p>
+        <p>Та доорх баталгаажуулах кодыг оруулна уу:</p>
+        <p class="otp">${otp}</p>
+        <p>Хэрвээ та энэ үйлдлийг өөрөө хийгээгүй бол ignore хийнэ үү.</p>
+        <p>Хүндэтгэсэн,<br/><b>Zunailbar Salon</b></p>
+      </div>
+      <div class="footer">
+        © ${new Date().getFullYear()} Zunailbar Salon — Бүх эрх хуулиар хамгаалагдсан.
+      </div>
     </div>
-  </center>
+  </div>
 </body>
 </html>
 `,
