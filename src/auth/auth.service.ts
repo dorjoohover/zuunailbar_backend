@@ -160,8 +160,9 @@ export class AuthService {
       </div>
       <div class="body">
         <p>Өдрийн мэнд,</p>
-        <p>Та доорх баталгаажуулах кодыг оруулна уу:</p>
-        <p class="otp">${otp}</p>
+        <p>Та доорх <strong>OTP баталгаажуулах кодыг</strong> оруулна уу:</p>
+        <!-- iOS QuickType тохиргоо -->
+        <p class="otp" style="user-select:text; font-family:monospace;">OTP: <span>${otp}</span></p>
         <p>Хэрвээ та энэ үйлдлийг өөрөө хийгээгүй бол ignore хийнэ үү.</p>
         <p>Хүндэтгэсэн,<br/><b>Zunailbar Salon</b></p>
       </div>
