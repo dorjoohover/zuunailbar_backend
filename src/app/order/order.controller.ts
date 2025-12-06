@@ -117,10 +117,7 @@ export class OrderController {
   async confirmOrder(@Param('date') date: string, @Req() { user }) {
     return this.orderService.confirmSalaryProcessStatus(user.user.id, date);
   }
-  @Post('artists')
-  async artists(@Body() dto: OrderDto) {
-    return this.orderService.getArtists(dto);
-  }
+
   @Get('check/:invoice/:id')
   @ApiParam({ name: 'id' })
   @ApiParam({ name: 'invoice' })

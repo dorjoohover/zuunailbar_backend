@@ -124,6 +124,18 @@ export class OrdersDao {
 
     return await this._db.select(sql, params);
   }
+  async getOrderWithDetail(id: string) {
+    const sql = `
+    SELECT order_date, od.user_id as user_id
+    FROM ${tableName} o
+    inner join order_details od on od.order_id = o.id
+    WHERE o.id = $1
+      `;
+
+    const params = [id];
+
+    return await this._db.select(sql, params);
+  }
 
   async getOrders(userId: string) {
     const today = ubDateAt00(); // moment эсвэл өөр date util
@@ -230,10 +242,10 @@ export class OrdersDao {
     builder.conditionIfNotEmpty('order_status', '=', query.order_status);
 
     const criteria = builder.criteria();
-    const sql =
-      `SELECT * FROM "${tableName}" o inner join order_details od on od.order_id = o.id  ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
-      `${query.limit ? `limit ${query.limit}` : ''}` +
-      ` offset ${+query.skip * +(query.limit ?? 0)}`;
+    let sql = `SELECT * FROM "${tableName}" o inner join order_details od on od.order_id = o.id  ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
+    if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
+    if (query.skip) ` offset ${+query.skip * +(query.limit ?? 0)}`;
+
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

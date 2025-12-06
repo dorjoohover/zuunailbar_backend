@@ -110,6 +110,12 @@ export class OrderError {
       HttpStatus.BAD_REQUEST,
     );
   }
+  get cannotChooseHour() {
+    throw new HttpException(
+      'Сонгох боломжгүй цаг сонгосон байна',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
 
   // Цаг ажиллахгүй эсвэл өдөр, цаг буруу
   get nonWorkingHour() {

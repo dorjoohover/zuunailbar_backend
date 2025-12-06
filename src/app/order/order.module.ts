@@ -16,6 +16,7 @@ import { AllExceptionsFilter } from 'src/core/utils/all-exceptions.filter';
 import { FileErrorLogService } from 'src/error-log.service';
 import { UserServiceModule } from '../user_service/user_service.module';
 import { IntegrationModule } from '../integrations/integrations.module';
+import { AvailabilitySlotsModule } from '../availability_slots/availability_slots.module';
 
 @Module({
   imports: [
@@ -28,7 +29,8 @@ import { IntegrationModule } from '../integrations/integrations.module';
     BookingModule,
     IntegrationModule,
     UserServiceModule,
-    forwardRef(() => ScheduleModule),
+    AvailabilitySlotsModule,
+    ScheduleModule,
   ],
   controllers: [OrderController],
   providers: [

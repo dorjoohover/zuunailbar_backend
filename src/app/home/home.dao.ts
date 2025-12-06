@@ -92,10 +92,9 @@ export class HomeDao {
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('LOWER(artist_name)', '=', query.artist_name)
       .criteria();
-    const sql =
-      `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
-      `${query.limit ? `limit ${query.limit}` : ''}` +
-      ` offset ${+query.skip * +(query.limit ?? 0)}`;
+    let sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
+    if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
+    if (query.skip) ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
@@ -111,10 +110,10 @@ export class HomeDao {
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
       .criteria();
-    const sql =
-      `SELECT * FROM "${feature}" ${criteria} order by index asc ` +
-      `${query.limit ? `limit ${query.limit}` : ''}` +
-      ` offset ${+query.skip * +(query.limit ?? 0)}`;
+    let sql = `SELECT * FROM "${feature}" ${criteria} order by index asc `;
+    if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
+    if (query.skip) ` offset ${+query.skip * +(query.limit ?? 0)}`;
+
     const countSql = `SELECT COUNT(*) FROM "${feature}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

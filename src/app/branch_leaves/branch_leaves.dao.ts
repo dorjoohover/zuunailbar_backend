@@ -2,21 +2,23 @@ import { Injectable } from '@nestjs/common';
 import { STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Brand } from './brand.entity';
+import { BranchLeave } from './branch_leaves.entity';
 
-const tableName = 'brands';
+const tableName = 'branch_leaves';
 
 @Injectable()
-export class BrandDao {
+export class BranchLeavesDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Brand) {
+  async add(data: BranchLeave) {
     return await this._db.insert(tableName, data, [
       'id',
-      'name',
-      'merchant_id',
-      'status',
-      'order_days',
+      'branch_id',
+      'description',
+      'end_time',
+      'date',
+      'created_by',
+      'start_time',
     ]);
   }
 
@@ -26,10 +28,20 @@ export class BrandDao {
     ]);
   }
 
-  async updateStatus(id: string, status: number) {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
-      [status, id],
+  async deleteByBranch(id: string, dates?: Date[]) {
+    if (!dates || dates?.length == 0) {
+      return await this._db.delete(
+        `DELETE FROM "${tableName}" WHERE "branch_id" = $1`,
+        [id],
+      );
+    }
+
+    return await this._db.delete(
+      `DELETE FROM "${tableName}" 
+   WHERE "branch_id" = $1 
+     AND "date" = ANY($2) 
+     `,
+      [id, dates],
     );
   }
 
@@ -37,6 +49,12 @@ export class BrandDao {
     return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "id"=$1`,
       [id],
+    );
+  }
+  async getByDateAndBranch(id: string, date: Date) {
+    return await this._db.selectOne(
+      `SELECT id FROM "${tableName}" WHERE "id"=$1 and "date" = $2`,
+      [id, date],
     );
   }
 
@@ -49,11 +67,19 @@ export class BrandDao {
     }
 
     const builder = new SqlBuilder(query);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
-      .criteria();
+
+    builder
+      .conditionIfNotEmpty('id', '=', query.id)
+      .conditionIfNotEmpty('branch_id', '=', query.branch_id);
+    if (query.start_date) {
+      builder.conditionIfNotEmpty('date', '>=', query.start_date);
+    }
+
+    if (query.end_date) {
+      builder.conditionIfNotEmpty('date', '<=', query.end_date);
+    }
+
+    const criteria = builder.criteria();
     let sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
     if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
     if (query.skip) ` offset ${+query.skip * +(query.limit ?? 0)}`;
@@ -61,27 +87,5 @@ export class BrandDao {
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
-  }
-
-  async search(filter: any): Promise<any[]> {
-    let nameCondition = ``;
-    if (filter.id) {
-      filter.id = `%${filter.id.toLowerCase()}%`;
-    }
-
-    const builder = new SqlBuilder(filter);
-    const criteria = builder
-      .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.id)
-      .conditionIfNotEmpty('status', '=', STATUS.Active)
-
-      .criteria();
-    return await this._db.select(
-      ` SELECT "id",
-           CONCAT(
-             COALESCE("name", ''), ''
-
-           ) AS "value" FROM "${tableName}" ${criteria}${nameCondition}`,
-      builder.values,
-    );
   }
 }

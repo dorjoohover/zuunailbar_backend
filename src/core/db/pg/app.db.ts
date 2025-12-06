@@ -86,7 +86,8 @@ export class AppDB {
       try {
         const result = await client.query(sql, params);
         if (result.rows.length === 0) {
-          throw new AppDBResultNotFoundException('Select One not found!');
+          return null;
+          // throw new AppDBResultNotFoundException('Select One not found!');
         } else if (result.rows.length === 1) {
           return result.rows[0];
         } else {
@@ -163,6 +164,7 @@ export class AppDB {
   async delete(sql: string, params: any): Promise<boolean> {
     return this.executeQuery(async (client) => {
       const result = await client.query(sql, params);
+
       return result.rowCount > 0;
     });
   }

@@ -18,9 +18,8 @@ import { ScheduleListType } from './schedule.entity';
 export class ScheduleService {
   constructor(
     private readonly dao: ScheduleDao,
+    @Inject(forwardRef(() => UserService))
     private userService: UserService,
-    @Inject(forwardRef(() => OrderService))
-    private readonly order: OrderService,
   ) {}
   public async create(dto: ScheduleDto, u: string) {
     if (!dto.times || dto.times.length == 0)

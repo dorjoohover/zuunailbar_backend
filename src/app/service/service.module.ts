@@ -9,8 +9,8 @@ import { UserSalariesModule } from '../user_salaries/user_salaries.module';
 import { BranchServiceModule } from '../branch_service/branch_service.module';
 import { BranchModule } from '../branch/branch.module';
 import { UserModule } from '../user/user.module';
-import { UserServiceModule } from '../user_service/user_service.module';
 import { ServiceCategoryModule } from '../service_category/service_category.module';
+import { UserServiceModule } from '../user_service/user_service.module';
 
 @Module({
   imports: [

@@ -163,7 +163,6 @@ export class AuthService {
     try {
       const otp = this.generateOtp();
       this.otps[mobile] = otp;
-      console.log(otp);
       const text = `Your OTP code is: ${otp}\n
                     Thank you.`;
       const url = `${process.env.TELCOCOM_URL}?tenantId=${process.env.TELCOCOM}&fromNumber=${process.env.FROM_NUMBER}&toNumber=${mobile}&sms=${text}`;

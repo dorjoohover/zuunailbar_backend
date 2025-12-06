@@ -23,7 +23,7 @@ import { SAP } from 'src/common/decorator/use-param.decorator';
 @Controller('user_service')
 export class UserServiceController {
   constructor(private readonly userServiceService: UserServiceService) {}
-  private static readonly clientFields = ['service_id', 'user_id'];
+  private static readonly clientFields = ['services', 'user_id'];
   private static readonly employeeFields = ['service_id', 'user_id', 'status'];
   @Employee()
   @Post()
@@ -36,6 +36,16 @@ export class UserServiceController {
   @PQ(UserServiceController.employeeFields)
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.userServiceService.findAllUserService(pg, user.user.role);
+  }
+  @Post('client')
+  @PQ(UserServiceController.clientFields)
+  findClient(@Body() pg: any, @Req() { user }) {
+    return this.userServiceService.etParallelArtists(
+      pg.branch_id,
+      pg.services,
+      // false,
+      pg.parallel ?? false,
+    );
   }
 
   @Get('get/:id')

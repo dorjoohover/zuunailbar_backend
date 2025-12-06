@@ -87,6 +87,11 @@ export class SqlBuilder {
 
     return this;
   }
+  conditionRaw(raw: string, values: any[] = []) {
+    this.conditions.push(raw);
+    this.values.push(...values);
+    return this;
+  }
   conditionIfArray(column: string, value: any[]) {
     if (!Array.isArray(value) || value.length === 0) return this;
 

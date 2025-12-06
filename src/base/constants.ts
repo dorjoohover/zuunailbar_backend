@@ -42,6 +42,12 @@ export const firstLetterUpper = (value: string) => {
   if (value.length == 0) return value;
   return `${value.substring(0, 1).toUpperCase()}${value.substring(1)}`;
 };
+export function toYMD(d: Date) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function getUBOffsetMinutes(d: Date): number {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -105,9 +111,7 @@ export enum SCHEDULE_TYPE {
   Employee = 10,
   Branch = 20,
 }
-export enum SERVICE_TYPE {
-  
-}
+export enum SERVICE_TYPE {}
 export const round = (value: number, round = 1000) => {
   return Math.floor(value / round) * round;
 };
@@ -161,6 +165,7 @@ export enum OrderStatus {
   Absent = 60,
   Friend = 70,
 }
+
 export enum COST_STATUS {
   Paid = 10,
   Pending = 20,
@@ -194,4 +199,43 @@ export enum SERVICE_VIEW {
   SPECIAL = 10,
   DEFAULT = 0,
   FEATURED = 20,
+}
+export enum EmployeeStatus {
+  ACTIVE = 10,
+  DEKIRIT = 20,
+  VACATION = 30,
+  FIRED = 40,
+  BANNED = 50,
+}
+
+export function getDatesBetween(start: Date, end: Date): Date[] {
+  const dates: Date[] = [];
+  let current = new Date(start);
+
+  while (current <= end) {
+    dates.push(new Date(current)); // copy
+    current.setDate(current.getDate() + 1); // дараагийн өдөр
+  }
+
+  return dates;
+}
+export function intersectSlots(
+  scheduleSlots: string[],
+  bookingSlots: string[],
+): string[] {
+  return scheduleSlots?.filter((slot) => bookingSlots.includes(slot));
+}
+
+export interface OrderSlot {
+  [artist: string]: {
+    slots: Record<string, string[]>;
+  };
+}
+export interface ParallelOrderSlot {
+  [service: string]: {
+    [artist: string]: {
+      artists: string[];
+      slots: Record<string, string[]>;
+    };
+  };
 }

@@ -44,6 +44,9 @@ import { ServiceCategoryModule } from './app/service_category/service_category.m
 import { EmailModule } from './auth/email.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { SystemLogger } from './system-logger.service';
+import { BranchLeavesModule } from './app/branch_leaves/branch_leaves.module';
+import { ArtistLeavesModule } from './app/artist_leaves/artist_leaves.module';
+import { AvailabilitySlotsModule } from './app/availability_slots/availability_slots.module';
 
 @Module({
   imports: [
@@ -83,6 +86,9 @@ import { SystemLogger } from './system-logger.service';
     BranchServiceModule,
     ServiceCategoryModule,
     EmailModule,
+    BranchLeavesModule,
+    ArtistLeavesModule,
+    AvailabilitySlotsModule,
   ],
   controllers: [AppController],
   providers: [
