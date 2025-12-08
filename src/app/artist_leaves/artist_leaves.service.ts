@@ -60,11 +60,8 @@ export class ArtistLeavesService {
 
   public async removeByDate(artist: string, user: string, dates?: Date[]) {
     const res = await this.dao.deleteByArtist(artist, dates);
-    const { items } = await this.dao.list({
-      artist_id: artist,
-    });
-    const date = items.map((i) => i?.date);
-    await this.slotService.createByArtist(artist, date);
+
+    await this.slotService.createByArtist(artist, dates);
     return res;
   }
   public async remove(id: string) {

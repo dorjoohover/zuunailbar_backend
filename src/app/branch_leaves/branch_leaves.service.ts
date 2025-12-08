@@ -15,13 +15,9 @@ export class BranchLeavesService {
   ) {}
   public async create(dto: BranchLeaveDto, user: string) {
     const { dates, ...body } = dto;
-    const { items } = await this.dao.list({
-      branch_id: dto.branch_id,
-    });
-    const date = items.map((i) => i?.date);
-    await this.slots.removeByBranch(dto.branch_id, date);
     return await Promise.all(
       dates.map(async (date) => {
+        await this.slots.removeByBranch(dto.branch_id, [date]);
         const leave = await this.dao.getByDateAndBranch(body.branch_id, date);
         if (leave) return leave.id;
         return await this.dao.add({
@@ -43,11 +39,8 @@ export class BranchLeavesService {
 
   public async removeByDate(branch: string, user: string, dates?: Date[]) {
     const res = await this.dao.deleteByBranch(branch, dates);
-    const { items } = await this.dao.list({
-      branch_id: branch,
-    });
-    const date = items.map((i) => i?.date);
-    await this.slots.createByBranch(branch, date);
+
+    await this.slots.createByBranch(branch, dates);
     return res;
   }
 }
