@@ -138,41 +138,46 @@ export class AvailabilitySlotsService {
     );
   }
   public async createByBranch(branch: string, dates: Date[]) {
-    const artists = await this.user.findAll(
-      {
-        branch_id: branch,
-        role: E_M,
-      },
-      ADMIN,
-    );
-    return await Promise.all(
-      artists.items.map(async (artist) => {
-        const res = await this.getDates(branch, dates, artist.id);
-        console.log(artist.nickname, res);
-        return await Promise.all(
-          Object.entries(res).map(async ([key, value]) => {
-            const date = key as unknown as Date;
-            const slot = await this.dao.list({
-              artist_id: artist.id,
-              branch_id: branch,
-              date: date,
-            });
-            let payload = {
-              id: AppUtils.uuid4(),
-              artist_id: artist.id,
-              branch_id: branch,
-              date: date,
-              slots: value,
-            } as any;
-            if (slot.items.length > 0) {
-              payload.id = slot.items[0].id;
-              return await this.dao.update(payload, getDefinedKeys(payload));
-            }
-            return await this.dao.add(payload);
-          }),
-        );
-      }),
-    );
+    try {
+      const artists = await this.user.findAll(
+        {
+          branch_id: branch,
+          role: E_M,
+        },
+        ADMIN,
+      );
+      return await Promise.all(
+        artists.items.map(async (artist) => {
+          const res = await this.getDates(branch, dates, artist.id);
+          console.log(artist.nickname, res);
+          return await Promise.all(
+            Object.entries(res).map(async ([key, value]) => {
+              const date = key as unknown as Date;
+              const slot = await this.dao.list({
+                artist_id: artist.id,
+                branch_id: branch,
+                date: date,
+              });
+              let payload = {
+                id: AppUtils.uuid4(),
+                artist_id: artist.id,
+                branch_id: branch,
+                date: date,
+                slots: value,
+              } as any;
+              console.log(slot.items);
+              if (slot.items.length > 0) {
+                payload.id = slot.items[0].id;
+                return await this.dao.update(payload, getDefinedKeys(payload));
+              }
+              return await this.dao.add(payload);
+            }),
+          );
+        }),
+      );
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   public async getById(id: string) {
