@@ -32,7 +32,7 @@ export class BranchController {
   @Post()
   async create(@Body() dto: BranchDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
-    return await this.branchService.create(dto, user.merchant.id);
+    return await this.branchService.create(dto, user.merchant.id, user.user);
   }
   @Public()
   @Get()

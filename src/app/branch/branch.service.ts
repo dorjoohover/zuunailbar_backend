@@ -6,6 +6,7 @@ import { getDefinedKeys, STATUS } from 'src/base/constants';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { BranchServiceService } from '../branch_service/branch_service.service';
+import { User } from '../user/user.entity';
 
 @Injectable()
 export class BranchService {
@@ -14,7 +15,7 @@ export class BranchService {
     @Inject(forwardRef(() => BranchServiceService))
     private service: BranchServiceService,
   ) {}
-  public async create(dto: BranchDto, merchant: string) {
+  public async create(dto: BranchDto, merchant: string, user: User) {
     const res = await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
@@ -23,7 +24,7 @@ export class BranchService {
       status: STATUS.Active,
     });
     console.log(res);
-    await this.service.updateByService(res);
+    await this.service.updateByService(res, user);
     return res;
   }
   async findOne(id: string) {

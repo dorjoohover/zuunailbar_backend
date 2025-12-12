@@ -44,26 +44,22 @@ export class BranchServiceService {
     }
   }
 
-  public async updateByService(branch: string) {
+  public async updateByService(branch: string, user: User) {
     const { items } = await this.service.findAll({}, CLIENT);
     console.log(items.length);
     await Promise.all(
       items.map(async (service) => {
-        await this.updateByServiceAndBranch({
-          meta: {
-            serviceName: service.name,
-            description: service.description ?? '',
-            categoryName: service.meta?.name,
-            branchName: '',
+        await this.create(
+          {
+            branch_id: branch,
+            duration: service.duration,
+            max_price: service.max_price,
+            min_price: service.min_price,
+            pre: service.pre,
+            service_id: service.id,
           },
-          index: service.index,
-          branch_id: branch,
-          service_id: service.id,
-          min_price: service.min_price,
-          max_price: service.max_price,
-          pre: service.pre,
-          duration: service.duration,
-        });
+          user,
+        );
       }),
     );
   }
