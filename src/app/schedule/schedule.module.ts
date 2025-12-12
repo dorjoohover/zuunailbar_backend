@@ -8,7 +8,12 @@ import { UserModule } from '../user/user.module';
 import { ServiceModule } from '../service/service.module';
 
 @Module({
-  imports: [AppDbModule, BaseModule, forwardRef(() => UserModule), ServiceModule],
+  imports: [
+    AppDbModule,
+    BaseModule,
+    forwardRef(() => UserModule),
+    forwardRef(() => ServiceModule),
+  ],
   controllers: [ScheduleController],
   providers: [ScheduleService, ScheduleDao],
   exports: [ScheduleService],

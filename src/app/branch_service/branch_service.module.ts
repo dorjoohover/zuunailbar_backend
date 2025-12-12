@@ -12,7 +12,7 @@ import { BranchModule } from '../branch/branch.module';
     AppDbModule,
     BaseModule,
     forwardRef(() => ServiceModule),
-    BranchModule,
+    forwardRef(() => BranchModule),
   ],
   controllers: [BranchServiceController],
   providers: [BranchServiceService, BranchServiceDao],

@@ -16,6 +16,7 @@ export class BranchServiceService {
     private readonly dao: BranchServiceDao,
     @Inject(forwardRef(() => ServiceService))
     private service: ServiceService,
+    @Inject(forwardRef(() => BranchService))
     private branchService: BranchService,
   ) {}
   public async create(dto: BranchServiceDto, u: User) {
@@ -41,6 +42,29 @@ export class BranchServiceService {
     } catch (error) {
       console.log(error);
     }
+  }
+
+  public async updateByService(branch: string) {
+    const { items } = await this.service.findAll({}, CLIENT);
+    await Promise.all(
+      items.map(async (service) => {
+        this.updateByServiceAndBranch({
+          meta: {
+            serviceName: service.name,
+            description: service.description ?? '',
+            categoryName: service.meta?.name,
+            branchName: '',
+          },
+          index: service.index,
+          branch_id: branch,
+          service_id: service.id,
+          min_price: service.min_price,
+          max_price: service.max_price,
+          pre: service.pre,
+          duration: service.duration,
+        });
+      }),
+    );
   }
 
   public async findAll(pg: PaginationDto) {

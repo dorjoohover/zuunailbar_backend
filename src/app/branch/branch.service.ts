@@ -1,14 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { BranchDto } from './branch.dto';
 import { BranchDao } from './branch.dao';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { getDefinedKeys, STATUS } from 'src/base/constants';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { BranchServiceService } from '../branch_service/branch_service.service';
 
 @Injectable()
 export class BranchService {
-  constructor(private readonly dao: BranchDao) {}
+  constructor(
+    private readonly dao: BranchDao,
+    @Inject(forwardRef(() => BranchServiceService))
+    private service: BranchServiceService,
+  ) {}
   public async create(dto: BranchDto, merchant: string) {
     const res = await this.dao.add({
       ...dto,
@@ -17,6 +22,7 @@ export class BranchService {
       user_id: null,
       status: STATUS.Active,
     });
+    await this.service.updateByService(res);
     return res;
   }
   async findOne(id: string) {

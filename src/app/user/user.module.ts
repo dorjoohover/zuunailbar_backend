@@ -18,7 +18,7 @@ import { UserService } from './user.service';
     forwardRef(() => UserServiceModule),
     forwardRef(() => ScheduleModule),
     BookingModule,
-    BranchModule,
+    forwardRef(() => BranchModule),
   ],
   controllers: [UserController],
   providers: [UserService, UserDao],

@@ -29,6 +29,12 @@ export class AvailabilitySlotsController {
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.service.findAll(pg);
   }
+  // @Admin()
+  // @Get("/:type")
+  // updateBy(@Param('type') type: string, @Req() { user }) {
+  //   if(type == 'artist') this.service.createByBranch
+  //   return this.service.findAll(pg);
+  // }
 
   @Admin()
   @Patch(':id')

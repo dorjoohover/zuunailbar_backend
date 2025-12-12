@@ -19,7 +19,7 @@ import { UserServiceModule } from '../user_service/user_service.module';
     DiscountModule,
     UserSalariesModule,
     forwardRef(() => BranchServiceModule),
-    BranchModule,
+    forwardRef(() => BranchModule),
     forwardRef(() => UserModule),
     forwardRef(() => UserServiceModule),
     ServiceCategoryModule,

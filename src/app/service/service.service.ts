@@ -18,6 +18,7 @@ export class ServiceService {
   constructor(
     private readonly dao: ServiceDao,
     private readonly discount: DiscountService,
+    @Inject(forwardRef(() => BranchService))
     private readonly branchService: BranchService,
     @Inject(forwardRef(() => BranchServiceService))
     private readonly branchServiceService: BranchServiceService,
