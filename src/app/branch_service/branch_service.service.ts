@@ -46,9 +46,10 @@ export class BranchServiceService {
 
   public async updateByService(branch: string) {
     const { items } = await this.service.findAll({}, CLIENT);
+    console.log(items.length);
     await Promise.all(
       items.map(async (service) => {
-        this.updateByServiceAndBranch({
+        await this.updateByServiceAndBranch({
           meta: {
             serviceName: service.name,
             description: service.description ?? '',
@@ -96,7 +97,7 @@ export class BranchServiceService {
   }
   public async updateByServiceAndBranch(dto: BranchServiceDto) {
     try {
-      console.log(dto);
+      console.log(dto, dto.branch_id);
       const items = await this.dao.list({
         branch_id: dto.branch_id,
         service_id: dto.service_id,

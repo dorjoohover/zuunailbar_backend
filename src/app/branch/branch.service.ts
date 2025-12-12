@@ -22,6 +22,7 @@ export class BranchService {
       user_id: null,
       status: STATUS.Active,
     });
+    console.log(res);
     await this.service.updateByService(res);
     return res;
   }
