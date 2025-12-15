@@ -1,32 +1,30 @@
 import { Injectable } from '@nestjs/common';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Service } from './service.entity';
+import { Payment } from './payment.entity';
 
-const tableName = 'services';
+const tableName = 'payments';
 
 @Injectable()
-export class ServiceDao {
+export class PaymentDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Service) {
+  async add(data: Payment) {
     return await this._db.insert(tableName, data, [
       'id',
       'merchant_id',
-      'category_id',
-      'name',
-      'min_price',
-      'max_price',
-      'duration',
-      'image',
-      'icon',
-      'description',
-      'pre',
+      'order_id',
+      'order_detail_id',
+      'invoice_id',
+      'payment_id',
+      'qr_text',
+      'qr_image',
+      'amount',
+      'method',
       'status',
+      'is_pre_amount',
+      'paid_at',
       'created_by',
-      'view',
-      'index',
-      'meta',
     ]);
   }
 
@@ -49,45 +47,41 @@ export class ServiceDao {
       [id],
     );
   }
-  async findName(name: string) {
-    return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "name" like %$1%`,
-      [name],
-    );
-  }
 
-  async list(query, column?: string) {
+  async list(query, cols?: string) {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
     if (query.name) {
-      query.name = `%${query.name}%`;
+      query.name = `%${query.name.toLowerCase()}%`;
     }
 
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('merchant_id', '=', query.merchant_id)
-      .conditionIfNotEmpty('category_id', '=', query.category_id)
+      .conditionIfNotEmpty('order_id', '=', query.order_id)
+      .conditionIfNotEmpty('order_detail_id', '=', query.order_detail_id)
+      .conditionIfNotEmpty('method', '=', query.method)
+      .conditionIfNotEmpty('invoice_id', '=', query.invoice_id)
+      .conditionIfNotEmpty('payment_id', '=', query.payment_id)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('view', '=', query.view)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
+      .conditionIfNotEmpty('is_pre_amount', '=', query.is_pre_amount)
       .criteria();
-    let sql = `SELECT ${column ?? '*'} FROM "${tableName}" ${criteria} order by index ${query.sort === 'false' ? 'asc' : 'desc'} `;
-    if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
+    let sql = `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by GREATEST("quantity", 0) DESC NULLS LAST, LOWER("name") ASC,   created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
+    if (query.limit) sql += `${query.limit ? `limit ${query.limit}` : ''}`;
     if (query.skip) sql += ` offset ${+query.skip * +(query.limit ?? 0)}`;
-
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
   }
+  async count(filters?: Record<string, any>) {
+    const builder = new SqlBuilder(filters ?? {});
+    const whereClause = builder.criteria(); // → 'WHERE ...' хэлбэртэй болно
 
-  async pairs(query) {
-    const items = await this._db.select(
-      `SELECT "id" as "key", CONCAT("id", '-', "name") as "value" FROM "${tableName}" order by "id" asc`,
-      {},
-    );
-    return items;
+    const sql = `SELECT COUNT(*) FROM "${tableName}" ${whereClause}`;
+    const result = await this._db.count(sql, builder.values);
+
+    return result;
   }
 }

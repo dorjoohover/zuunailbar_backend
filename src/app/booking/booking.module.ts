@@ -4,10 +4,10 @@ import { BookingController } from './booking.controller';
 import { AppDbModule } from 'src/core/db/database.module';
 import { BaseModule } from 'src/base/base.module';
 import { BookingDao } from './booking.dao';
-import { ScheduleModule } from '../schedule/schedule.module';
+import { AvailabilitySlotsModule } from '../availability_slots/availability_slots.module';
 
 @Module({
-  imports: [AppDbModule, BaseModule],
+  imports: [AppDbModule, BaseModule, forwardRef(() => AvailabilitySlotsModule)],
   controllers: [BookingController],
   providers: [BookingService, BookingDao],
   exports: [BookingService],

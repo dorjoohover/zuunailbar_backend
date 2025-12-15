@@ -37,8 +37,12 @@ export class AvailabilitySlotsController {
   // }
 
   @Admin()
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: AvailabilitySlotDto) {
-    return this.service.update(id, dto);
+  @Get('update/:type/:id')
+  update(@Param('type') type: string, @Param('id') id: string) {
+    let t = type == 'artist' ? true : type == 'branch' ? false : undefined;
+    return this.service.update({
+      isArtist: t,
+      id,
+    });
   }
 }

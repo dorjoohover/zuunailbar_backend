@@ -17,6 +17,7 @@ import { FileErrorLogService } from 'src/error-log.service';
 import { UserServiceModule } from '../user_service/user_service.module';
 import { IntegrationModule } from '../integrations/integrations.module';
 import { AvailabilitySlotsModule } from '../availability_slots/availability_slots.module';
+import { PaymentModule } from '../payment/payment.module';
 
 @Module({
   imports: [
@@ -26,11 +27,10 @@ import { AvailabilitySlotsModule } from '../availability_slots/availability_slot
     ServiceModule,
     HttpModule,
     UserModule,
-    BookingModule,
     IntegrationModule,
     UserServiceModule,
     AvailabilitySlotsModule,
-    ScheduleModule,
+    forwardRef(() => PaymentModule),
   ],
   controllers: [OrderController],
   providers: [
@@ -41,6 +41,6 @@ import { AvailabilitySlotsModule } from '../availability_slots/availability_slot
     FileErrorLogService,
     AllExceptionsFilter,
   ],
-  exports: [OrderService],
+  exports: [OrderService, QpayService],
 })
 export class OrderModule {}

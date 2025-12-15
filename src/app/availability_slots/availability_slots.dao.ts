@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { AvailabilitySlot } from './availability_slots.entity';
+import { SlotAction } from 'src/base/constants';
 
 const tableName = 'availability_slots';
 
@@ -30,21 +31,32 @@ export class AvailabilitySlotsDao {
       id,
     ]);
   }
-  async updateByArtistSlot(artist: string, date: string, slot: string) {
+  async updateByArtistSlot(
+    artist: string,
+    date: string,
+    slot: string,
+    action: SlotAction,
+  ) {
     const lists = await this.list({
       artist_id: artist,
       date,
     });
 
-    let slots = lists.items?.[0]?.slots as string[]; // text[] → string[]
-    if (!slots) return;
+    let slots = (lists.items?.[0]?.slots ?? []) as string[];
 
-    // slot устгах
-    slots = slots.filter((s) => s !== slot);
+    if (action === 'ADD') {
+      if (!slots.includes(slot)) {
+        slots.push(slot);
+      }
+    }
 
-    return await this._db._update(
+    if (action === 'REMOVE') {
+      slots = slots.filter((s) => s !== slot);
+    }
+
+    return this._db._update(
       `UPDATE "${tableName}" SET slots = $1 WHERE "artist_id"=$2 AND "date"=$3`,
-      [slots, artist, date], // PostgreSQL text[]-д шууд дамжуулж болно
+      [slots, artist, date],
     );
   }
   async deleteByArtist(id: string, dates?: Date[]) {

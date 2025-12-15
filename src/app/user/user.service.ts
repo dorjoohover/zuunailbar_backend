@@ -24,6 +24,7 @@ import { RegisterDto } from 'src/auth/auth.dto';
 import { BranchService } from '../branch/branch.service';
 import { UserServiceService } from '../user_service/user_service.service';
 import { UserSalariesService } from '../user_salaries/user_salaries.service';
+import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
 @Injectable()
 export class UserService {
   constructor(
@@ -31,6 +32,7 @@ export class UserService {
     private readonly userService: UserServiceService,
     private readonly userSalary: UserSalariesService,
     private readonly branchService: BranchService,
+    private slot: AvailabilitySlotsService,
   ) {}
   public async create(
     dto: UserDto,
@@ -73,6 +75,14 @@ export class UserService {
       level: dto.level ?? null,
       mail: dto.mail ?? null,
       percent: dto.percent,
+      firstname: dto.firstname ?? '',
+      device: dto.device ?? null,
+      description: dto.description ?? null,
+      experience: dto.experience ?? null,
+      lastname: dto.lastname ?? '',
+      nickname: dto.nickname ?? '',
+      profile_img: dto.profile_img ?? '',
+      role: dto.role ?? CLIENT,
     });
     if (dto.duration || dto.percent || dto.date) {
       console.log(dto.duration, dto.percent, dto.date);
@@ -201,7 +211,6 @@ export class UserService {
   }
   public async update(id: string, dto: UserDto) {
     try {
-      console.log(dto);
       let body = dto;
       body.id = id;
       if (body.password) {
@@ -212,17 +221,42 @@ export class UserService {
           await this.branchService.findOne(body.branch_id)
         ).name;
       }
-      return await this.dao.update(body, getDefinedKeys(body));
+      const res = await this.dao.update(body, getDefinedKeys(body));
+      this.slot.update({ id: id, isArtist: true });
+      return res;
     } catch (error) {
       console.log(error);
     }
   }
 
+  public async updateBranch(branch: string) {
+    const { items } = await this.findAll(
+      {
+        branch_id: branch,
+        role: E_M,
+      },
+      ADMIN,
+    );
+
+    await Promise.all(
+      items.map(async (item) => {
+        await this.update(item.id, {
+          branch_id: branch,
+        });
+      }),
+    );
+  }
+
   public async updateStatus(id: string) {
-    return await this.dao.updateStatus(id, STATUS.Hidden);
+    const res = await this.dao.updateStatus(id, STATUS.Hidden);
+
+    this.slot.update({ id: id, isArtist: true });
+    return res;
   }
   public async updateUserStatus(id: string, status: UserStatus) {
-    return await this.dao.updateUserStatus(id, status);
+    const res = await this.dao.updateUserStatus(id, status);
+    this.slot.update({ id: id, isArtist: true });
+    return res;
   }
   public async updateLevel(id: string, level: UserLevel) {
     return await this.dao.updateLevel(id, level);

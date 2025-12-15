@@ -3,37 +3,37 @@ import { UserStatus } from 'src/base/constants';
 
 export class UserDto {
   @ApiProperty()
-  firstname: string;
+  firstname?: string;
   @ApiProperty()
-  lastname: string;
+  lastname?: string;
   @ApiProperty()
-  mobile: string;
+  mobile?: string;
   @ApiProperty()
-  birthday: string;
-  mail: string;
+  birthday?: string;
+  mail?: string;
   @ApiProperty()
-  password: string;
-  id: string;
+  password?: string;
+  id?: string;
   @ApiProperty()
-  branch_id: string;
+  branch_id?: string;
   branch_name?: string;
   duration?: number;
   date?: Date;
   percent?: number;
   @ApiProperty()
-  role: number;
+  role?: number;
   @ApiProperty()
-  color: number;
+  color?: number;
   @ApiProperty()
-  experience: number;
+  experience?: number;
   @ApiProperty()
-  nickname: string;
+  nickname?: string;
   @ApiProperty()
-  profile_img: string;
+  profile_img?: string;
   @ApiProperty()
-  description: string;
+  description?: string;
   @ApiProperty()
-  device: string;
+  device?: string;
 
   @ApiProperty()
   user_status?: number;

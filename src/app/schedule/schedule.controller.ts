@@ -74,16 +74,8 @@ export class ScheduleController {
   }
 
   @SAP()
-  @Delete('id/:id')
-  remove(@Param('id') id: string) {
-    return this.scheduleService.remove(id);
-  }
-  @SAP()
   @Delete('index/:user/:index')
-  deleteByIndex(
-    @Param('user') user: string,
-    @Param('index') index: number,
-  ) {
+  deleteByIndex(@Param('user') user: string, @Param('index') index: number) {
     return this.scheduleService.removeByIndex(user, index);
   }
 }

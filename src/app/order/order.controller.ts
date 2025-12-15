@@ -129,11 +129,6 @@ export class OrderController {
   async cancel(@Param('id') id: string) {
     return this.orderService.cancelOrder(id);
   }
-  @Post('available_times')
-  @Public()
-  async availableTimes(@Body() dto: AvailableTimeDto) {
-    return this.orderService.getAvailableTimes(dto);
-  }
 
   @Employee()
   @Patch('/update/:id')

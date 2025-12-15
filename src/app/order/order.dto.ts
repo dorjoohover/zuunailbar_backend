@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderDetailDto } from '../order_detail/order_detail.dto';
 import { IsDateString, IsEnum, IsOptional } from 'class-validator';
+import { PaymentMethod } from 'src/base/constants';
 
 export class OrderDto {
   @ApiProperty()
@@ -32,7 +33,7 @@ export class OrderDto {
   @ApiProperty()
   branch_id?: string;
   services?: string[];
-
+  method: PaymentMethod;
   @ApiProperty({ isArray: true })
   details: OrderDetailDto[];
 }

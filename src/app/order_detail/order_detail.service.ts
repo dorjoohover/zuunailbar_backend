@@ -14,7 +14,7 @@ export class OrderDetailService {
     private user: UserService,
   ) {}
   public async create(dto: OrderDetailDto) {
-    await this.dao.add({
+    return await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
       status: STATUS.Active,

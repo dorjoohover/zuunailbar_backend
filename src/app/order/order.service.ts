@@ -6,20 +6,18 @@ import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
   ADMIN,
   CLIENT,
-  DISCOUNT,
   EMPLOYEE,
   ENDTIME,
-  firstLetterUpper,
   getDefinedKeys,
   MANAGER,
   mnDate,
   OrderStatus,
-  SALARY_LOG_STATUS,
+  PAYMENT_STATUS,
+  PaymentMethod,
   STARTTIME,
   STATUS,
   toTimeString,
   toYMD,
-  ubDateAt00,
   UserLevel,
   usernameFormatter,
   UserStatus,
@@ -27,22 +25,20 @@ import {
 import { AppUtils } from 'src/core/utils/app.utils';
 import { OrderDetailService } from '../order_detail/order_detail.service';
 import { ServiceService } from '../service/service.service';
-import { start } from 'repl';
 import { Order } from './order.entity';
 import { QpayService } from './qpay.service';
 import { ExcelService } from 'src/excel.service';
 import { Response } from 'express';
 import { UserService } from '../user/user.service';
-import { MobileFormat, MobileParser } from 'src/common/formatter';
-import { isSameDay, parse } from 'date-fns';
+import { MobileParser } from 'src/common/formatter';
+import { isSameDay } from 'date-fns';
 import { User } from '../user/user.entity';
 import { BadRequest, OrderError } from 'src/common/error';
 import { OrderDetailDto } from '../order_detail/order_detail.dto';
-import { BookingService } from '../booking/booking.service';
-import { ScheduleService } from '../schedule/schedule.service';
 import { UserServiceService } from '../user_service/user_service.service';
 import { IntegrationService } from '../integrations/integrations.service';
 import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
+import { PaymentService } from '../payment/payment.service';
 
 @Injectable()
 export class OrderService {
@@ -57,12 +53,11 @@ export class OrderService {
     private readonly service: ServiceService,
     private readonly user: UserService,
     private excel: ExcelService,
-    private booking: BookingService,
-    @Inject(forwardRef(() => ScheduleService))
-    private schedule: ScheduleService,
     private qpay: QpayService,
     private userService: UserServiceService,
     private integrationService: IntegrationService,
+    // @Inject(forwardRef(() => PaymentService))
+    private payment: PaymentService,
     private slot: AvailabilitySlotsService,
   ) {}
   public async canPlaceOrder(
@@ -130,99 +125,6 @@ export class OrderService {
       count: res,
     };
   }
-  private async getLastOrderOfArtist(user: string) {
-    const results = await this.dao.getOrdersOfArtist(user);
-    return results[0];
-  }
-  private getTargetDate({
-    dtoDate,
-    artist,
-  }: {
-    dtoDate?: Date;
-    artist?: Order;
-  }) {
-    let artistDateTime: Date | undefined;
-
-    if (artist) {
-      artistDateTime = new Date(artist.order_date);
-      const [hour, minute] = artist.end_time?.split(':').map(Number);
-      artistDateTime.setHours(hour, minute, 0, 0); // цаг, минут, секунд, мс
-    }
-    // dtoDate байхгүй бол өнөөдөр
-
-    let referenceDate = new Date();
-    if (dtoDate) {
-      const minutes = referenceDate.getMinutes();
-      let hour = referenceDate.getHours() + 8;
-      minutes > 0 && hour++;
-      const day = referenceDate.getDate();
-      const date = new Date(dtoDate);
-      referenceDate = date;
-      if (day == date.getDate()) {
-        referenceDate.setHours(hour, 0, 0);
-      }
-    } else {
-      referenceDate.setHours(0, 0, 0);
-    }
-    if (artistDateTime) {
-      return artistDateTime >= referenceDate
-        ? {
-            date: artistDateTime,
-            time: artist.end_time?.split(':').map(Number)[0],
-          }
-        : {
-            date: referenceDate,
-          };
-    }
-
-    return {
-      date: referenceDate,
-    };
-  }
-  public async getAvailableTimes(dto: AvailableTimeDto) {
-    const firstArtist = Object.values(dto.serviceArtist).find(
-      (artist): artist is string => !!artist,
-    );
-    const parallel = Object.values.length > 0;
-
-    let availableTimes: number[] = [];
-    let targetDate: Date | undefined;
-    if (firstArtist) {
-      // 2. Эхний artist-ийн сүүлчийн захиалгыг авах
-      const artistOrder = await this.getLastOrderOfArtist(firstArtist);
-      // 3. TargetDate-ийг тодорхойлох
-
-      const target = this.getTargetDate({
-        artist: artistOrder,
-        dtoDate: dto.date,
-      });
-      targetDate = target.date;
-
-      // 4. Эхний artist-ийн боломжит цагийг авах
-      // const artistSchedule = await this.schedule.getAvailableTime(
-      //   firstArtist,
-      //   targetDate,
-      // );
-      // 5. Branch-ийн боломжит цагийг авах
-      // const branchBooking = await this.booking.getAvailableTime(
-      //   dto.branch_id,
-      //   targetDate,
-      // );
-
-      // 6. Давхцсан цагийг гаргах (intersection)
-      // availableTimes = (artistSchedule?.times || []).filter((t) =>
-      //   branchBooking?.times?.includes(t),
-      // );
-      if (target.time) {
-        availableTimes = availableTimes?.filter((a) => a >= target.time);
-      }
-    }
-    return {
-      date: targetDate,
-      times: availableTimes,
-      limit: this.orderLimit,
-    };
-  }
 
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
@@ -245,6 +147,9 @@ export class OrderService {
           duration += d;
         }
       }
+      if (user.role == ADMIN && dto.pre_amount) {
+        pre = +dto.pre_amount;
+      }
       const durationHours = Math.ceil(duration / 60);
 
       const startHour = +dto.start_time.toString().slice(0, 2);
@@ -265,9 +170,12 @@ export class OrderService {
         discount: dto.discount ?? null,
         total_amount: dto.total_amount ?? null,
         paid_amount: dto.paid_amount ?? null,
-        pre_amount: pre ?? 0,
+        pre_amount: dto.pre_amount ?? pre ?? 0,
         is_pre_amount_paid: pre == 0,
-        order_status: dto.order_status ?? OrderStatus.Pending,
+        order_status:
+          user.role == ADMIN
+            ? OrderStatus.Active
+            : (dto.order_status ?? OrderStatus.Pending),
         status: STATUS.Active,
         branch_id: dto.branch_id,
       } as const;
@@ -283,14 +191,14 @@ export class OrderService {
 
       const order = await this.dao.add(payload);
       let startDate = startHour;
-
+      let details = {};
       for (const d of dto.details ?? []) {
         const service = await this.service.findOne(d.service_id);
         const artist = await this.user.findOne(d.user_id);
 
         const duration = Math.ceil(+service.duration / 60);
         const endDate = startDate + duration;
-        await this.orderDetail.create({
+        const detail = await this.orderDetail.create({
           id: AppUtils.uuid4(),
           start_time: toTimeString(startDate),
           end_time: toTimeString(endDate),
@@ -303,28 +211,43 @@ export class OrderService {
           description: d.description,
           user_id: artist.id ?? d.user_id,
         });
+        details[service.id] = detail;
 
         if (dto.parallel !== true) startDate = endDate;
       }
 
       await Promise.all(
         dto.details.map(async (detail) => {
-          await this.slot.removeByArtistAndSlot(
+          await this.slot.updateByArtistAndSlot(
             detail.user_id,
             orderDate,
             `${startHour}`,
+            'REMOVE',
           );
         }),
       );
-      if (pre > 0) {
+      if (dto.method != PaymentMethod.P2P && +(dto.pre_amount ?? '0') > 0) {
         const invoice = await this.qpay.createInvoice(
           pre,
           order.id,
           user.id,
           dto.branch_name,
         );
-        console.log(new Date(), 'invoice');
-
+        console.log(new Date(), 'invoice', invoice);
+        await this.payment.create(
+          {
+            amount: pre,
+            is_pre_amount: true,
+            created_by: user.id,
+            invoice_id: invoice.invoice_id,
+            qr_image: invoice.qr_image,
+            qr_text: invoice.qr_text,
+            status: PAYMENT_STATUS.Pending,
+            method: PaymentMethod.P2P,
+            order_id: order,
+          },
+          merchant,
+        );
         return {
           id: order,
           invoice: {
@@ -336,6 +259,16 @@ export class OrderService {
         };
       } else {
         console.log('first', new Date());
+        // if(payload.paid_amount) {
+
+        //   await this.payment.create({
+        //     amount: payload.paid_amount,
+        //     created_by: user.id,
+        //     is_pre_amount: false,
+        //     method: dto.method,
+        //     status: dto.order_status
+        //   }, merchant)
+        // }
         await this.updatePrePaid(order, true);
         await this.dao.updateOrderStatus(order, OrderStatus.Active);
         console.log('second', new Date());
@@ -540,56 +473,82 @@ export class OrderService {
       dateKeys: ['order'],
     });
   }
-  public async findByUserDateTime(
-    user_id: string,
-    date: string,
-    times: number[],
-  ) {
-    const takenHours = await this.dao.checkTimes({
-      user_id,
-      start_date: date,
-      times,
-    });
-    if (takenHours.length === 0) {
-      // авсан зүйл алга → бүх хүссэн цаг боломжтой
-      return times.sort((a, b) => a - b);
-    }
-
-    // 4) times - takenHours  (авсан цагийг ХАСНА)
-    const takenLookup: Record<number, 1> = {};
-    for (let i = 0; i < takenHours.length; i++) takenLookup[takenHours[i]] = 1;
-
-    const remaining = times
-      ?.filter((h) => !takenLookup[h])
-      .sort((a, b) => a - b);
-    return remaining;
-  }
 
   public async update(id: string, dto: OrderDto) {
-    const { details, branch_id, order_date, ...payload } = dto;
-    await this.dao.update({ ...payload, id }, getDefinedKeys(payload));
+    const { details, order_date, ...payload } = dto;
 
-    const existingDetails = await this.orderDetail.findByOrder(id);
-    const existingIds = existingDetails.map((d) => d.id);
-    const newIds = details.map((d) => d.id)?.filter(Boolean);
+    try {
+      // 1️⃣ Order update
+      await this.dao.update({ id, ...payload }, getDefinedKeys(payload));
 
-    const toDelete = existingDetails?.filter((d) => !newIds.includes(d.id));
+      // 2️⃣ Existing details map (O(1) lookup)
+      const existingDetails = await this.orderDetail.findByOrder(id);
+      const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
 
-    await Promise.all(
-      details.map(async (d) => {
-        if (d.id && existingIds.includes(d.id)) {
-          await this.orderDetail.update(d.id, { ...d });
-        } else {
+      const incomingIds = details.map((d) => d.id).filter(Boolean);
+
+      // 3️⃣ Handle create / update
+      await Promise.all(
+        details.map(async (d) => {
+          const prev = d.id ? existingMap.get(d.id) : null;
+
+          // ✏️ UPDATE
+          if (prev) {
+            // slot change
+            if (prev.start_time !== d.start_time) {
+              await this.slot.updateByArtistAndSlot(
+                d.user_id,
+                order_date.toString(),
+                prev.start_time,
+                'ADD',
+              );
+              await this.slot.updateByArtistAndSlot(
+                d.user_id,
+                order_date.toString(),
+                d.start_time,
+                'REMOVE',
+              );
+            }
+
+            await this.orderDetail.update(d.id, d);
+            return;
+          }
+
+          // ➕ CREATE
           await this.orderDetail.create({
             ...d,
             order_id: id,
           });
-        }
-      }),
-    );
 
-    if (toDelete.length > 0) {
-      await Promise.all(toDelete.map((d) => this.orderDetail.remove(d.id)));
+          await this.slot.updateByArtistAndSlot(
+            d.user_id,
+            order_date.toString(),
+            d.start_time,
+            'REMOVE',
+          );
+        }),
+      );
+
+      // 4️⃣ Handle delete
+      const toDelete = existingDetails.filter(
+        (d) => !incomingIds.includes(d.id),
+      );
+
+      await Promise.all(
+        toDelete.map(async (d) => {
+          await this.orderDetail.remove(d.id);
+
+          await this.slot.updateByArtistAndSlot(
+            d.user_id,
+            order_date.toString(),
+            d.start_time,
+            'ADD',
+          );
+        }),
+      );
+    } catch (error) {
+      console.error('Order update failed:', error);
+      // throw error;
     }
   }
   public async updateStatus(id: string, status: OrderStatus) {
@@ -759,85 +718,6 @@ export class OrderService {
     await this.dao.updateStatus(id, STATUS.Hidden);
   }
 
-  // public async excelAdd() {
-  //   const res = await this.excel.readExcel('client');
-  //   const artist = await this.user.findOne('2c25b08bc5fc4f86a22bf947c9db5f54');
-  //   const merchant = '3f86c0b23a5a4ef89a745269e7849640';
-  //   const creater = await this.user.findOne('05e0434bbf4c4dd587a11c3709c889c3');
-  //   await Promise.all(
-  //     res.map(async (r) => {
-  //       const mobile = String(r[1]).trim();
-  //       let user;
-  //       try {
-  //         user = await this.user.findMobile(mobile);
-  //       } catch (error) {
-  //         user = await this.user.register(
-  //           { mobile, password: 'string' },
-  //           merchant,
-  //         );
-  //       }
-  //       console.log(user.id);
-  //       const service = String(r[4])?.split(';');
-  //       const description = String(r[3]);
-  //       const date = parse(
-  //         r[5]?.replace(/\s+/g, ' '),
-  //         'MMM d yyyy h:mma',
-  //         new Date(),
-  //       );
-  //       const hour = date.getHours();
-
-  //       const services = await Promise.all(
-  //         service.map(async (s) => {
-  //           let ser;
-  //           try {
-  //             ser = (await this.service.findByName(s)).id;
-  //           } catch (error) {
-  //             ser = await this.service.create(
-  //               {
-  //                 branch_id: artist.branch_id,
-  //                 description: null,
-  //                 duration: 30,
-  //                 min_price: 10000,
-  //                 max_price: 10000,
-  //                 name: s,
-  //                 icon: null,
-  //                 image: null,
-  //                 pre: 10000,
-  //                 para: false,
-  //                 view: null,
-  //               },
-  //               merchant,
-  //               creater,
-  //             );
-  //           }
-  //           return {
-  //             service_id: ser,
-  //           };
-  //         }),
-  //       );
-  //       const res = await this.create(
-  //         {
-  //           order_date: date,
-  //           details: services as any,
-  //           branch_name: artist.branch_name,
-  //           description: null,
-  //           discount: null,
-  //           discount_type: null,
-  //           order_status: OrderStatus.Finished,
-  //           paid_amount: 0,
-  //           start_time: hour,
-  //           total_amount: 0,
-  //           user_id: user.id,
-  //         },
-  //         user.id,
-  //         merchant,
-  //       );
-  //       console.log(res);
-
-  //       // console.log(mobile, mnDate(date), hour);
-  //     }),
-  //   );
-  // }
   public async checkCallback(user: string, id: string, order_id: string) {
     const res = await this.qpay.getInvoice(id);
 

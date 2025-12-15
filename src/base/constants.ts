@@ -175,6 +175,27 @@ export enum PRODUCT_STATUS {
   Active = 10,
   Hidden = 20,
 }
+export enum PAYMENT_STATUS {
+  // uridchilgaa toloogui
+  Pending = 10,
+  // uridchilgaa tolson
+  Active = 20,
+
+  // duussan
+  Finished = 40,
+  // tsutsalsan
+  Cancelled = 50,
+  // tsutsalsan
+  Absent = 60,
+  Friend = 70,
+}
+
+export enum PaymentMethod {
+  P2P = 1,
+  CASH = 2,
+  BANK = 3,
+  CARD = 4,
+}
 export enum SALARY_LOG_STATUS {
   Pending = 10,
   Paid = 20,
@@ -200,6 +221,8 @@ export enum SERVICE_VIEW {
   DEFAULT = 0,
   FEATURED = 20,
 }
+
+export type SlotAction = "ADD" | "REMOVE";
 export enum EmployeeStatus {
   ACTIVE = 10,
   DEKIRIT = 20,
@@ -239,3 +262,58 @@ export interface ParallelOrderSlot {
     };
   };
 }
+
+// ://q?qPay_QRcode=
+export const QpayLinks = [
+  {
+    name: 'Khan bank',
+    description: 'Хаан банк',
+    link: 'khanbank',
+  },
+  {
+    name: 'State bank',
+    description: 'Төрийн банк',
+
+    link: 'statebank',
+  },
+  {
+    name: 'Xac bank',
+    description: 'Хас банк',
+    link: 'xacbank',
+  },
+  {
+    name: 'Trade and Development bank',
+    description: 'TDB online',
+    link: 'tdbbank',
+  },
+  {
+    name: 'Most money',
+    description: 'МОСТ мони',
+    link: 'most',
+  },
+  {
+    name: 'National investment bank',
+    description: 'Үндэсний хөрөнгө оруулалтын банк',
+    link: 'nibank',
+  },
+  {
+    name: 'Chinggis khaan bank',
+    description: 'Чингис Хаан банк',
+    link: 'ckbank',
+  },
+  {
+    name: 'Capitron bank',
+    description: 'Капитрон банк',
+    link: 'capitronbank',
+  },
+  {
+    name: 'Bogd bank',
+    description: 'Богд банк',
+    link: 'bogdbank',
+  },
+  {
+    name: 'Candy pay',
+    description: 'Мон Пэй',
+    link: 'candybank',
+  },
+];

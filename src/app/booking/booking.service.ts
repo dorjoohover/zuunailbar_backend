@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { BookingDao } from './booking.dao';
 import { BookingDto, BookingListType } from './booking.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
@@ -10,10 +10,15 @@ import {
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { BadRequest } from 'src/common/error';
+import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
 
 @Injectable()
 export class BookingService {
-  constructor(private readonly dao: BookingDao) {}
+  constructor(
+    private readonly dao: BookingDao,
+    @Inject(forwardRef(() => AvailabilitySlotsService))
+    private slot: AvailabilitySlotsService,
+  ) {}
   public async create(dto: BookingDto, merchant: string, user: string) {
     if (!dto.times || dto.times.length == 0)
       throw new BadRequest().notFound('Цаг');
@@ -33,6 +38,7 @@ export class BookingService {
       end_time: toTimeString(end),
       merchant_id: merchant,
     });
+    this.slot.update({ id: dto.branch_id, isArtist: false });
   }
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
@@ -64,20 +70,14 @@ export class BookingService {
       end_time = toTimeString(end);
     }
 
-    return await this.dao.update(
+    const res = await this.dao.update(
       { ...dto, start_time, end_time, times, id },
       getDefinedKeys({ ...dto, start_time, end_time, times }, true),
     );
+    if (dto.branch_id) this.slot.update({ id: dto.branch_id, isArtist: false });
+    return res;
   }
 
-  public async remove(branch_id: string) {
-    const bookings = await this.findByBranchId(branch_id);
-    await Promise.all(
-      bookings.items.map(async (booking) => {
-        await this.dao.deleteBooking(booking.id);
-      }),
-    );
-  }
   public async removeByIndex(branch_id: string, index: number) {
     const bookings = await this.dao.list({
       index,
@@ -88,5 +88,6 @@ export class BookingService {
         await this.dao.deleteBooking(booking.id);
       }),
     );
+    this.slot.update({ id: branch_id, isArtist: false });
   }
 }

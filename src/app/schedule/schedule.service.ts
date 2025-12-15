@@ -13,6 +13,7 @@ import { OrderService } from '../order/order.service';
 import { BadRequest } from 'src/common/error';
 import { UserService } from '../user/user.service';
 import { ScheduleListType } from './schedule.entity';
+import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
 
 @Injectable()
 export class ScheduleService {
@@ -20,6 +21,8 @@ export class ScheduleService {
     private readonly dao: ScheduleDao,
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
+    @Inject(forwardRef(() => AvailabilitySlotsService))
+    private slot: AvailabilitySlotsService,
   ) {}
   public async create(dto: ScheduleDto, u: string) {
     if (!dto.times || dto.times.length == 0)
@@ -49,6 +52,7 @@ export class ScheduleService {
       branch_id: artist.branch_id,
       meta,
     });
+    this.slot.update({ id: dto.user_id, isArtist: true });
   }
 
   public async findAll(pg: PaginationDto, role: number) {
@@ -80,15 +84,14 @@ export class ScheduleService {
       end_time = toTimeString(end);
     }
 
-    return await this.dao.update(
+    const res = await this.dao.update(
       { ...dto, start_time, end_time, times, id },
       getDefinedKeys({ ...dto, start_time, end_time }, true),
     );
+    this.slot.update({ id: dto.user_id, isArtist: true });
+    return res;
   }
 
-  public async remove(id: string) {
-    return await this.dao.updateStatus(id, ScheduleStatus.Hidden);
-  }
   public async removeByIndex(user_id: string, index: number) {
     const schedules = await this.dao.list({
       index,
@@ -99,5 +102,6 @@ export class ScheduleService {
         await this.dao.deleteSchedule(schedule.id);
       }),
     );
+    this.slot.update({ id: user_id, isArtist: true });
   }
 }
