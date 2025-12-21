@@ -94,7 +94,10 @@ export class OrderService {
       this.orderError.dateOrTimeNotSelected;
 
     if (details.length <= 0) this.orderError.serviceNotSelected;
-    const start_time = +dto.start_time;
+    let prev_start_time = dto.start_time;
+    if (prev_start_time.length > 2)
+      prev_start_time = prev_start_time.slice(0, 2);
+    const start_time = +prev_start_time;
     if (start_time < STARTTIME || start_time > ENDTIME)
       this.orderError.invalidHour;
     const date = new Date();
@@ -104,11 +107,14 @@ export class OrderService {
       isSameDay(date, dto.order_date)
     )
       this.orderError.cannotChooseHour;
-    console.log(dto, details.map((d) => d.user_id));
+    console.log(
+      dto,
+      details.map((d) => d.user_id),
+    );
     const slots = await this.slot.findAll({
       branch_id: dto.branch_id,
       date: dto.order_date,
-      slots: [+dto.start_time],
+      slots: [+dto.start_time?.slice(0, 2)],
       artists: details.map((d) => d.user_id),
     });
     console.log(slots);
