@@ -719,7 +719,7 @@ export class OrderService {
         await this.slot.updateByArtistAndSlot(
           detail.user_id,
           order.order_date,
-          order.start_time,
+          order.start_time.slice(0, 2),
           'ADD',
         );
         await this.orderDetail.remove(detail.id);
