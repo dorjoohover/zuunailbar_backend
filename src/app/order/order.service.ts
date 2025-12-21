@@ -104,7 +104,7 @@ export class OrderService {
       isSameDay(date, dto.order_date)
     )
       this.orderError.cannotChooseHour;
-
+    console.log(dto);
     const slots = await this.slot.findAll({
       branch_id: dto.branch_id,
       date: dto.order_date,

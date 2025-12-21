@@ -131,6 +131,7 @@ export class UserServiceService {
         branch_id,
         service_id: service,
       });
+      console.log(items);
 
       mapping[service] = items.map((i) => i.user_id);
     }
