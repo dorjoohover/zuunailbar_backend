@@ -107,17 +107,13 @@ export class OrderService {
       isSameDay(date, dto.order_date)
     )
       this.orderError.cannotChooseHour;
-    console.log(
-      dto,
-      details.map((d) => d.user_id),
-    );
+
     const slots = await this.slot.findAll({
       branch_id: dto.branch_id,
       date: dto.order_date,
       slots: [+dto.start_time?.slice(0, 2)],
       artists: details.map((d) => d.user_id),
     });
-    console.log(slots);
     if (slots.items.length == 0 && dto.order_status != OrderStatus.Friend)
       this.orderError.artistTimeUnavailable;
   }
@@ -232,7 +228,7 @@ export class OrderService {
           );
         }),
       );
-      if (dto.method != PaymentMethod.P2P && +(dto.pre_amount ?? '0') > 0) {
+      if (dto.method == PaymentMethod.P2P && +(dto.pre_amount ?? '0') > 0) {
         const invoice = await this.qpay.createInvoice(
           pre,
           order.id,
