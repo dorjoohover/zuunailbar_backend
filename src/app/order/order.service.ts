@@ -228,8 +228,10 @@ export class OrderService {
           );
         }),
       );
-      console.log(dto.method, dto.pre_amount, pre);
-      if (dto.method == PaymentMethod.P2P && +(dto.pre_amount ?? '0') > 0) {
+      if (
+        dto.method == PaymentMethod.P2P &&
+        +(dto.pre_amount ?? pre ?? '0') > 0
+      ) {
         const invoice = await this.qpay.createInvoice(
           pre,
           order.id,
