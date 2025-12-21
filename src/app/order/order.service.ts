@@ -712,8 +712,15 @@ export class OrderService {
 
   public async remove(id: string) {
     const details = await this.orderDetail.findByOrder(id);
+    const order = await this.dao.getById(id);
     await Promise.all(
       details.map(async (detail) => {
+        await this.slot.updateByArtistAndSlot(
+          detail.user_id,
+          order.order_date,
+          order.start_time,
+          'ADD',
+        );
         await this.orderDetail.remove(detail.id);
       }),
     );
