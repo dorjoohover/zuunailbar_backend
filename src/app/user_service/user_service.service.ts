@@ -138,12 +138,18 @@ export class UserServiceService {
 
     return mapping; // { service1: [artist1, artist5], service2: [artist2], ... }
   }
-  private async getArtistsSlots(artistIds: string[], parallel: boolean) {
+  private async getArtistsSlots(
+    artistIds: string[],
+    date: string,
+    slot: number,
+  ) {
     const result: Record<string, AvailabilitySlot[]> = {};
     for (const id of artistIds) {
       const slots = await this.slots.findAll({
         artist_id: id,
-        start_date: toYMD(new Date()),
+        date: date,
+        slots: [slot],
+        // start_date: toYMD(new Date()),
       });
       result[id] = slots.items;
     }
@@ -246,15 +252,16 @@ export class UserServiceService {
     branch_id: string,
     services: string[],
     parallel: boolean,
+    date: string,
+    slot: number,
   ) {
     // 1. Service бүрт хэн ажиллаж чадах вэ?
     const mapping = await this.getServiceArtists(branch_id, services);
     // Artist ID–уудыг бүхэлд нь цуглуулах
     const artistIds = Array.from(new Set(Object.values(mapping).flat()));
     // 2. Artist slots татах
-    const slots = await this.getArtistsSlots(artistIds, parallel);
+    const slots = await this.getArtistsSlots(artistIds, date, slot);
     // 3. Parallel эсэхээс хамаарч тооцоолно
-    console.log(slots, mapping);
     let res = parallel
       ? this.getParallelAvailable(slots, mapping)
       : this.getSequentialAvailable(mapping, slots);

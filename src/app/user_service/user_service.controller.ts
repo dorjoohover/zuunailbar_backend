@@ -45,6 +45,8 @@ export class UserServiceController {
       pg.services,
       // false,
       pg.parallel ?? false,
+      pg.date,
+      pg.start_time,
     );
   }
 
