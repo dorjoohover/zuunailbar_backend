@@ -227,8 +227,8 @@ export class AvailabilitySlotsService {
       await Promise.all(
         artists.map(async (artist) => {
           if (
-            artist.user_status !== EmployeeStatus.ACTIVE ||
-            artist.status !== STATUS.Active
+            artist.user_status != EmployeeStatus.ACTIVE ||
+            artist.status != STATUS.Active
           ) {
             await this.removeByArtist(artist.id);
             return;
