@@ -305,18 +305,22 @@ export class OrderService {
   }
 
   public async cancelOrder(id: string) {
-    const orders = await this.dao.getOrderWithDetail(id);
-    await Promise.all(
-      orders.map(async (order) => {
-        await this.slot.createByArtist(
-          order.user_id,
-          [order.order_date],
-          order.start_time.slice(0, 2),
-        );
-      }),
-    );
-    await this.dao.updateOrderStatus(id, OrderStatus.Cancelled);
-    return true;
+    try {
+      const orders = await this.dao.getOrderWithDetail(id);
+      await Promise.all(
+        orders.map(async (order) => {
+          await this.slot.createByArtist(
+            order.user_id,
+            [order.order_date],
+            order.start_time.slice(0, 2),
+          );
+        }),
+      );
+      await this.dao.updateOrderStatus(id, OrderStatus.Cancelled);
+      return true;
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   public async findByClient(pg: PaginationDto) {
