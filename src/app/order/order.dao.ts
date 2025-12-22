@@ -126,7 +126,7 @@ export class OrdersDao {
   }
   async getOrderWithDetail(id: string) {
     const sql = `
-    SELECT order_date, od.user_id as user_id
+    SELECT order_date, start_time , od.user_id as user_id
     FROM ${tableName} o
     inner join order_details od on od.order_id = o.id
     WHERE o.id = $1
