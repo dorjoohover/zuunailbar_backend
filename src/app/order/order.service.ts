@@ -114,12 +114,7 @@ export class OrderService {
       slots: [+dto.start_time?.slice(0, 2)],
       artists: uniqueUserIds,
     });
-    console.log(slots, {
-      branch_id: dto.branch_id,
-      date: dto.order_date,
-      slots: [+dto.start_time?.slice(0, 2)],
-      artists: uniqueUserIds,
-    });
+
     if (slots.items.length == 0 && dto.order_status != OrderStatus.Friend)
       this.orderError.artistTimeUnavailable;
   }

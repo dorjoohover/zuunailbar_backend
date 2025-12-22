@@ -167,20 +167,23 @@ export class UserServiceService {
 
       for (const artistId of artistIds) {
         const artistSchedules = schedules[artistId] || [];
-        result[serviceId][artistId] = { artists: [], slots: {} };
+
+        if (artistSchedules.length === 0) continue; // slots хоосон бол skip
 
         // Бүх slots-ыг нэг array-д merge
         const allSlots = artistSchedules.flatMap((s) => s.slots.map(String));
 
-        // Давхардалгүй хадгалах
-        result[serviceId][artistId].slots['all'] = Array.from(
-          new Set(allSlots),
-        ).sort();
+        if (allSlots.length === 0) continue; // slots хоосон бол skip
 
-        // artists array-д service-д багтсан бусад artist-уудыг нэмнэ
-        result[serviceId][artistId].artists = artistIds.filter(
-          (id) => id !== artistId,
-        );
+        result[serviceId][artistId] = {
+          artists: artistIds.filter((id) => id !== artistId),
+          slots: { all: Array.from(new Set(allSlots)).sort() },
+        };
+      }
+
+      // Хэрэв service-д нэг ч artist байхгүй бол устгах
+      if (Object.keys(result[serviceId]).length === 0) {
+        delete result[serviceId];
       }
     }
 
@@ -195,15 +198,24 @@ export class UserServiceService {
     const result: OrderSlot = {};
 
     firstServiceArtists.forEach((artistId) => {
-      result[artistId] = { slots: {} };
+      const artistSlots = slots[artistId] || [];
+      if (artistSlots.length === 0) return; // slots хоосон бол skip
 
-      (slots[artistId] || []).forEach((slot) => {
+      const slotObj: Record<string, string[]> = {};
+
+      artistSlots.forEach((slot) => {
         const dateKey = toYMD(slot.date);
-        if (!result[artistId].slots[dateKey]) {
-          result[artistId].slots[dateKey] = [];
-        }
-        result[artistId].slots[dateKey].push(...slot.slots);
+        if (!slotObj[dateKey]) slotObj[dateKey] = [];
+        slotObj[dateKey].push(...slot.slots);
       });
+
+      // slots хоосон бол skip
+      const nonEmptyDates = Object.fromEntries(
+        Object.entries(slotObj).filter(([_, s]) => s.length > 0),
+      );
+      if (Object.keys(nonEmptyDates).length > 0) {
+        result[artistId] = { slots: nonEmptyDates };
+      }
     });
 
     return result;
