@@ -309,6 +309,7 @@ export class OrderService {
       const orders = await this.dao.getOrderWithDetail(id);
       await Promise.all(
         orders.map(async (order) => {
+          console.log(order);
           await this.slot.createByArtist(
             order.user_id,
             [order.order_date],
