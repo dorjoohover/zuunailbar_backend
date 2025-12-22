@@ -119,7 +119,11 @@ export class AvailabilitySlotsService {
     return finalValue;
   }
 
-  public async createByArtist(artist: string, dates: Date[], orderslot?: number) {
+  public async createByArtist(
+    artist: string,
+    dates: Date[],
+    orderslot?: number,
+  ) {
     console.log('slot create by artist ', artist, dates);
     const branch = await this.user.findOne(artist);
     const res = await this.getDates(branch.branch_id, dates, artist);
@@ -140,8 +144,13 @@ export class AvailabilitySlotsService {
         } as any;
         if (slot.items.length > 0) {
           payload.id = slot.items[0].id;
-          if (orderslot) payload.slots.push(orderslot);
-          console.log(payload)
+          if (
+            orderslot &&
+            payload.slots.filter((s) => s == orderslot).length == 0 &&
+            dates.some((d) => isSameDay(date, d))
+          )
+            payload.slots.push(orderslot);
+          console.log(payload);
           return await this.dao.update(payload, getDefinedKeys(payload));
         }
         return await this.dao.add(payload);
