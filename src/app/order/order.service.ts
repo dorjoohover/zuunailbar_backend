@@ -154,7 +154,7 @@ export class OrderService {
       }
       const durationHours = Math.ceil(duration / 60);
 
-      const startHour = +dto.start_time.toString().slice(0, 2);
+      const startHour = +dto.start_time;
 
       const endHourRaw = +startHour + durationHours;
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
