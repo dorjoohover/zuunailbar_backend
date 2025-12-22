@@ -223,7 +223,7 @@ export class AvailabilitySlotsService {
         artists = result.items;
         dates = await this.getDates(branchId, []);
       }
-
+      console.log(dates, branchId, artists);
       await Promise.all(
         artists.map(async (artist) => {
           if (
