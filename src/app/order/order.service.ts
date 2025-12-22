@@ -114,6 +114,12 @@ export class OrderService {
       slots: [+dto.start_time?.slice(0, 2)],
       artists: details.map((d) => d.user_id),
     });
+    console.log(slots, {
+      branch_id: dto.branch_id,
+      date: dto.order_date,
+      slots: [+dto.start_time?.slice(0, 2)],
+      artists: details.map((d) => d.user_id),
+    });
     if (slots.items.length == 0 && dto.order_status != OrderStatus.Friend)
       this.orderError.artistTimeUnavailable;
   }
@@ -130,7 +136,7 @@ export class OrderService {
 
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
-      console.log(new Date(), 'start', dto);
+      console.log(new Date(), 'start');
       const parallel = dto.parallel;
 
       // artists.length == 0 || artists?.[0] == '0' && artists =
@@ -154,7 +160,7 @@ export class OrderService {
       }
       const durationHours = Math.ceil(duration / 60);
 
-      const startHour = +dto.start_time;
+      const startHour = +dto.start_time.toString().slice(0, 2);
 
       const endHourRaw = +startHour + durationHours;
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
