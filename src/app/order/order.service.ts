@@ -317,7 +317,7 @@ export class OrderService {
           );
         }),
       );
-      await this.dao.updateOrderStatus(id, OrderStatus.Cancelled);
+      // await this.dao.updateOrderStatus(id, OrderStatus.Cancelled);
       return true;
     } catch (error) {
       console.log(error);
