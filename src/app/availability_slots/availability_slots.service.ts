@@ -197,6 +197,7 @@ export class AvailabilitySlotsService {
     return await this.dao.getCommonDates(artists);
   }
   public async update({ id, isArtist }: { id?: string; isArtist?: boolean }) {
+    console.log('slot update', id, isArtist);
     if (typeof isArtist !== 'boolean' || !id) return;
 
     let branchId: string;
