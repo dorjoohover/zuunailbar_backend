@@ -165,71 +165,22 @@ export class UserServiceService {
     for (const [serviceId, artistIds] of Object.entries(mapping)) {
       result[serviceId] = {};
 
-      // service-д харьяалагдах artist-уудын schedule-г filter
-      const serviceSchedules: Record<string, AvailabilitySlot[]> = {};
       for (const artistId of artistIds) {
-        if (schedules[artistId])
-          serviceSchedules[artistId] = schedules[artistId];
-      }
-
-      for (const artistId of artistIds) {
-        const artistSchedules = serviceSchedules[artistId] || [];
+        const artistSchedules = schedules[artistId] || [];
         result[serviceId][artistId] = { artists: [], slots: {} };
 
-        for (const schedule of artistSchedules) {
-          const dateStr = toYMD(schedule.date);
+        // Бүх slots-ыг нэг array-д merge
+        const allSlots = artistSchedules.flatMap((s) => s.slots.map(String));
 
-          // slots-г string болгож normalize
-          const currentSlots = schedule.slots.map(String);
+        // Давхардалгүй хадгалах
+        result[serviceId][artistId].slots['all'] = Array.from(
+          new Set(allSlots),
+        ).sort();
 
-          let commonSlots: string[] | null = [...currentSlots];
-
-          const matchedArtists: string[] = [];
-
-          for (const otherArtistId of artistIds) {
-            if (otherArtistId === artistId) continue;
-
-            const otherSchedules = serviceSchedules[otherArtistId] || [];
-            const otherDaySlots = otherSchedules.find(
-              (s) => toYMD(s.date) === dateStr,
-            )?.slots;
-
-            if (!otherDaySlots) {
-              // overlap байхгүй бол тухайн artist-тай нэг өдөрт slot байхгүй
-              commonSlots = null;
-              break;
-            }
-
-            const normalizedOther = otherDaySlots.map(String);
-
-            // common slot-уудыг filter
-            commonSlots = commonSlots.filter((slot) =>
-              normalizedOther.includes(slot),
-            );
-
-            if (commonSlots.length === 0) {
-              commonSlots = null;
-              break;
-            }
-
-            // overlap байгаа artist-ийг нэмнэ
-            matchedArtists.push(otherArtistId);
-          }
-
-          if (commonSlots && commonSlots.length > 0) {
-            // artists array-д зөвхөн overlap хийсэн artist-уудыг нэмнэ
-            result[serviceId][artistId].artists = Array.from(
-              new Set(matchedArtists),
-            );
-
-            // slots-д өдөр тус бүрээр нэмнэ (давхардалгүй)
-            result[serviceId][artistId].slots[dateStr] ??= [];
-            const slotSet = new Set(result[serviceId][artistId].slots[dateStr]);
-            commonSlots.forEach((s) => slotSet.add(s));
-            result[serviceId][artistId].slots[dateStr] =
-              Array.from(slotSet).sort();
-          }
-        }
+        // artists array-д service-д багтсан бусад artist-уудыг нэмнэ
+        result[serviceId][artistId].artists = artistIds.filter(
+          (id) => id !== artistId,
+        );
       }
     }
 
