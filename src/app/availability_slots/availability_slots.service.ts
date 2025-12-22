@@ -141,6 +141,7 @@ export class AvailabilitySlotsService {
         if (slot.items.length > 0) {
           payload.id = slot.items[0].id;
           if (orderslot) payload.slots.push(orderslot);
+          console.log(payload)
           return await this.dao.update(payload, getDefinedKeys(payload));
         }
         return await this.dao.add(payload);
