@@ -310,7 +310,7 @@ export class OrderService {
       await Promise.all(
         orders.map(async (order) => {
           console.log(order);
-          await this.slot.createByArtist(
+          await this.slot.createByArtistWithSlot(
             order.user_id,
             [order.order_date],
             order.start_time.slice(0, 2),

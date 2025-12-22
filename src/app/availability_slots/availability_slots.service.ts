@@ -119,11 +119,7 @@ export class AvailabilitySlotsService {
     return finalValue;
   }
 
-  public async createByArtist(
-    artist: string,
-    dates: Date[],
-    orderslot?: number,
-  ) {
+  public async createByArtist(artist: string, dates: Date[]) {
     console.log('slot create by artist ', artist, dates);
     const branch = await this.user.findOne(artist);
     const res = await this.getDates(branch.branch_id, dates, artist);
@@ -144,16 +140,49 @@ export class AvailabilitySlotsService {
         } as any;
         if (slot.items.length > 0) {
           payload.id = slot.items[0].id;
-          if (
-            orderslot &&
-            payload.slots.filter((s) => s == orderslot).length == 0 &&
-            dates.some((d) => isSameDay(date, d))
-          )
-            payload.slots.push(orderslot);
-          console.log(payload);
+
           return await this.dao.update(payload, getDefinedKeys(payload));
         }
         return await this.dao.add(payload);
+      }),
+    );
+  }
+
+  public async createByArtistWithSlot(
+    artist: string,
+    dates: Date[],
+    orderSlot: number,
+  ) {
+    console.log('slot create with slot by artist ', artist, dates);
+    return await Promise.all(
+      dates.map(async (date) => {
+        const slot = await this.dao.list({
+          artist_id: artist,
+          date: date,
+        });
+        await Promise.all(
+          slot.items.map(async (item) => {
+            let payload = {
+              id: AppUtils.uuid4(),
+              artist_id: artist,
+              branch_id: item.branch_id,
+              date: date,
+              slots: item.slots,
+            } as any;
+            if (
+              orderSlot &&
+              payload.slots.filter((s) => s == orderSlot).length == 0 &&
+              dates.some((d) => isSameDay(date, d))
+            )
+              payload.slots.push(orderSlot);
+            if (slot.items.length > 0) {
+              payload.id = slot.items[0].id;
+
+              return await this.dao.update(payload, getDefinedKeys(payload));
+            }
+            return await this.dao.add(payload);
+          }),
+        );
       }),
     );
   }
