@@ -200,64 +200,68 @@ export class AvailabilitySlotsService {
   }
   public async update({ id, isArtist }: { id?: string; isArtist?: boolean }) {
     console.log('slot update', id, isArtist);
-    if (typeof isArtist !== 'boolean' || !id) return;
+    try {
+      if (typeof isArtist !== 'boolean' || !id) return;
 
-    let branchId: string;
-    let artists: any[] = [];
-    let dates: Record<string, string[]>;
+      let branchId: string;
+      let artists: any[] = [];
+      let dates: Record<string, string[]>;
 
-    if (isArtist) {
-      const user = await this.user.findOne(id);
-      if (!user) return;
+      if (isArtist) {
+        const user = await this.user.findOne(id);
+        if (!user) return;
 
-      branchId = user.branch_id;
-      artists = [user];
-      dates = await this.getDates(branchId, [], user.id);
-    } else {
-      branchId = id;
-      const result = await this.user.findAll(
-        { branch_id: branchId, role: E_M },
-        ADMIN,
-      );
-      artists = result.items;
-      dates = await this.getDates(branchId, []);
-    }
-
-    await Promise.all(
-      artists.map(async (artist) => {
-        if (
-          artist.user_status !== EmployeeStatus.ACTIVE ||
-          artist.status !== STATUS.Active
-        ) {
-          await this.removeByArtist(artist.id);
-          return;
-        }
-
-        await Promise.all(
-          Object.entries(dates).map(async ([date, slots]) => {
-            const existing = await this.dao.list({
-              artist_id: artist.id,
-              branch_id: branchId,
-              date: date as unknown as Date,
-            });
-
-            const payload = {
-              id: existing.items?.[0]?.id ?? AppUtils.uuid4(),
-              artist_id: artist.id,
-              branch_id: branchId,
-              date: date as unknown as Date,
-              slots,
-            };
-
-            if (existing.items.length) {
-              return this.dao.update(payload, getDefinedKeys(payload));
-            }
-
-            return this.dao.add(payload);
-          }),
+        branchId = user.branch_id;
+        artists = [user];
+        dates = await this.getDates(branchId, [], user.id);
+      } else {
+        branchId = id;
+        const result = await this.user.findAll(
+          { branch_id: branchId, role: E_M },
+          ADMIN,
         );
-      }),
-    );
+        artists = result.items;
+        dates = await this.getDates(branchId, []);
+      }
+
+      await Promise.all(
+        artists.map(async (artist) => {
+          if (
+            artist.user_status !== EmployeeStatus.ACTIVE ||
+            artist.status !== STATUS.Active
+          ) {
+            await this.removeByArtist(artist.id);
+            return;
+          }
+
+          await Promise.all(
+            Object.entries(dates).map(async ([date, slots]) => {
+              const existing = await this.dao.list({
+                artist_id: artist.id,
+                branch_id: branchId,
+                date: date as unknown as Date,
+              });
+
+              const payload = {
+                id: existing.items?.[0]?.id ?? AppUtils.uuid4(),
+                artist_id: artist.id,
+                branch_id: branchId,
+                date: date as unknown as Date,
+                slots,
+              };
+
+              if (existing.items.length) {
+                return this.dao.update(payload, getDefinedKeys(payload));
+              }
+
+              return this.dao.add(payload);
+            }),
+          );
+        }),
+      );
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   public async removeByArtist(artist: string, date?: Date[]) {
