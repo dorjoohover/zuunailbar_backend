@@ -130,7 +130,7 @@ export class OrderService {
 
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
-      console.log(new Date(), 'start');
+      console.log(new Date(), 'start', dto);
       const parallel = dto.parallel;
 
       // artists.length == 0 || artists?.[0] == '0' && artists =
