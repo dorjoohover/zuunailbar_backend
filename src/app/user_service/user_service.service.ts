@@ -258,6 +258,7 @@ export class UserServiceService {
     let res = parallel
       ? this.getParallelAvailable(slots, mapping)
       : this.getSequentialAvailable(mapping, slots);
+    console.log(res);
     return res;
   }
 }

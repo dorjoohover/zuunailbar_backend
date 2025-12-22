@@ -43,6 +43,7 @@ export class AvailabilitySlotsService {
   }
   public async updateOrderLimit(limit: number) {
     this.orderLimit = limit;
+    // end update hiine 
   }
   public async getDates(branch: string, dates: Date[], artist?: string) {
     let schedule: any[] = [];
