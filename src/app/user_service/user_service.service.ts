@@ -179,8 +179,12 @@ export class UserServiceService {
         for (const schedule of artistSchedules) {
           const dateStr = toYMD(schedule.date);
 
-          // Хоёр дахь artist-уудтай overlap шалгах
-          let commonSlots: string[] | null = null;
+          // slots-г string болгож normalize
+          const currentSlots = schedule.slots.map(String);
+
+          let commonSlots: string[] | null = [...currentSlots];
+
+          const matchedArtists: string[] = [];
 
           for (const otherArtistId of artistIds) {
             if (otherArtistId === artistId) continue;
@@ -189,36 +193,41 @@ export class UserServiceService {
             const otherDaySlots = otherSchedules.find(
               (s) => toYMD(s.date) === dateStr,
             )?.slots;
-            console.log(otherDaySlots, 'otherday');
+
             if (!otherDaySlots) {
-              commonSlots = null; // date давхцахгүй
+              // overlap байхгүй бол тухайн artist-тай нэг өдөрт slot байхгүй
+              commonSlots = null;
               break;
             }
 
-            if (commonSlots === null) {
-              commonSlots = schedule.slots.filter((slot) =>
-                otherDaySlots.includes(slot),
-              );
-            } else {
-              commonSlots = commonSlots.filter((slot) =>
-                otherDaySlots.includes(slot),
-              );
-            }
-            console.log(commonSlots, 'common');
+            const normalizedOther = otherDaySlots.map(String);
 
-            if (commonSlots.length === 0) break; // overlap байхгүй
+            // common slot-уудыг filter
+            commonSlots = commonSlots.filter((slot) =>
+              normalizedOther.includes(slot),
+            );
+
+            if (commonSlots.length === 0) {
+              commonSlots = null;
+              break;
+            }
+
+            // overlap байгаа artist-ийг нэмнэ
+            matchedArtists.push(otherArtistId);
           }
 
           if (commonSlots && commonSlots.length > 0) {
-            // artists array-д бусад artist-уудыг нэмнэ
-            result[serviceId][artistId].artists = artistIds.filter(
-              (id) => id !== artistId,
+            // artists array-д зөвхөн overlap хийсэн artist-уудыг нэмнэ
+            result[serviceId][artistId].artists = Array.from(
+              new Set(matchedArtists),
             );
 
-            // slots-д өдөр тус бүрээр нэмнэ
-            if (!result[serviceId][artistId].slots[dateStr])
-              result[serviceId][artistId].slots[dateStr] = [];
-            result[serviceId][artistId].slots[dateStr].push(...commonSlots);
+            // slots-д өдөр тус бүрээр нэмнэ (давхардалгүй)
+            result[serviceId][artistId].slots[dateStr] ??= [];
+            const slotSet = new Set(result[serviceId][artistId].slots[dateStr]);
+            commonSlots.forEach((s) => slotSet.add(s));
+            result[serviceId][artistId].slots[dateStr] =
+              Array.from(slotSet).sort();
           }
         }
       }
