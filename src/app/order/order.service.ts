@@ -107,18 +107,18 @@ export class OrderService {
       isSameDay(date, dto.order_date)
     )
       this.orderError.cannotChooseHour;
-
+    const uniqueUserIds = Array.from(new Set(details.map((d) => d.user_id)));
     const slots = await this.slot.findAll({
       branch_id: dto.branch_id,
       date: dto.order_date,
       slots: [+dto.start_time?.slice(0, 2)],
-      artists: details.map((d) => d.user_id),
+      artists: uniqueUserIds,
     });
     console.log(slots, {
       branch_id: dto.branch_id,
       date: dto.order_date,
       slots: [+dto.start_time?.slice(0, 2)],
-      artists: details.map((d) => d.user_id),
+      artists: uniqueUserIds,
     });
     if (slots.items.length == 0 && dto.order_status != OrderStatus.Friend)
       this.orderError.artistTimeUnavailable;
