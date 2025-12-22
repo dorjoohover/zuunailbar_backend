@@ -43,8 +43,9 @@ export class AvailabilitySlotsService {
   }
   public async updateOrderLimit(limit: number) {
     this.orderLimit = limit;
-    // end update hiine 
+    // end update hiine
   }
+
   public async getDates(branch: string, dates: Date[], artist?: string) {
     let schedule: any[] = [];
     if (artist) {
@@ -118,7 +119,7 @@ export class AvailabilitySlotsService {
     return finalValue;
   }
 
-  public async createByArtist(artist: string, dates: Date[]) {
+  public async createByArtist(artist: string, dates: Date[], slot?: number) {
     console.log('slot create by artist ', artist, dates);
     const branch = await this.user.findOne(artist);
     const res = await this.getDates(branch.branch_id, dates, artist);
@@ -139,6 +140,7 @@ export class AvailabilitySlotsService {
         } as any;
         if (slot.items.length > 0) {
           payload.id = slot.items[0].id;
+          if (slot) payload.slots.push(slot);
           return await this.dao.update(payload, getDefinedKeys(payload));
         }
         return await this.dao.add(payload);
