@@ -118,6 +118,7 @@ export class AvailabilitySlotsService {
   }
 
   public async createByArtist(artist: string, dates: Date[]) {
+    console.log('slot create by artist ', artist, dates);
     const branch = await this.user.findOne(artist);
     const res = await this.getDates(branch.branch_id, dates, artist);
     return await Promise.all(
@@ -145,6 +146,7 @@ export class AvailabilitySlotsService {
   }
   public async createByBranch(branch: string, dates: Date[]) {
     try {
+      console.log('slot create by branch', branch, dates);
       const artists = await this.user.findAll(
         {
           branch_id: branch,
@@ -267,9 +269,11 @@ export class AvailabilitySlotsService {
     time: string,
     action: SlotAction,
   ) {
+    console.log('slot update by artist ', artist, date, time, action);
     return await this.dao.updateByArtistSlot(artist, date, time, action);
   }
   public async removeByBranch(branch: string, date?: Date[]) {
+    console.log('remove by branch', branch, date);
     return await this.dao.deleteByBranch(branch, date);
   }
 }
