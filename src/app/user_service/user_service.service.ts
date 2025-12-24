@@ -234,7 +234,6 @@ export class UserServiceService {
     // 2. Artist slots татах
     const slots = await this.getArtistsSlots(artistIds, date, slot);
     // 3. Parallel эсэхээс хамаарч тооцоолно
-    console.log(slots, date, slot, mapping);
     let res = parallel
       ? this.getParallelAvailable(slots, mapping)
       : this.getSequentialAvailable(mapping, slots);
