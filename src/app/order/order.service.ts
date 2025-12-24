@@ -218,7 +218,7 @@ export class OrderService {
 
         if (dto.parallel !== true) startDate = endDate;
       }
-
+      console.log(startHour, orderDate)
       await Promise.all(
         dto.details.map(async (detail) => {
           await this.slot.updateByArtistAndSlot(
@@ -239,7 +239,7 @@ export class OrderService {
           user.id,
           dto.branch_name,
         );
-        console.log(new Date(), 'invoice', invoice);
+        console.log(new Date(), 'invoice', invoice?.invoice_id);
         await this.payment.create(
           {
             amount: pre,
