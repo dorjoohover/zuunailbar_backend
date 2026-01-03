@@ -193,6 +193,7 @@ export class AvailabilitySlotsService {
         {
           branch_id: branch,
           role: E_M,
+          user_status: UserStatus.Active,
         },
         ADMIN,
       );
@@ -259,7 +260,7 @@ export class AvailabilitySlotsService {
       } else {
         branchId = id;
         const result = await this.user.findAll(
-          { branch_id: branchId, role: E_M },
+          { branch_id: branchId, role: E_M, user_status: UserStatus.Active },
           ADMIN,
         );
         artists = result.items;

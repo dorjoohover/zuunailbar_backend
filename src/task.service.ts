@@ -9,6 +9,7 @@ import {
   E_M,
   mnDate,
   OrderStatus,
+  STATUS,
   toYMD,
   ubDateAt00,
   UserStatus,
@@ -41,32 +42,43 @@ export class TasksService {
       ADMIN,
     );
 
-    await artists.map(async (artist) => {
-      const { items: artistLeaves } = await this.artistLeave.findAll(
-        {
-          artist_id: artist.id,
-          start_date: today,
-        },
-        ADMIN,
-      );
-      const dates = artistLeaves.map((al) => toYMD(al.date) as unknown as Date);
-      await this.slots.createByArtist(artist.id, dates);
-    });
+    await Promise.all(
+      artists.map(async (artist) => {
+        const { items: artistLeaves } = await this.artistLeave.findAll(
+          {
+            artist_id: artist.id,
+            start_date: today,
+          },
+          ADMIN,
+        );
+        const dates = artistLeaves.map(
+          (al) => toYMD(al.date) as unknown as Date,
+        );
+        await this.slots.createByArtist(artist.id, dates);
+      }),
+    );
   }
   private async updateBranchSlots(today: string) {
-    const { items: branches } = await this.branch.find({}, ADMIN);
+    const { items: branches } = await this.branch.find(
+      { status: STATUS.Active },
+      ADMIN,
+    );
 
-    await branches.map(async (branch) => {
-      const { items: branchLeaves } = await this.branchLeave.findAll(
-        {
-          branch_id: branch.id,
-          start_date: today,
-        },
-        ADMIN,
-      );
-      const dates = branchLeaves.map((al) => toYMD(al.date) as unknown as Date);
-      await this.slots.createByBranch(branch.id, dates);
-    });
+    await Promise.all(
+      branches.map(async (branch) => {
+        const { items: branchLeaves } = await this.branchLeave.findAll(
+          {
+            branch_id: branch.id,
+            start_date: today,
+          },
+          ADMIN,
+        );
+        const dates = branchLeaves.map(
+          (al) => toYMD(al.date) as unknown as Date,
+        );
+        await this.slots.createByBranch(branch.id, dates);
+      }),
+    );
   }
   @Cron('0 0 * * *', {
     timeZone: 'Asia/Ulaanbaatar',

@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { forwardRef, HttpException, Inject, Injectable } from '@nestjs/common';
 import { ScheduleDao } from './schedule.dao';
 import { ScheduleDto } from './schedule.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
@@ -27,10 +27,18 @@ export class ScheduleService {
   public async create(dto: ScheduleDto, u: string) {
     if (!dto.times || dto.times.length == 0)
       throw new BadRequest().notFound('Цаг');
-    if (!dto.user_id) throw new BadRequest().notFound('Артист');
+    if (!dto.user_id)
+      throw new HttpException(
+        'Боломжтой сул цагтай артист энэ цагт байхгүй байна',
+        400,
+      );
     const artist = await this.userService.findOne(dto.user_id);
 
-    if (!artist) throw new BadRequest().notFound('Артист');
+    if (!artist)
+      throw new HttpException(
+        'Боломжтой сул цагтай артист энэ цагт байхгүй байна',
+        400,
+      );
     const times = dto.times.map((time) => Number(time));
     const start = Math.min(...times);
     const end = Math.max(...times);
