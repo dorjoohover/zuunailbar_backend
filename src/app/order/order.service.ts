@@ -160,14 +160,18 @@ export class OrderService {
 
       const endHourRaw = +startHour + durationHours;
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
-
+      const start_time = toTimeString(
+        Math.floor(startHour),
+        startHour % 1 != 0,
+      );
+      const end_time = toTimeString(Math.floor(endHour), endHour % 1 != 0);
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
         customer_id: dto.customer_id ?? user.id,
         order_date: orderDate, // Date (өдөр давсан бол +1, +2 ...)
-        start_time: toTimeString(Math.floor(startHour), startHour % 1 != 0),
-        end_time: toTimeString(Math.floor(endHour), endHour % 1 != 0),
+        start_time: start_time,
+        end_time: end_time,
         duration: duration,
         description: dto.description ?? null,
         discount_type: dto.discount_type ?? null,
@@ -204,8 +208,8 @@ export class OrderService {
         const endDate = startDate + duration;
         const detail = await this.orderDetail.create({
           id: AppUtils.uuid4(),
-          start_time: toTimeString(startDate),
-          end_time: toTimeString(endDate),
+          start_time: start_time,
+          end_time: end_time,
           order_id: order,
           service_id: service.id,
           service_name: service.name,

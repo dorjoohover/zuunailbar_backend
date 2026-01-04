@@ -108,7 +108,6 @@ export class AvailabilitySlotsService {
     const finalValue: Record<string, string[]> = {};
     for (const dayKey in result) {
       const numericKey = Number(dayKey);
-      console.log(numericKey);
       if (!result[numericKey] || result[numericKey].length === 0) continue;
       const dateStr = datetime[numericKey];
       if (!dateStr) continue;
