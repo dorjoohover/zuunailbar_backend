@@ -511,7 +511,7 @@ export class OrderService {
 
           // ✏️ UPDATE
           if (prev) {
-            console.log('update', d);
+            console.log('update', dto.start_time);
             // slot change
             if (prev.start_time !== d.start_time) {
               await this.slot.updateByArtistAndSlot(
@@ -523,7 +523,7 @@ export class OrderService {
               await this.slot.updateByArtistAndSlot(
                 d.user_id,
                 order_date.toString(),
-                d.start_time,
+                dto.start_time.toString(),
                 'REMOVE',
               );
             }
