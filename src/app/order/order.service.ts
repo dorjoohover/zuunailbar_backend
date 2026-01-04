@@ -495,6 +495,7 @@ export class OrderService {
     const { details, order_date, ...payload } = dto;
 
     try {
+      console.log(payload, order_date, dto);
       // 1️⃣ Order update
       await this.dao.update({ id, ...payload }, getDefinedKeys(payload));
 
