@@ -218,7 +218,7 @@ export class OrderService {
 
         if (dto.parallel !== true) startDate = endDate;
       }
-      console.log(startHour, orderDate)
+      console.log(startHour, orderDate);
       await Promise.all(
         dto.details.map(async (detail) => {
           await this.slot.updateByArtistAndSlot(
@@ -511,6 +511,7 @@ export class OrderService {
 
           // ✏️ UPDATE
           if (prev) {
+            console.log('update', d);
             // slot change
             if (prev.start_time !== d.start_time) {
               await this.slot.updateByArtistAndSlot(
