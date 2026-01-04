@@ -81,7 +81,8 @@ export class ScheduleService {
 
   public async update(id: string, dto: ScheduleDto) {
     const times = dto.times ? dto.times?.join('|') : null;
-
+    const schedule = await this.findOne(id);
+    if (!schedule) return;
     let start_time = null,
       end_time = null;
     if (dto.times && times != '') {
@@ -96,7 +97,7 @@ export class ScheduleService {
       { ...dto, start_time, end_time, times, id },
       getDefinedKeys({ ...dto, start_time, end_time }, true),
     );
-    this.slot.update({ id: dto.user_id, isArtist: true });
+    await this.slot.update({ id: dto.user_id, isArtist: true });
     return res;
   }
 

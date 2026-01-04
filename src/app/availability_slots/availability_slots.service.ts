@@ -51,6 +51,7 @@ export class AvailabilitySlotsService {
     if (artist) {
       const res = await this.schedule.findByArtist(artist);
       schedule = res.items ?? [];
+      console.log(res.items);
     }
 
     const { items: booking } = await this.booking.findByBranchId(branch);
