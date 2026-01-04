@@ -33,9 +33,12 @@ export const usernameFormatter = (user: User) => {
 };
 
 export const saltOrRounds = 1;
-export function toTimeString(hour: number | string): string {
+export function toTimeString(
+  hour: number | string,
+  half?: boolean,
+): string {
   const h = String(hour).padStart(2, '0');
-  return `${h}:00:00`;
+  return half ? `${h}:30:00` : `${h}:00:00`;
 }
 
 export const firstLetterUpper = (value: string) => {
@@ -47,6 +50,11 @@ export function toYMD(d: Date) {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+export function timeToDecimal(time: string): number {
+  const [h, m, s = '0'] = time.split(':');
+  return Number(h) + Number(m) / 60 + Number(s) / 3600;
 }
 
 function getUBOffsetMinutes(d: Date): number {
@@ -222,7 +230,7 @@ export enum SERVICE_VIEW {
   FEATURED = 20,
 }
 
-export type SlotAction = "ADD" | "REMOVE";
+export type SlotAction = 'ADD' | 'REMOVE';
 export enum EmployeeStatus {
   ACTIVE = 10,
   DEKIRIT = 20,

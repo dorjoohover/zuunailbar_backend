@@ -12,7 +12,7 @@ export class OrderDto {
   @ApiProperty()
   start_time: number;
   @ApiProperty()
-  end_time?: number;
+  end_time?: string;
   @ApiProperty()
   order_status: number;
   @ApiProperty()

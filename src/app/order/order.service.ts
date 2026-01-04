@@ -16,6 +16,7 @@ import {
   PaymentMethod,
   STARTTIME,
   STATUS,
+  timeToDecimal,
   toTimeString,
   toYMD,
   UserLevel,
@@ -155,7 +156,7 @@ export class OrderService {
       }
       const durationHours = Math.ceil(duration / 60);
 
-      const startHour = +dto.start_time.toString().slice(0, 2);
+      const startHour = timeToDecimal(dto.start_time.toString());
 
       const endHourRaw = +startHour + durationHours;
       const endHour = dto.end_time ? +dto.end_time : +endHourRaw;
@@ -165,9 +166,9 @@ export class OrderService {
         id: AppUtils.uuid4(),
         customer_id: dto.customer_id ?? user.id,
         order_date: orderDate, // Date (өдөр давсан бол +1, +2 ...)
-        start_time: toTimeString(startHour),
-        end_time: toTimeString(endHour),
-        duration: durationHours,
+        start_time: toTimeString(Math.floor(startHour), startHour % 1 != 0),
+        end_time: toTimeString(Math.floor(endHour), endHour % 1 != 0),
+        duration: duration,
         description: dto.description ?? null,
         discount_type: dto.discount_type ?? null,
         discount: dto.discount ?? null,
@@ -496,6 +497,19 @@ export class OrderService {
 
     try {
       console.log(payload, order_date, dto, 'order update');
+      const order = await this.findOne(id);
+      if (!order) return;
+      const start_time = timeToDecimal(dto.start_time.toString());
+      if (!payload.end_time) {
+        const hasHalfHour = start_time % 1 !== 0;
+
+        const duration = +order.duration + (hasHalfHour ? 30 : 0);
+
+        payload.end_time = toTimeString(
+          Math.floor(start_time + Math.ceil(duration / 60)),
+          hasHalfHour,
+        );
+      }
       // 1️⃣ Order update
       await this.dao.update({ id, ...payload }, getDefinedKeys(payload));
 
