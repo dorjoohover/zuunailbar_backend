@@ -51,7 +51,6 @@ export class AvailabilitySlotsService {
     if (artist) {
       const res = await this.schedule.findByArtist(artist);
       schedule = res.items ?? [];
-      console.log(res.items);
     }
 
     const { items: booking } = await this.booking.findByBranchId(branch);
@@ -109,8 +108,8 @@ export class AvailabilitySlotsService {
     const finalValue: Record<string, string[]> = {};
     for (const dayKey in result) {
       const numericKey = Number(dayKey);
+      console.log(numericKey);
       if (!result[numericKey] || result[numericKey].length === 0) continue;
-
       const dateStr = datetime[numericKey];
       if (!dateStr) continue;
 
@@ -267,7 +266,7 @@ export class AvailabilitySlotsService {
         artists = result.items;
         dates = await this.getDates(branchId, []);
       }
-      console.log(dates, branchId, artists);
+      console.log(dates, branchId, id, artists);
       await Promise.all(
         artists.map(async (artist) => {
           if (
