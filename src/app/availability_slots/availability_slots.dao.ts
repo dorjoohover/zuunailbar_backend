@@ -51,7 +51,7 @@ export class AvailabilitySlotsDao {
     }
 
     if (action === 'REMOVE') {
-      slots = slots.filter((s) => s !== slot);
+      slots = slots.filter((s) => s != slot);
     }
 
     return this._db._update(
