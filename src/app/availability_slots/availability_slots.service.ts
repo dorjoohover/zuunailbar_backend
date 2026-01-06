@@ -188,7 +188,7 @@ export class AvailabilitySlotsService {
       }),
     );
   }
-  public async createByBranch(branch: string, dates: Date[]) {
+  public async createByBranch(branch: string, dates: Date[], limits?: Date[]) {
     try {
       console.log('slot create by branch', branch, dates);
       const artists = await this.user.findAll(
@@ -206,6 +206,7 @@ export class AvailabilitySlotsService {
           return await Promise.all(
             Object.entries(res).map(async ([key, value]) => {
               const date = key as unknown as Date;
+              if (limits.includes(date)) return;
               const slot = await this.dao.list({
                 artist_id: artist.id,
                 branch_id: branch,

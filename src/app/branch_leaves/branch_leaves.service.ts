@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { BranchLeaveDto } from './branch_leaves.dto';
 import { BranchLeavesDao } from './branch_leaves.dao';
-import { getDatesBetween, getDefinedKeys, STATUS } from 'src/base/constants';
+import {
+  CLIENT,
+  getDatesBetween,
+  getDefinedKeys,
+  STATUS,
+} from 'src/base/constants';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
@@ -39,8 +44,9 @@ export class BranchLeavesService {
 
   public async removeByDate(branch: string, user: string, dates?: Date[]) {
     const res = await this.dao.deleteByBranch(branch, dates);
-
-    await this.slots.createByBranch(branch, dates);
+    const { items } = await this.findAll({ branch_id: branch }, CLIENT);
+    const limits = items.map((i) => i.date.toISOString().slice(0, 10));
+    await this.slots.createByBranch(branch, dates, limits);
     return res;
   }
 }
