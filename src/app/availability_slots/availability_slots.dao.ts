@@ -69,7 +69,7 @@ export class AvailabilitySlotsDao {
 
     try {
       const res = await this._db.delete(
-        `delete FROM "${tableName}" WHERE "artist_id" = $1 AND "date" = ANY($2)`,
+        `delete FROM "${tableName}" WHERE "artist_id" = $1 AND  "date" = ANY($2::date[])`,
         [id, dates],
       );
       console.log(res, dates, id);
