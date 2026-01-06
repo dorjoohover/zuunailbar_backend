@@ -72,7 +72,7 @@ export class AvailabilitySlotsDao {
         `delete FROM "${tableName}" WHERE "artist_id" = $1 AND "date" = ANY($2)`,
         [id, dates],
       );
-      console.log(res);
+      console.log(res, dates, id);
     } catch (error) {
       console.log(error);
     }
