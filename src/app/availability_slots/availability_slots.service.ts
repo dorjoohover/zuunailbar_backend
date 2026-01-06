@@ -93,7 +93,7 @@ export class AvailabilitySlotsService {
 
           for (const s of schedule) {
             if (!s.times || s.index == null) continue;
-            const key = week > 0 ? s.index + 7 * week : s.index;
+            const key = (s.index + 7 * week) % 7;
             if (!datetime[key]) continue;
 
             const scheduleTimes = s.times.split('|');
