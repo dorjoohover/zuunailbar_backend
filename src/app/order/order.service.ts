@@ -157,16 +157,16 @@ export class OrderService {
       const durationHours = duration / 60; // 👈 хамгийн зөв
 
       const startHour = timeToDecimal(dto.start_time.toString()); // ж: 12.5
-
+      console.log(durationHours, startHour);
       const endHourRaw = startHour + durationHours;
       const endHour = dto.end_time ? Number(dto.end_time) : endHourRaw;
 
       const start_time = toTimeString(
         Math.floor(startHour),
-        startHour % 1 !== 0,
+        startHour % 1 != 0,
       );
 
-      const end_time = toTimeString(Math.floor(endHour), endHour % 1 !== 0);
+      const end_time = toTimeString(Math.floor(endHour), endHour % 1 != 0);
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const payload: Order = {
         id: AppUtils.uuid4(),
