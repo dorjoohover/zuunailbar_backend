@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ArtistLeaveDto } from './artist_leaves.dto';
 import { ArtistLeavesDao } from './artist_leaves.dao';
 import {
+  CLIENT,
   EmployeeStatus,
   getDatesBetween,
   getDefinedKeys,
@@ -60,8 +61,14 @@ export class ArtistLeavesService {
 
   public async removeByDate(artist: string, user: string, dates?: Date[]) {
     const res = await this.dao.deleteByArtist(artist, dates);
-
-    await this.slotService.createByArtist(artist, dates);
+    const { items } = await this.findAll(
+      {
+        artist_id: artist,
+      },
+      CLIENT,
+    );
+    const limits = await items.map((i) => i.date);
+    await this.slotService.createByArtist(artist, dates, limits);
     return res;
   }
   public async remove(id: string) {

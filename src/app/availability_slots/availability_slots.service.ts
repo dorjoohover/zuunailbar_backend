@@ -52,7 +52,6 @@ export class AvailabilitySlotsService {
       const res = await this.schedule.findByArtist(artist);
       schedule = res.items ?? [];
     }
-    console.log(schedule);
 
     const { items: booking } = await this.booking.findByBranchId(branch);
 
@@ -81,7 +80,7 @@ export class AvailabilitySlotsService {
       if (schedule.length === 0) {
         for (const b of booking) {
           if (!b.times || b.index == null) continue;
-          const key = (b.index + 7 * week) % 7;
+          const key = week > 0 ? b.index + 7 * week : b.index;
           if (!datetime[key]) continue;
           const times = b.times.split('|');
           result[key] = times;
@@ -93,7 +92,7 @@ export class AvailabilitySlotsService {
 
           for (const s of schedule) {
             if (!s.times || s.index == null) continue;
-            const key = (s.index + 7 * week) % 7;
+            const key = week > 0 ? s.index + 7 * week : s.index;
             if (!datetime[key]) continue;
 
             const scheduleTimes = s.times.split('|');
@@ -107,7 +106,7 @@ export class AvailabilitySlotsService {
     }
 
     const finalValue: Record<string, string[]> = {};
-    console.log(result, 'result');
+    console.log(result);
     for (const dayKey in result) {
       const numericKey = Number(dayKey);
       if (!result[numericKey] || result[numericKey].length === 0) continue;
@@ -120,13 +119,14 @@ export class AvailabilitySlotsService {
     return finalValue;
   }
 
-  public async createByArtist(artist: string, dates: Date[]) {
+  public async createByArtist(artist: string, dates: Date[], limits?: Date[]) {
     console.log('slot create by artist ', artist, dates);
     const branch = await this.user.findOne(artist);
     const res = await this.getDates(branch.branch_id, dates, artist);
     return await Promise.all(
       Object.entries(res).map(async ([key, value]) => {
         const date = key as unknown as Date;
+        if (limits.includes(date)) return;
         console.log(date);
         const slot = await this.dao.list({
           artist_id: artist,
