@@ -125,6 +125,7 @@ export class AvailabilitySlotsService {
     return await Promise.all(
       Object.entries(res).map(async ([key, value]) => {
         const date = key as unknown as Date;
+        console.log(date)
         const slot = await this.dao.list({
           artist_id: artist,
           branch_id: branch.branch_id,
