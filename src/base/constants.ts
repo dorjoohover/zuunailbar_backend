@@ -33,10 +33,7 @@ export const usernameFormatter = (user: User) => {
 };
 
 export const saltOrRounds = 1;
-export function toTimeString(
-  hour: number | string,
-  half?: boolean,
-): string {
+export function toTimeString(hour: number | string, half?: boolean): string {
   const h = String(hour).padStart(2, '0');
   return half ? `${h}:30:00` : `${h}:00:00`;
 }
@@ -53,6 +50,7 @@ export function toYMD(d: Date) {
 }
 
 export function timeToDecimal(time: string): number {
+  console.log(time);
   const [h, m, s = '0'] = time.split(':');
   return Number(h) + Number(m) / 60 + Number(s) / 3600;
 }
