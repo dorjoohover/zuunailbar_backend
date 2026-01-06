@@ -81,7 +81,7 @@ export class AvailabilitySlotsService {
       if (schedule.length === 0) {
         for (const b of booking) {
           if (!b.times || b.index == null) continue;
-          const key = week > 0 ? b.index + 7 * week : b.index;
+          const key = (b.index + 7 * week) % 7;
           if (!datetime[key]) continue;
           const times = b.times.split('|');
           result[key] = times;
