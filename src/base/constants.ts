@@ -51,6 +51,7 @@ export function toYMD(d: Date) {
 
 export function timeToDecimal(time: string): number {
   console.log(time);
+  if (time.length < 2) return +time;
   const [h, m, s = '0'] = time.split(':');
   return Number(h) + Number(m) / 60 + Number(s) / 3600;
 }
