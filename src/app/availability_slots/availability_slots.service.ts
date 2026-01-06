@@ -120,7 +120,7 @@ export class AvailabilitySlotsService {
   }
 
   public async createByArtist(artist: string, dates: Date[], limits?: Date[]) {
-    console.log('slot create by artist ', artist, dates);
+    console.log('slot create by artist ', artist, dates, limits);
     const branch = await this.user.findOne(artist);
     const res = await this.getDates(branch.branch_id, dates, artist);
     return await Promise.all(
