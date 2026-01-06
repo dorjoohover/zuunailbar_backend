@@ -67,7 +67,7 @@ export class ArtistLeavesService {
       },
       CLIENT,
     );
-    const limits = await items.map((i) => i.date);
+    const limits = items.map((i) => i.date.toISOString().slice(0, 10));
     await this.slotService.createByArtist(artist, dates, limits);
     return res;
   }
