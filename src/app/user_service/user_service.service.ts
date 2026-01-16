@@ -150,7 +150,6 @@ export class UserServiceService {
 
   public async etParallelArtists(branch_id: string, services: string[]) {
     const mapping = await this.getServiceArtists(branch_id, services);
-
     return mapping;
   }
 }

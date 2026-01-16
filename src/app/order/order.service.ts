@@ -88,7 +88,7 @@ export class OrderService {
     } catch (error) {
       client = null;
     }
-    if (client == null || client.role != CLIENT) this.orderError.clientNotFound;
+    // if (client == null || client.role != CLIENT) this.orderError.clientNotFound;
     if (!dto.start_time || !dto.order_date)
       this.orderError.dateOrTimeNotSelected;
 
@@ -137,12 +137,12 @@ export class OrderService {
         artists = artists_res.map((r) => r.user_id);
       }
     }
-    if (services.length > 1 && !p) {
+    if (services?.length > 1 && !p) {
       const service = [services.split(',')];
       duration =
         (await this.userService.getDurationOfServices(service))?.[0]?.sum ?? 0;
     }
-    if (!p && services.length > 1 && +duration > 30) {
+    if (!p && services?.length > 1 && +duration > 30) {
       result = await this.dao.getSlotsQueue({
         branch_id: pg.branch_id,
         artists,
@@ -170,6 +170,7 @@ export class OrderService {
 
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
+      const admin = user.role < ADMIN;
       console.log(new Date(), 'start');
       const parallel = dto.parallel;
 
@@ -177,7 +178,7 @@ export class OrderService {
 
       const orderDate = toYMD(new Date(dto.order_date));
       let pre = 0;
-      let duration = 0;
+      let duration = admin && dto.duration ? +dto.duration : 0;
       for (const detail of dto.details ?? []) {
         const service = await this.service.findOne(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
@@ -189,7 +190,7 @@ export class OrderService {
           duration += d;
         }
       }
-      if (user.role == ADMIN && dto.pre_amount) {
+      if (admin && dto.pre_amount) {
         pre = +dto.pre_amount;
       }
       const durationHours = duration / 60; // 👈 хамгийн зөв
@@ -197,15 +198,18 @@ export class OrderService {
       const startHour = timeToDecimal(dto.start_time.toString()); // ж: 12.5
       console.log(durationHours, startHour);
       const endHourRaw = startHour + durationHours;
-      const endHour = dto.end_time ? Number(dto.end_time) : endHourRaw;
+      const endHour = endHourRaw;
 
       const start_time = toTimeString(
         Math.floor(startHour),
         startHour % 1 != 0,
       );
 
-      const end_time = toTimeString(Math.floor(endHour), endHour % 1 != 0);
+      const end_time = dto.end_time
+        ? dto.end_time
+        : toTimeString(Math.floor(endHour), endHour % 1 != 0);
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
+      console.log(start_time, end_time);
       const order_status =
         user.role == ADMIN
           ? OrderStatus.Active
@@ -229,23 +233,26 @@ export class OrderService {
         created_by: user.id,
         branch_id: dto.branch_id,
       } as const;
-      await this.canPlaceOrder(
-        {
-          ...payload,
-          start_time: dto.start_time.toString(),
-        },
-        user,
-        dto.details,
-        merchant,
-      );
+      if (!admin) {
+        await this.canPlaceOrder(
+          {
+            ...payload,
+            start_time: dto.start_time.toString(),
+          },
+          user,
+          dto.details,
+          merchant,
+        );
+      }
       let startDate = startHour;
       const orderDetails = [];
       for (const d of dto.details ?? []) {
         const service = await this.service.findOne(d.service_id);
         const artist = await this.user.findOne(d.user_id);
 
-        const duration = Math.ceil(+service.duration / 60);
+        const duration = +service.duration / 60;
         const endDate = startDate + duration;
+
         orderDetails.push({
           id: AppUtils.uuid4(),
           start_time: toTimeString(Math.floor(startDate), startDate % 1 != 0),
@@ -265,8 +272,6 @@ export class OrderService {
       }
       const order = await this.dao.create(payload, orderDetails);
 
-      console.log(startHour, orderDate);
-
       if (
         dto.method == PaymentMethod.P2P &&
         +(dto.pre_amount ?? pre ?? '0') > 0
@@ -277,7 +282,6 @@ export class OrderService {
           user.id,
           dto.branch_name,
         );
-        console.log(new Date(), 'invoice', invoice?.invoice_id);
         await this.payment.create(
           {
             amount: pre,
@@ -302,7 +306,6 @@ export class OrderService {
           },
         };
       } else {
-        console.log('first', new Date());
         // if(payload.paid_amount) {
 
         //   await this.payment.create({
@@ -315,7 +318,6 @@ export class OrderService {
         // }
         await this.updatePrePaid(order, true);
         await this.dao.updateOrderStatus(order, OrderStatus.Active);
-        console.log('second', new Date());
         return { id: order };
       }
     } catch (error) {
@@ -344,8 +346,8 @@ export class OrderService {
 
   public async cancelOrder(id: string) {
     try {
-      await this.dao.updateOrderStatus(id, OrderStatus.Cancelled);
-      await this.orderDetail.updateStatusByOrder(id, OrderStatus.Cancelled);
+      await this.dao.updateOrderStatus(id, OrderStatus.Absent);
+      await this.orderDetail.updateStatusByOrder(id, OrderStatus.Absent);
       return true;
     } catch (error) {
       console.log(error);
@@ -404,12 +406,15 @@ export class OrderService {
             const user = await this.user.findOne(item.customer_id);
 
             const order_date = mnDate(new Date(item.order_date));
-
+            const created_by = item.created_by
+              ? await this.user.findOne(item.created_by)
+              : undefined;
             return {
               ...item,
               order_date,
               customer: user,
               branch_id,
+              created_by,
               details: detail.items,
             };
           }),
@@ -520,7 +525,7 @@ export class OrderService {
   }
 
   public async update(id: string, dto: OrderDto) {
-    const { details, order_date, ...payload } = dto;
+    const { details, parallel, order_date, ...payload } = dto;
 
     try {
       console.log(payload, order_date, dto, 'order update');
@@ -547,15 +552,24 @@ export class OrderService {
       const incomingIds = details.map((d) => d.id).filter(Boolean);
 
       // 3️⃣ Handle create / update
+      let startDate = timeToDecimal(dto.start_time.toString());
       await Promise.all(
         details.map(async (d) => {
           const prev = d.id ? existingMap.get(d.id) : null;
+          const service = await this.service.findOne(d.service_id);
 
+          const duration = +service.duration / 60;
+          const endDate = startDate + duration;
+          let payload = {
+            ...d,
+            start_time: toTimeString(Math.floor(startDate), startDate % 1 != 0),
+            end_time: toTimeString(Math.floor(endDate), endDate % 1 != 0),
+          };
           // ✏️ UPDATE
           if (prev) {
             console.log('update', dto.start_time);
 
-            await this.orderDetail.update(d.id, d);
+            await this.orderDetail.update(d.id, payload);
             return;
           }
 

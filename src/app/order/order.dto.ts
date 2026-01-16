@@ -10,7 +10,7 @@ export class OrderDto {
   @ApiProperty()
   order_date: Date;
   @ApiProperty()
-  start_time: number;
+  start_time: string;
   @ApiProperty()
   end_time?: string;
   @ApiProperty()
@@ -28,6 +28,7 @@ export class OrderDto {
   discount_type: number;
   @ApiProperty()
   discount: number;
+  duration: number;
   @ApiProperty()
   parallel?: boolean;
   @ApiProperty()

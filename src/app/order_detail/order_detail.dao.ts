@@ -28,7 +28,7 @@ export class OrderDetailDao {
   }
   async create(client: any, body: any) {
     try {
-      console.log(body)
+      console.log(body);
       await this._db.insertTx(
         client,
         tableName,
@@ -118,13 +118,13 @@ export class OrderDetailDao {
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('order_id', '=', query.order_id)
       .conditionIfNotEmpty('service_id', '=', query.service_id)
-      .conditionIfNotEmpty('status', '=', query.status)
 
       .criteria();
     const sql =
       `SELECT * FROM "${tableName}"  ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
+
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
