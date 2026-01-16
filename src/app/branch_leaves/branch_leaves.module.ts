@@ -4,10 +4,9 @@ import { BranchLeavesController } from './branch_leaves.controller';
 import { AppDbModule } from 'src/core/db/database.module';
 import { BaseModule } from 'src/base/base.module';
 import { BranchLeavesDao } from './branch_leaves.dao';
-import { AvailabilitySlotsModule } from '../availability_slots/availability_slots.module';
 
 @Module({
-  imports: [AppDbModule, BaseModule, AvailabilitySlotsModule],
+  imports: [AppDbModule, BaseModule],
   controllers: [BranchLeavesController],
   providers: [BranchLeavesService, BranchLeavesDao],
   exports: [BranchLeavesService],

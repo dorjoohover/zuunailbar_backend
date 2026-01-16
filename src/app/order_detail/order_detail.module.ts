@@ -10,6 +10,6 @@ import { UserModule } from '../user/user.module';
   imports: [AppDbModule, BaseModule, UserModule],
   controllers: [OrderDetailController],
   providers: [OrderDetailService, OrderDetailDao],
-  exports: [OrderDetailService],
+  exports: [OrderDetailService, OrderDetailDao],
 })
 export class OrderDetailModule {}

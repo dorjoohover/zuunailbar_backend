@@ -10,17 +10,12 @@ import {
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
-import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
 
 @Injectable()
 export class ArtistLeavesService {
-  constructor(
-    private dao: ArtistLeavesDao,
-    private slotService: AvailabilitySlotsService,
-  ) {}
+  constructor(private dao: ArtistLeavesDao) {}
   public async create(dto: ArtistLeaveDto, user: string) {
     const { dates, ...body } = dto;
-    await this.slotService.removeByArtist(dto.artist_id, dates);
     return await Promise.all(
       dates.map(async (date) => {
         const leave = await this.dao.getByDateAndArtist(body.artist_id, date);
@@ -47,8 +42,6 @@ export class ArtistLeavesService {
   public async updateByArtist(id: string, dto: ArtistLeaveDto, user: string) {
     const { dates, artist_id, ...body } = dto;
 
-    await this.slotService.removeByArtist(artist_id, dates);
-
     return await Promise.all(
       dates.map(async (date) => {
         return await this.dao.updateByDate(
@@ -61,14 +54,7 @@ export class ArtistLeavesService {
 
   public async removeByDate(artist: string, user: string, dates?: Date[]) {
     const res = await this.dao.deleteByArtist(artist, dates);
-    const { items } = await this.findAll(
-      {
-        artist_id: artist,
-      },
-      CLIENT,
-    );
-    const limits = items.map((i) => i.date.toISOString().slice(0, 10));
-    await this.slotService.createByArtist(artist, dates, limits);
+
     return res;
   }
   public async remove(id: string) {

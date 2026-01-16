@@ -111,7 +111,7 @@ export class AppDB {
     params: any,
     options?: DBSelectOptions,
   ): Promise<any[]> {
-    return this.executeQuery(async (client) => {
+    const res = this.executeQuery(async (client) => {
       try {
         let query = sql;
         if (options && options.limit && options.skip && options.sortBy) {
@@ -126,6 +126,7 @@ export class AppDB {
         throw err;
       }
     });
+    return res;
   }
 
   async count(sql: string, params: any): Promise<number> {
@@ -145,6 +146,44 @@ export class AppDB {
     });
   }
 
+  public async withTransaction<T>(fn: (client: any) => Promise<T>) {
+    return this.executeQuery(async (client) => {
+      try {
+        console.log('begin');
+        await client.query('BEGIN');
+        const res = await fn(client);
+        console.log('first');
+        await client.query('COMMIT');
+        return res;
+      } catch (err) {
+        console.log(err);
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    });
+  }
+  public async insertTx(
+    client: any,
+    tableName: string,
+    data: any,
+    columns: string[],
+  ) {
+    try {
+      const builder = new SqlBuilder(data, columns);
+      const { cols, indexes } = builder.create();
+
+      const sql = `
+    INSERT INTO "${tableName}" (${cols})
+    VALUES (${indexes})
+    RETURNING id
+  `;
+
+      const { rows } = await client.query(sql, builder.values);
+      return rows[0].id;
+    } catch (error) {
+      throw error;
+    }
+  }
   private async _insert(sql: string, params: any): Promise<void> {
     return this.executeQuery(async (client) => {
       try {

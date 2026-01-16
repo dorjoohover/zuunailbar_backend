@@ -6,7 +6,6 @@ import { BaseModule } from 'src/base/base.module';
 import { ScheduleDao } from './schedule.dao';
 import { UserModule } from '../user/user.module';
 import { ServiceModule } from '../service/service.module';
-import { AvailabilitySlotsModule } from '../availability_slots/availability_slots.module';
 
 @Module({
   imports: [
@@ -14,7 +13,6 @@ import { AvailabilitySlotsModule } from '../availability_slots/availability_slot
     BaseModule,
     forwardRef(() => UserModule),
     forwardRef(() => ServiceModule),
-    forwardRef(() => AvailabilitySlotsModule),
   ],
   controllers: [ScheduleController],
   providers: [ScheduleService, ScheduleDao],

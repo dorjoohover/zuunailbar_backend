@@ -18,8 +18,6 @@ import {
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { User } from '../user/user.entity';
-import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
-import { AvailabilitySlot } from '../availability_slots/availability_slots.entity';
 
 @Injectable()
 export class UserServiceService {
@@ -28,8 +26,6 @@ export class UserServiceService {
     @Inject(forwardRef(() => ServiceService))
     private readonly service: ServiceService,
     @Inject(forwardRef(() => UserService)) private userService: UserService,
-    @Inject(forwardRef(() => AvailabilitySlotsService))
-    private slots: AvailabilitySlotsService,
   ) {}
   public async create(dto: UserServiceDto, u: User) {
     try {
@@ -80,8 +76,21 @@ export class UserServiceService {
     }
   }
 
-  public async search(services: string, user?: string) {
-    return await this.dao.getByServices(services, user);
+  public async getDurationOfServices(id: string[]) {
+    return await this.service.getDurationOfServices(id);
+  }
+  public async getByServices(input: {
+    services: string[];
+    user?: string;
+    parallel: boolean;
+  }) {
+    const { services, parallel } = input;
+    console.log(parallel, services.length);
+    if (parallel || services.length == 1) {
+      return await this.dao.getByServices(services);
+    } else {
+      return await this.dao.getByServicesAll(services);
+    }
   }
 
   public async findAll(pg: PaginationDto, role: number) {
@@ -138,106 +147,10 @@ export class UserServiceService {
 
     return mapping; // { service1: [artist1, artist5], service2: [artist2], ... }
   }
-  private async getArtistsSlots(
-    artistIds: string[],
-    date: string,
-    slot: number,
-  ) {
-    const result: Record<string, AvailabilitySlot[]> = {};
-    for (const id of artistIds) {
-      const slots = await this.slots.findAll({
-        artist_id: id,
-        date: date,
-        slots: [slot],
-        // start_date: toYMD(new Date()),
-      });
-      result[id] = slots.items;
-    }
 
-    return result;
-  }
-  private getParallelAvailable(
-    schedules: Record<string, AvailabilitySlot[]>,
-    mapping: Record<string, string[]>,
-  ): ParallelOrderSlot {
-    const result: ParallelOrderSlot = {};
-
-    for (const [serviceId, artistIds] of Object.entries(mapping)) {
-      result[serviceId] = {};
-
-      for (const artistId of artistIds) {
-        const artistSchedules = schedules[artistId] || [];
-
-        if (artistSchedules.length === 0) continue; // slots хоосон бол skip
-
-        // Бүх slots-ыг нэг array-д merge
-        const allSlots = artistSchedules.flatMap((s) => s.slots.map(String));
-
-        if (allSlots.length === 0) continue; // slots хоосон бол skip
-
-        result[serviceId][artistId] = {
-          artists: artistIds.filter((id) => id !== artistId),
-          slots: { all: Array.from(new Set(allSlots)).sort() },
-        };
-      }
-
-      // Хэрэв service-д нэг ч artist байхгүй бол устгах
-      if (Object.keys(result[serviceId]).length === 0) {
-        delete result[serviceId];
-      }
-    }
-
-    return result;
-  }
-
-  private getSequentialAvailable(
-    mapping: Record<string, string[]>, // serviceId → artistId[]
-    slots: Record<string, AvailabilitySlot[]>, // artistId → [{date, slots[]}]
-  ): OrderSlot {
-    const firstServiceArtists = Object.values(mapping)[0] || [];
-    const result: OrderSlot = {};
-
-    firstServiceArtists.forEach((artistId) => {
-      const artistSlots = slots[artistId] || [];
-      if (artistSlots.length === 0) return; // slots хоосон бол skip
-
-      const slotObj: Record<string, string[]> = {};
-
-      artistSlots.forEach((slot) => {
-        const dateKey = toYMD(slot.date);
-        if (!slotObj[dateKey]) slotObj[dateKey] = [];
-        slotObj[dateKey].push(...slot.slots);
-      });
-
-      // slots хоосон бол skip
-      const nonEmptyDates = Object.fromEntries(
-        Object.entries(slotObj).filter(([_, s]) => s.length > 0),
-      );
-      if (Object.keys(nonEmptyDates).length > 0) {
-        result[artistId] = { slots: nonEmptyDates };
-      }
-    });
-
-    return result;
-  }
-  public async etParallelArtists(
-    branch_id: string,
-    services: string[],
-    parallel: boolean,
-    date: string,
-    slot: number,
-  ) {
-    // 1. Service бүрт хэн ажиллаж чадах вэ?
+  public async etParallelArtists(branch_id: string, services: string[]) {
     const mapping = await this.getServiceArtists(branch_id, services);
-    // Artist ID–уудыг бүхэлд нь цуглуулах
-    const artistIds = Array.from(new Set(Object.values(mapping).flat()));
-    // 2. Artist slots татах
-    const slots = await this.getArtistsSlots(artistIds, date, slot);
-    // 3. Parallel эсэхээс хамаарч тооцоолно
-    let res = parallel
-      ? this.getParallelAvailable(slots, mapping)
-      : this.getSequentialAvailable(mapping, slots);
-    console.log(res);
-    return res;
+
+    return mapping;
   }
 }

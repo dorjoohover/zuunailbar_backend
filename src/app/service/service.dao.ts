@@ -49,6 +49,19 @@ export class ServiceDao {
       [id],
     );
   }
+
+  async getDurationOfServices(id: string[]) {
+    return await this._db.select(
+      `
+       SELECT sum(duration)
+       FROM "${tableName}"
+       WHERE 
+          id = ANY($1)
+      
+       `,
+      [id],
+    );
+  }
   async findName(name: string) {
     return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "name" like %$1%`,

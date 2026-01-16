@@ -26,7 +26,7 @@ import {
 import { AppUtils } from 'src/core/utils/app.utils';
 import { OrderDetailService } from '../order_detail/order_detail.service';
 import { ServiceService } from '../service/service.service';
-import { Order } from './order.entity';
+import { Order, Slot } from './order.entity';
 import { QpayService } from './qpay.service';
 import { ExcelService } from 'src/excel.service';
 import { Response } from 'express';
@@ -38,7 +38,6 @@ import { BadRequest, OrderError } from 'src/common/error';
 import { OrderDetailDto } from '../order_detail/order_detail.dto';
 import { UserServiceService } from '../user_service/user_service.service';
 import { IntegrationService } from '../integrations/integrations.service';
-import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
 import { PaymentService } from '../payment/payment.service';
 
 @Injectable()
@@ -59,7 +58,6 @@ export class OrderService {
     private integrationService: IntegrationService,
     // @Inject(forwardRef(() => PaymentService))
     private payment: PaymentService,
-    private slot: AvailabilitySlotsService,
   ) {}
   public async canPlaceOrder(
     dto: Order,
@@ -109,19 +107,59 @@ export class OrderService {
     )
       this.orderError.cannotChooseHour;
     const uniqueUserIds = Array.from(new Set(details.map((d) => d.user_id)));
-    const slots = await this.slot.findAll({
-      branch_id: dto.branch_id,
-      date: dto.order_date,
-      slots: [+dto.start_time?.slice(0, 2)],
-      artists: uniqueUserIds,
-    });
+    // const slots = await this.slot.findAll({
+    //   branch_id: dto.branch_id,
+    //   date: dto.order_date,
+    //   slots: [+dto.start_time?.slice(0, 2)],
+    //   artists: uniqueUserIds,
+    // });
 
-    if (slots.items.length == 0 && dto.order_status != OrderStatus.Friend)
-      this.orderError.artistTimeUnavailable;
+    // if (slots.items.length == 0 && dto.order_status != OrderStatus.Friend)
+    //   this.orderError.artistTimeUnavailable;
+  }
+  public async getOrderLimit() {
+    return await this.dao.getLimit();
   }
 
+  public async getSlots(pg: PaginationDto) {
+    let { parallel, branch_id, services } = pg;
+    let artists = [];
+    let result: Slot[] = [];
+    let duration = 30;
+    const p = parallel === 'true';
+    if (services) {
+      const service = [services.split(',')];
+      if (service.length > 0) {
+        const artists_res = await this.userService.getByServices({
+          services: service,
+          parallel: p,
+        });
+        artists = artists_res.map((r) => r.user_id);
+      }
+    }
+    if (services.length > 1 && !p) {
+      const service = [services.split(',')];
+      duration =
+        (await this.userService.getDurationOfServices(service))?.[0]?.sum ?? 0;
+    }
+    if (!p && services.length > 1 && +duration > 30) {
+      result = await this.dao.getSlotsQueue({
+        branch_id: pg.branch_id,
+        artists,
+        duration,
+      });
+      console.log(result);
+    } else {
+      result = await this.dao.getSlots({
+        branch_id: pg.branch_id,
+        artists,
+      });
+    }
+    return result;
+  }
   public async updateOrderLimit(limit: number) {
-    this.slot.updateOrderLimit(limit);
+    await this.dao.orderLimit(limit);
+    // this.slot.updateOrderLimit(limit);
   }
   public async getUserCount(user: string) {
     const res = await this.dao.customerCheck(user);
@@ -168,6 +206,10 @@ export class OrderService {
 
       const end_time = toTimeString(Math.floor(endHour), endHour % 1 != 0);
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
+      const order_status =
+        user.role == ADMIN
+          ? OrderStatus.Active
+          : (dto.order_status ?? OrderStatus.Pending);
       const payload: Order = {
         id: AppUtils.uuid4(),
         customer_id: dto.customer_id ?? user.id,
@@ -182,11 +224,9 @@ export class OrderService {
         paid_amount: dto.paid_amount ?? null,
         pre_amount: dto.pre_amount ?? pre ?? 0,
         is_pre_amount_paid: pre == 0,
-        order_status:
-          user.role == ADMIN
-            ? OrderStatus.Active
-            : (dto.order_status ?? OrderStatus.Pending),
+        order_status,
         status: STATUS.Active,
+        created_by: user.id,
         branch_id: dto.branch_id,
       } as const;
       await this.canPlaceOrder(
@@ -198,44 +238,35 @@ export class OrderService {
         dto.details,
         merchant,
       );
-
-      const order = await this.dao.add(payload);
       let startDate = startHour;
-      let details = {};
+      const orderDetails = [];
       for (const d of dto.details ?? []) {
         const service = await this.service.findOne(d.service_id);
         const artist = await this.user.findOne(d.user_id);
 
         const duration = Math.ceil(+service.duration / 60);
         const endDate = startDate + duration;
-        const detail = await this.orderDetail.create({
+        orderDetails.push({
           id: AppUtils.uuid4(),
-          start_time: start_time,
-          end_time: end_time,
-          order_id: order,
+          start_time: toTimeString(Math.floor(startDate), startDate % 1 != 0),
+          end_time: toTimeString(Math.floor(endDate), endDate % 1 != 0),
           service_id: service.id,
+          order_date: orderDate,
           service_name: service.name,
           price: d.price,
           duration: service.duration,
           nickname: artist.nickname,
           description: d.description,
+          status: order_status,
           user_id: artist.id ?? d.user_id,
         });
-        details[service.id] = detail;
 
         if (dto.parallel !== true) startDate = endDate;
       }
+      const order = await this.dao.create(payload, orderDetails);
+
       console.log(startHour, orderDate);
-      await Promise.all(
-        dto.details.map(async (detail) => {
-          await this.slot.updateByArtistAndSlot(
-            detail.user_id,
-            orderDate,
-            `${startHour}`,
-            'REMOVE',
-          );
-        }),
-      );
+
       if (
         dto.method == PaymentMethod.P2P &&
         +(dto.pre_amount ?? pre ?? '0') > 0
@@ -313,18 +344,8 @@ export class OrderService {
 
   public async cancelOrder(id: string) {
     try {
-      const orders = await this.dao.getOrderWithDetail(id);
-      await Promise.all(
-        orders.map(async (order) => {
-          console.log(order);
-          await this.slot.createByArtistWithSlot(
-            order.user_id,
-            [order.order_date],
-            order.start_time.slice(0, 2),
-          );
-        }),
-      );
-      // await this.dao.updateOrderStatus(id, OrderStatus.Cancelled);
+      await this.dao.updateOrderStatus(id, OrderStatus.Cancelled);
+      await this.orderDetail.updateStatusByOrder(id, OrderStatus.Cancelled);
       return true;
     } catch (error) {
       console.log(error);
@@ -533,21 +554,6 @@ export class OrderService {
           // ✏️ UPDATE
           if (prev) {
             console.log('update', dto.start_time);
-            // slot change
-            if (prev.start_time !== d.start_time) {
-              await this.slot.updateByArtistAndSlot(
-                d.user_id,
-                order_date.toString(),
-                prev.start_time,
-                'ADD',
-              );
-              await this.slot.updateByArtistAndSlot(
-                d.user_id,
-                order_date.toString(),
-                dto.start_time.toString(),
-                'REMOVE',
-              );
-            }
 
             await this.orderDetail.update(d.id, d);
             return;
@@ -558,13 +564,6 @@ export class OrderService {
             ...d,
             order_id: id,
           });
-
-          await this.slot.updateByArtistAndSlot(
-            d.user_id,
-            order_date.toString(),
-            d.start_time,
-            'REMOVE',
-          );
         }),
       );
 
@@ -576,13 +575,6 @@ export class OrderService {
       await Promise.all(
         toDelete.map(async (d) => {
           await this.orderDetail.remove(d.id);
-
-          await this.slot.updateByArtistAndSlot(
-            d.user_id,
-            order_date.toString(),
-            d.start_time,
-            'ADD',
-          );
         }),
       );
     } catch (error) {
@@ -749,15 +741,8 @@ export class OrderService {
 
   public async remove(id: string) {
     const details = await this.orderDetail.findByOrder(id);
-    const order = await this.dao.getById(id);
     await Promise.all(
       details.map(async (detail) => {
-        await this.slot.updateByArtistAndSlot(
-          detail.user_id,
-          order.order_date,
-          order.start_time.slice(0, 2),
-          'ADD',
-        );
         await this.orderDetail.remove(detail.id);
       }),
     );

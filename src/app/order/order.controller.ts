@@ -102,11 +102,23 @@ export class OrderController {
     return await this.orderService.report(pg, CLIENT, res);
   }
   @Get('limit/:limit')
-  @Admin()
+  // @Admin()
+  @Public()
   @ApiParam({ name: 'limit' })
   async limit(@Param('limit') limit: number) {
     return this.orderService.updateOrderLimit(limit);
   }
+  @Public()
+  @Get('get-limit')
+  async getLimit() {
+    return this.orderService.getOrderLimit();
+  }
+  @Get('slots')
+  @PQ(['artists', 'date', 'branch_id', 'parellel', 'artist_id'])
+  findSlots(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.orderService.getSlots(pg);
+  }
+
   @Get('user_count')
   async userCount(@Req() { user }) {
     return this.orderService.getUserCount(user.user.id);

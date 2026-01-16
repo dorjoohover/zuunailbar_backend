@@ -15,7 +15,16 @@ export class Order {
   discount_type: number;
   status: number;
   created_at?: Date;
+  created_by?: string;
   salary_date?: Date;
   updated_at?: Date;
   branch_id?: string;
+}
+
+export class Slot {
+  branch_id: string;
+  artist_id: string;
+  date: Date;
+  start_time: Date;
+  end_time: Date;
 }

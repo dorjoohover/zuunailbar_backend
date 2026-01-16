@@ -46,7 +46,6 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { SystemLogger } from './system-logger.service';
 import { BranchLeavesModule } from './app/branch_leaves/branch_leaves.module';
 import { ArtistLeavesModule } from './app/artist_leaves/artist_leaves.module';
-import { AvailabilitySlotsModule } from './app/availability_slots/availability_slots.module';
 import { PaymentModule } from './app/payment/payment.module';
 
 @Module({
@@ -89,7 +88,6 @@ import { PaymentModule } from './app/payment/payment.module';
     EmailModule,
     BranchLeavesModule,
     ArtistLeavesModule,
-    AvailabilitySlotsModule,
     PaymentModule,
   ],
   controllers: [AppController],

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { OrderDetail } from './order_detail.entity';
+import { BadRequest, OrderError } from 'src/common/error';
 
 const tableName = 'order_details';
 
@@ -18,13 +19,44 @@ export class OrderDetailDao {
       'nickname',
       'start_time',
       'end_time',
+      'order_date',
       'description',
       'service_name',
       'price',
       'status',
     ]);
   }
-
+  async create(client: any, body: any) {
+    try {
+      console.log(body)
+      await this._db.insertTx(
+        client,
+        tableName,
+        {
+          ...body,
+        },
+        [
+          'id',
+          'order_id',
+          'service_id',
+          'user_id',
+          'nickname',
+          'start_time',
+          'end_time',
+          'order_date',
+          'description',
+          'service_name',
+          'price',
+          'status',
+        ],
+      );
+    } catch (error) {
+      console.log(error);
+      if (error?.message?.includes('no_artist_time_overlap')) {
+        throw new OrderError().artistTimeUnavailable;
+      }
+    }
+  }
   async update(data: any, attr: string[]): Promise<number> {
     return await this._db.update(tableName, data, attr, [
       new SqlCondition('id', '=', data.id),
@@ -47,7 +79,7 @@ export class OrderDetailDao {
 
   async updateStatus(id: string, status: number): Promise<number> {
     return await this._db._update(
-      `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
+      `UPDATE "${tableName}" SET "status"=$1 WHERE "order_id"=$2`,
       [status, id],
     );
   }

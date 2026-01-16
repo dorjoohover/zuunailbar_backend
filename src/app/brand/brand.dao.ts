@@ -15,6 +15,7 @@ export class BrandDao {
       'id',
       'name',
       'merchant_id',
+      'url',
       'status',
       'order_days',
     ]);

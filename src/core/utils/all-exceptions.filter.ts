@@ -25,11 +25,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     let status: number = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string = 'Системийн алдаа';
-
+    console.log(exception);
     try {
       if (exception instanceof HttpException) {
         status = exception.getStatus();
         const res = exception.getResponse();
+        console.log(res)
         if (typeof res === 'string') message = res;
         else if (typeof res === 'object' && (res as any).message)
           message = (res as any).message;

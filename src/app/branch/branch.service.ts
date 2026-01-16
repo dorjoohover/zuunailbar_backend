@@ -7,7 +7,6 @@ import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { BranchServiceService } from '../branch_service/branch_service.service';
 import { User } from '../user/user.entity';
-import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
 import { UserService } from '../user/user.service';
 
 @Injectable()
@@ -16,8 +15,6 @@ export class BranchService {
     private readonly dao: BranchDao,
     @Inject(forwardRef(() => BranchServiceService))
     private service: BranchServiceService,
-    @Inject(forwardRef(() => AvailabilitySlotsService))
-    private slot: AvailabilitySlotsService,
     @Inject(forwardRef(() => UserService))
     private user: UserService,
   ) {}
@@ -51,14 +48,12 @@ export class BranchService {
   }
   public async update(id: string, dto: BranchDto) {
     const res = await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
-    await this.slot.update({ id, isArtist: false });
     await this.user.updateBranch(id);
     return res;
   }
 
   public async remove(id: string) {
     const res = await this.dao.updateStatus(id, STATUS.Hidden);
-    await this.slot.update({ id, isArtist: false });
     return res;
   }
 }

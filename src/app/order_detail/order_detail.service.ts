@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { OrderDetailDao } from './order_detail.dao';
 import { OrderDetailDto } from './order_detail.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
-import { CLIENT, getDefinedKeys, STATUS } from 'src/base/constants';
+import {
+  CLIENT,
+  getDefinedKeys,
+  OrderStatus,
+  STATUS,
+} from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { UserService } from '../user/user.service';
@@ -48,7 +53,9 @@ export class OrderDetailService {
     const { start_time, end_time, ...body } = dto;
     return await this.dao.update({ ...body, id }, getDefinedKeys(body));
   }
-
+  public async updateStatusByOrder(id: string, status: OrderStatus) {
+    return await this.dao.updateStatus(id, status);
+  }
   public async remove(id: string) {
     return await this.dao.updateStatus(id, STATUS.Hidden);
   }

@@ -6,5 +6,6 @@ export class Branch {
   public address: string;
   public status: number;
   public order_days: number;
+  public url?: string;
   public created_at?: Date;
 }

@@ -10,15 +10,10 @@ import {
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { BadRequest } from 'src/common/error';
-import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
 
 @Injectable()
 export class BookingService {
-  constructor(
-    private readonly dao: BookingDao,
-    @Inject(forwardRef(() => AvailabilitySlotsService))
-    private slot: AvailabilitySlotsService,
-  ) {}
+  constructor(private readonly dao: BookingDao) {}
   public async create(dto: BookingDto, merchant: string, user: string) {
     if (!dto.times || dto.times.length == 0)
       throw new BadRequest().notFound('Цаг');
@@ -38,7 +33,6 @@ export class BookingService {
       end_time: toTimeString(end),
       merchant_id: merchant,
     });
-    this.slot.update({ id: dto.branch_id, isArtist: false });
   }
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
@@ -74,7 +68,6 @@ export class BookingService {
       { ...dto, start_time, end_time, times, id },
       getDefinedKeys({ ...dto, start_time, end_time, times }, true),
     );
-    if (dto.branch_id) this.slot.update({ id: dto.branch_id, isArtist: false });
     return res;
   }
 
@@ -88,6 +81,5 @@ export class BookingService {
         await this.dao.deleteBooking(booking.id);
       }),
     );
-    this.slot.update({ id: branch_id, isArtist: false });
   }
 }

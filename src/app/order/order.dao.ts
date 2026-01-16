@@ -3,12 +3,16 @@ import { OrderStatus, STATUS, ubDateAt00 } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Order } from './order.entity';
+import { OrderDetailDao } from '../order_detail/order_detail.dao';
 
 const tableName = 'orders';
 
 @Injectable()
 export class OrdersDao {
-  constructor(private readonly _db: AppDB) {}
+  constructor(
+    private readonly _db: AppDB,
+    private details: OrderDetailDao,
+  ) {}
 
   async add(data: Order) {
     try {
@@ -34,6 +38,40 @@ export class OrdersDao {
     }
   }
 
+  async create(order: any, details: any) {
+    try {
+      return this._db.withTransaction(async (client) => {
+        const orderId = await this._db.insertTx(client, tableName, order, [
+          'id',
+          'customer_id',
+          'duration',
+          'order_date',
+          'start_time',
+          'end_time',
+          'status',
+          'pre_amount',
+          'branch_id',
+          'is_pre_amount_paid',
+          'salary_date',
+          'created_by',
+          'total_amount',
+          'paid_amount',
+          'description',
+          'order_status',
+        ]);
+        await Promise.all(
+          details.map(async (detail) => {
+            await this.details.create(client, { ...detail, order_id: orderId });
+          }),
+        );
+
+        return orderId;
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
   async update(data: any, attr: string[]): Promise<number> {
     return await this._db.update(tableName, data, attr, [
       new SqlCondition('id', '=', data.id),
@@ -54,6 +92,7 @@ export class OrdersDao {
   `;
     return this._db._update(query, [date ?? null, id]);
   }
+
   async updatePrePaid(id: string, paid: boolean): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "is_pre_amount_paid"=$1 WHERE "id"=$2`,
@@ -135,6 +174,124 @@ export class OrdersDao {
     const params = [id];
 
     return await this._db.select(sql, params);
+  }
+
+  async getSlots(input: {
+    branch_id: string;
+    artists?: string[];
+    date?: Date;
+    time?: Date;
+  }) {
+    const { branch_id, date, time, artists } = input;
+    const params = [];
+    params.push(branch_id);
+    console.log(artists);
+    let sql = `
+  SELECT branch_id, artist_id, date, start_time, end_time
+  FROM availability_slots
+  WHERE branch_id = $1
+
+
+`;
+
+    if (artists && artists.length > 0) {
+      sql += `   AND artist_id = ANY($2)`;
+      params.push(artists);
+    }
+
+    sql += '  ORDER BY date;';
+    const res = await this._db.select(sql, params);
+    return res;
+  }
+
+  async getSlotsQueue(input: {
+    branch_id: string;
+    artists?: string[];
+    date?: Date;
+    duration: number; // minutes
+  }) {
+    const { branch_id, artists, date, duration } = input;
+
+    const params: any[] = [];
+    let i = 1;
+
+    let sql = `
+WITH ordered AS (
+  SELECT
+    branch_id,
+    artist_id,
+    date,
+    start_time,
+    end_time,
+    LAG(end_time) OVER (
+      PARTITION BY branch_id, artist_id, date
+      ORDER BY start_time
+    ) AS prev_end
+  FROM availability_slots
+  WHERE branch_id = $${i++}
+`;
+    params.push(branch_id);
+
+    if (artists && artists.length > 0) {
+      sql += ` AND artist_id = ANY($${i++})`;
+      params.push(artists);
+    }
+
+    if (date) {
+      sql += ` AND date = $${i++}`;
+      params.push(date);
+    }
+
+    sql += `
+),
+
+grp AS (
+  SELECT *,
+    SUM(
+      CASE
+        WHEN prev_end = start_time THEN 0
+        ELSE 1
+      END
+    ) OVER (
+      PARTITION BY branch_id, artist_id, date
+      ORDER BY start_time
+    ) AS grp_id
+  FROM ordered
+),
+
+ranges AS (
+  SELECT
+    branch_id,
+    artist_id,
+    date,
+    MIN(start_time) AS range_start,
+    MAX(end_time)   AS range_end
+  FROM grp
+  GROUP BY branch_id, artist_id, date, grp_id
+  HAVING MAX(end_time) - MIN(start_time) >= interval '${duration} min'
+)
+
+SELECT
+  r.branch_id,
+  r.artist_id,
+  r.date,
+
+  gs.start_ts::time AS start_time,
+  (gs.start_ts + interval '${duration} min')::time AS end_time
+
+FROM ranges r
+CROSS JOIN LATERAL generate_series(
+  r.date + r.range_start,
+  r.date + r.range_end - interval '2 hours',
+  interval '1 hour'
+) gs(start_ts)
+
+ORDER BY r.date, start_time;
+`;
+
+    // params.push(`'${duration} min'`);
+    console.log(sql, params);
+    return this._db.select(sql, params);
   }
 
   async getOrders(userId: string) {
@@ -251,6 +408,21 @@ export class OrdersDao {
     const items = await this._db.select(sql, builder.values);
     console.log(sql, builder.values, builder.values);
     return { count, items };
+  }
+
+  async orderLimit(value: number) {
+    const sql = `UPDATE app_config
+SET value = ${value}
+WHERE key = 'availability_days';`;
+    const result = await this._db.select(sql, []);
+    return result;
+  }
+
+  async getLimit() {
+    const sql = `SELECT value
+FROM app_config
+WHERE key = 'availability_days';`;
+    return await this._db.select(sql, []);
   }
 
   async customerCheck(customer_id: string): Promise<number> {

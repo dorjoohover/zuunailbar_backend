@@ -11,11 +11,13 @@ export class OrderDetailDto {
   service_name: string;
   description: string;
   user_id: string;
+  order_date: string;
   nickname: string;
   @ApiProperty()
   price: number;
   @ApiProperty()
   duration: number;
+  status: number;
   start_time: string;
   end_time: string;
 }

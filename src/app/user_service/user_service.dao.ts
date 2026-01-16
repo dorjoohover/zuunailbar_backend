@@ -83,13 +83,30 @@ export class UserServiceDao {
     );
   }
 
-  async getByServices(services: string, user?: string) {
+  async getByServices(services: string[], u?: string) {
+    const user = u || '';
     return await this._db.select(
-      `SELECT id, user_id, service_id 
-     FROM "${tableName}" 
-     WHERE status = ${STATUS.Active} 
-       AND ($1 = ANY(string_to_array("service_id", ',')) OR user_id = $2)`,
-      [services, user],
+      `
+    SELECT user_id
+    FROM "${tableName}"
+    WHERE status = $1
+      AND service_id = ANY($2)
+      group by user_id
+    `,
+      [STATUS.Active, services],
+    );
+  }
+  async getByServicesAll(services: string[], u?: string) {
+    return await this._db.select(
+      `
+    SELECT user_id
+    FROM "${tableName}"
+    WHERE status = $1
+      AND service_id = ANY($2)
+    GROUP BY user_id
+    HAVING COUNT(DISTINCT service_id) = $3
+    `,
+      [STATUS.Active, services, services.length],
     );
   }
 

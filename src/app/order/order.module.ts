@@ -10,13 +10,10 @@ import { QpayService } from './qpay.service';
 import { HttpModule } from '@nestjs/axios';
 import { ExcelService } from 'src/excel.service';
 import { UserModule } from '../user/user.module';
-import { BookingModule } from '../booking/booking.module';
-import { ScheduleModule } from '../schedule/schedule.module';
 import { AllExceptionsFilter } from 'src/core/utils/all-exceptions.filter';
 import { FileErrorLogService } from 'src/error-log.service';
 import { UserServiceModule } from '../user_service/user_service.module';
 import { IntegrationModule } from '../integrations/integrations.module';
-import { AvailabilitySlotsModule } from '../availability_slots/availability_slots.module';
 import { PaymentModule } from '../payment/payment.module';
 
 @Module({
@@ -29,7 +26,6 @@ import { PaymentModule } from '../payment/payment.module';
     UserModule,
     IntegrationModule,
     UserServiceModule,
-    AvailabilitySlotsModule,
     forwardRef(() => PaymentModule),
   ],
   controllers: [OrderController],

@@ -24,7 +24,6 @@ import { RegisterDto } from 'src/auth/auth.dto';
 import { BranchService } from '../branch/branch.service';
 import { UserServiceService } from '../user_service/user_service.service';
 import { UserSalariesService } from '../user_salaries/user_salaries.service';
-import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
 @Injectable()
 export class UserService {
   constructor(
@@ -32,7 +31,6 @@ export class UserService {
     private readonly userService: UserServiceService,
     private readonly userSalary: UserSalariesService,
     private readonly branchService: BranchService,
-    private slot: AvailabilitySlotsService,
   ) {}
   public async create(
     dto: UserDto,
@@ -166,7 +164,7 @@ export class UserService {
     });
 
     if (services && filter.role == E_M) {
-      const service = await this.userService.search(services);
+      const service = await this.userService.getByServices(services.split(','));
       res = service
         .map((s) => res.find((r) => r.id == s.user_id))
         .filter((d) => d != undefined);
@@ -222,7 +220,6 @@ export class UserService {
         ).name;
       }
       const res = await this.dao.update(body, getDefinedKeys(body));
-      this.slot.update({ id: id, isArtist: true });
       return res;
     } catch (error) {
       console.log(error);
@@ -250,12 +247,10 @@ export class UserService {
   public async updateStatus(id: string) {
     const res = await this.dao.updateStatus(id, STATUS.Hidden);
 
-    this.slot.update({ id: id, isArtist: true });
     return res;
   }
   public async updateUserStatus(id: string, status: UserStatus) {
     const res = await this.dao.updateUserStatus(id, status);
-    this.slot.update({ id: id, isArtist: true });
     return res;
   }
   public async updateLevel(id: string, level: UserLevel) {

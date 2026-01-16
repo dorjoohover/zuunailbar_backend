@@ -94,6 +94,10 @@ export class ServiceService {
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }
+
+  public async getDurationOfServices(ids: string[]) {
+    return await this.dao.getDurationOfServices(ids)
+  }
   public async findByName(name: string) {
     return await this.dao.findName(name);
   }

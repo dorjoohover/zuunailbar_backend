@@ -10,19 +10,14 @@ import {
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
-import { AvailabilitySlotsService } from '../availability_slots/availability_slots.service';
 
 @Injectable()
 export class BranchLeavesService {
-  constructor(
-    private dao: BranchLeavesDao,
-    private slots: AvailabilitySlotsService,
-  ) {}
+  constructor(private dao: BranchLeavesDao) {}
   public async create(dto: BranchLeaveDto, user: string) {
     const { dates, ...body } = dto;
     return await Promise.all(
       dates.map(async (date) => {
-        await this.slots.removeByBranch(dto.branch_id, [date]);
         const leave = await this.dao.getByDateAndBranch(body.branch_id, date);
         if (leave) return leave.id;
         return await this.dao.add({
@@ -44,9 +39,6 @@ export class BranchLeavesService {
 
   public async removeByDate(branch: string, user: string, dates?: Date[]) {
     const res = await this.dao.deleteByBranch(branch, dates);
-    const { items } = await this.findAll({ branch_id: branch }, CLIENT);
-    const limits = items.map((i) => i.date.toISOString().slice(0, 10));
-    await this.slots.createByBranch(branch, dates, limits);
     return res;
   }
 }
