@@ -17,9 +17,15 @@ export class BookingService {
   public async create(dto: BookingDto, merchant: string, user: string) {
     if (!dto.times || dto.times.length == 0)
       throw new BadRequest().notFound('Цаг');
-    const times = dto.times.map((time) => Number(time));
+    const times = dto.times.map((time) => {
+      let format = +time.slice(0, 2);
+      if (time.includes(':30')) format += 0.5;
+      return format;
+    });
     const start = Math.min(...times);
     const end = Math.max(...times);
+    const start_time = toTimeString(Math.floor(start), start % 1 == 0);
+    const end_time = toTimeString(Math.floor(end), end % 1 == 0);
 
     await this.dao.add({
       ...dto,
@@ -29,8 +35,8 @@ export class BookingService {
       booking_status: ScheduleStatus.Active,
       index: dto.index,
       times: dto.times?.join('|'),
-      start_time: toTimeString(start),
-      end_time: toTimeString(end),
+      start_time: start_time,
+      end_time: end_time,
       merchant_id: merchant,
     });
   }
@@ -57,11 +63,15 @@ export class BookingService {
     let start_time = null,
       end_time = null;
     if (dto.times) {
-      const times = dto.times.map((time) => Number(time));
+      const times = dto.times.map((time) => {
+        let format = +time.slice(0, 2);
+        if (time.includes(':30')) format += 0.5;
+        return format;
+      });
       const start = Math.min(...times);
       const end = Math.max(...times);
-      start_time = toTimeString(start);
-      end_time = toTimeString(end);
+      start_time = toTimeString(Math.floor(start), start % 1 == 0);
+      end_time = toTimeString(Math.floor(end), end % 1 == 0);
     }
 
     const res = await this.dao.update(

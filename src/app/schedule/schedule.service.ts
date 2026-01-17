@@ -36,9 +36,15 @@ export class ScheduleService {
         'Боломжтой сул цагтай артист энэ цагт байхгүй байна',
         400,
       );
-    const times = dto.times.map((time) => Number(time));
+    const times = dto.times.map((time) => {
+      let format = +time.slice(0, 2);
+      if (time.includes(':30')) format += 0.5;
+      return format;
+    });
     const start = Math.min(...times);
     const end = Math.max(...times);
+    const start_time = toTimeString(Math.floor(start), start % 1 == 0);
+    const end_time = toTimeString(Math.floor(end), end % 1 == 0);
     const meta = {
       mobile: artist.mobile,
       nickname: artist.nickname,
@@ -51,8 +57,8 @@ export class ScheduleService {
       schedule_status: ScheduleStatus.Active,
       index: dto.index,
       times: dto.times?.join('|'),
-      start_time: toTimeString(start),
-      end_time: toTimeString(end),
+      start_time,
+      end_time,
       user_id: dto.user_id,
       branch_id: artist.branch_id,
       meta,
@@ -82,11 +88,15 @@ export class ScheduleService {
     let start_time = null,
       end_time = null;
     if (dto.times && times != '') {
-      const times = dto.times.map((time) => Number(time));
+      const times = dto.times.map((time) => {
+        let format = +time.slice(0, 2);
+        if (time.includes(':30')) format += 0.5;
+        return format;
+      });
       const start = Math.min(...times);
       const end = Math.max(...times);
-      start_time = toTimeString(start);
-      end_time = toTimeString(end);
+      start_time = toTimeString(Math.floor(start), start % 1 == 0);
+      end_time = toTimeString(Math.floor(end), end % 1 == 0);
     }
 
     const res = await this.dao.update(

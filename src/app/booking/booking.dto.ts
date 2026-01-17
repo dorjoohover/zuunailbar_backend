@@ -10,7 +10,7 @@ export class BookingDto {
   // status: number;
 
   @ApiProperty()
-  times?: number[];
+  times?: string[];
 }
 
 export interface BookingListType {
