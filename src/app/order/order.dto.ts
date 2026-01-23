@@ -37,6 +37,7 @@ export class OrderDto {
   method: PaymentMethod;
   @ApiProperty({ isArray: true })
   details: OrderDetailDto[];
+  updated_at?: Date;
 }
 
 export enum ReportFormat {

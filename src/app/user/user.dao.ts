@@ -181,6 +181,7 @@ export class UserDao {
       .conditionIfNotEmpty('merchant_id', '=', filter.merchant)
       .conditionIfNotEmpty('branch_id', '=', filter.branch_id)
       .conditionIfNotEmpty('status', '=', filter.status)
+      .conditionIfNotEmpty('user_status', '=', filter.user_status)
       .conditionIfNotEmpty(
         'role',
         filter.role == 35 ? '<=' : '=',

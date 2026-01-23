@@ -14,20 +14,12 @@ export class TasksService {
   constructor(
     private readonly order: OrderService,
     // private integration: IntegrationService,
-
   ) {}
-  //   @Cron(CronExpression.EVERY_DAY_AT_11PM)
-
-  // @Cron('0 0 * * *', {
-  //   timeZone: 'Asia/Ulaanbaatar',
-  // })
-  // async handleCron() {
-  //   const today = toYMD(new Date());
-  //   await this.updateArtistSlots(today);
-  //   await this.updateBranchSlots(today);
-
-  //   console.log('Runs every day at ', new Date());
-  // }
+  @Cron(CronExpression.EVERY_MINUTE)
+  public async checkPendingOrders() {
+    await this.order.checkOrders();
+    console.log(new Date());
+  }
   // @Cron(CronExpression.EVERY_10_SECONDS)
   // public async handleCron() {
   //   const date = ubDateAt00();

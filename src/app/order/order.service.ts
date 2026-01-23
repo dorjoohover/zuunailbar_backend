@@ -106,16 +106,6 @@ export class OrderService {
       isSameDay(date, dto.order_date)
     )
       this.orderError.cannotChooseHour;
-    const uniqueUserIds = Array.from(new Set(details.map((d) => d.user_id)));
-    // const slots = await this.slot.findAll({
-    //   branch_id: dto.branch_id,
-    //   date: dto.order_date,
-    //   slots: [+dto.start_time?.slice(0, 2)],
-    //   artists: uniqueUserIds,
-    // });
-
-    // if (slots.items.length == 0 && dto.order_status != OrderStatus.Friend)
-    //   this.orderError.artistTimeUnavailable;
   }
   public async getOrderLimit() {
     return await this.dao.getLimit();
@@ -382,13 +372,7 @@ export class OrderService {
               { ...pg, order_id: item.id },
               role,
             );
-
-            if (
-              pg.user_id &&
-              !detail.items.some((d) => d.user_id !== pg.user_id)
-            ) {
-              return undefined;
-            }
+            if (detail.items.length == 0) return;
 
             // Давхар user-уудыг арилгах
             const users = Array.from(
@@ -409,6 +393,7 @@ export class OrderService {
             const created_by = item.created_by
               ? await this.user.findOne(item.created_by)
               : undefined;
+
             return {
               ...item,
               order_date,
@@ -524,17 +509,30 @@ export class OrderService {
     });
   }
 
+  public async checkOrders() {
+    const res = await this.dao.getCancelOrders();
+    console.log(res);
+    await Promise.all(
+      res.map(async (r) => {
+        await this.updateStatus(r.id, OrderStatus.Cancelled);
+        await this.orderDetail.updateStatusByOrder(r.id, OrderStatus.Cancelled);
+      }),
+    );
+  }
+
   public async update(id: string, dto: OrderDto) {
-    const { details, parallel, order_date, ...payload } = dto;
+    let { details, parallel, order_date, ...body } = dto;
+    let payload = body;
 
     try {
-      console.log(payload, order_date, dto, 'order update');
       const order = await this.findOne(id);
       if (!order) return;
+
       const start_time = timeToDecimal(dto.start_time.toString());
+
+      // ⏱ end_time автоматаар бодох
       if (!payload.end_time) {
         const hasHalfHour = start_time % 1 !== 0;
-
         const duration = +order.duration + (hasHalfHour ? 30 : 0);
 
         payload.end_time = toTimeString(
@@ -542,17 +540,59 @@ export class OrderService {
           hasHalfHour,
         );
       }
+
+      /**
+       * 💰 PAYMENT / PRICE VALIDATION
+       */
+      const hasAnyPrice = details.some((d) => +(d.price ?? 0) > 0);
+
+      const paidAmount = +(payload.paid_amount ?? 0);
+      const preAmount = +(payload.pre_amount ?? 0);
+      let status = order.order_status;
+      if (preAmount > 0 && status == OrderStatus.Active) {
+        if (!hasAnyPrice) {
+          this.orderError.EMPLOYEE_SERVICE_PRICE_REQUIRED;
+        }
+
+        if (paidAmount <= 0) {
+          this.orderError.PAID_AMOUNT_REQUIRED;
+        }
+
+        const total = preAmount + paidAmount;
+
+        const artistAmounts =
+          details.length > 1
+            ? details.reduce((sum, d) => sum + +(d.price ?? 0), 0)
+            : total;
+
+        if (total !== artistAmounts) {
+          this.orderError.PAID_AMOUNT_REQUIRED;
+        }
+
+        payload.total_amount = total;
+        payload.order_status = OrderStatus.Finished;
+        status = OrderStatus.Finished;
+
+        // ганц detail байвал автоматаар үнэ суулгах
+        if (details.length === 1 && +details[0].price === 0) {
+          details[0].price = total;
+        }
+      }
+      if (order.order_status != payload.order_status) {
+        payload.updated_at = new Date();
+      }
+
       // 1️⃣ Order update
       await this.dao.update({ id, ...payload }, getDefinedKeys(payload));
 
-      // 2️⃣ Existing details map (O(1) lookup)
+      // 2️⃣ Existing details
       const existingDetails = await this.orderDetail.findByOrder(id);
       const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
-
       const incomingIds = details.map((d) => d.id).filter(Boolean);
 
-      // 3️⃣ Handle create / update
-      let startDate = timeToDecimal(dto.start_time.toString());
+      // 3️⃣ Create / Update
+      let startDate = start_time;
+
       await Promise.all(
         details.map(async (d) => {
           const prev = d.id ? existingMap.get(d.id) : null;
@@ -560,40 +600,39 @@ export class OrderService {
 
           const duration = +service.duration / 60;
           const endDate = startDate + duration;
-          let payload = {
-            ...d,
-            start_time: toTimeString(Math.floor(startDate), startDate % 1 != 0),
-            end_time: toTimeString(Math.floor(endDate), endDate % 1 != 0),
-          };
-          // ✏️ UPDATE
-          if (prev) {
-            console.log('update', dto.start_time);
 
-            await this.orderDetail.update(d.id, payload);
-            return;
+          const detailPayload = {
+            ...d,
+            start_time: toTimeString(
+              Math.floor(startDate),
+              startDate % 1 !== 0,
+            ),
+            status: status,
+            end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
+          };
+
+          if (prev) {
+            await this.orderDetail.update(d.id, detailPayload);
+          } else {
+            await this.orderDetail.create({
+              ...detailPayload,
+              order_id: id,
+            });
           }
 
-          // ➕ CREATE
-          await this.orderDetail.create({
-            ...d,
-            order_id: id,
-          });
+          startDate = endDate;
         }),
       );
 
-      // 4️⃣ Handle delete
+      // 4️⃣ Delete removed details
       const toDelete = existingDetails.filter(
         (d) => !incomingIds.includes(d.id),
       );
 
-      await Promise.all(
-        toDelete.map(async (d) => {
-          await this.orderDetail.remove(d.id);
-        }),
-      );
+      await Promise.all(toDelete.map((d) => this.orderDetail.remove(d.id)));
     } catch (error) {
       console.error('Order update failed:', error);
-      // throw error;
+      throw error;
     }
   }
   public async updateStatus(id: string, status: OrderStatus) {

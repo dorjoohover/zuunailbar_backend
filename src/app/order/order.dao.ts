@@ -80,7 +80,7 @@ export class OrdersDao {
 
   async updateOrderStatus(id: string, status: number): Promise<number> {
     return await this._db._update(
-      `UPDATE "${tableName}" SET "order_status"=$1 WHERE "id"=$2`,
+      `UPDATE "${tableName}" SET "order_status"=$1 , updated_at = now() WHERE "id"=$2`,
       [status, id],
     );
   }
@@ -112,7 +112,17 @@ export class OrdersDao {
       [mobile],
     );
   }
-
+  async getCancelOrders() {
+    return this._db.select(
+      `
+    SELECT *
+    FROM "${tableName}"
+    WHERE order_status = $1
+      AND created_at < now() - interval '10 minutes'
+    `,
+      [OrderStatus.Pending],
+    );
+  }
   async getById(id: string) {
     return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "id"=$1`,
@@ -185,7 +195,6 @@ export class OrdersDao {
     const { branch_id, date, time, artists } = input;
     const params = [];
     params.push(branch_id);
-    console.log(artists);
     let sql = `
   SELECT branch_id, artist_id, date, start_time, end_time
   FROM availability_slots

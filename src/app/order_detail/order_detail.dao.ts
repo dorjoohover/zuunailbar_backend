@@ -118,6 +118,7 @@ export class OrderDetailDao {
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('order_id', '=', query.order_id)
       .conditionIfNotEmpty('service_id', '=', query.service_id)
+      .conditionIfNotEmpty('user_id', '=', query.user_id)
 
       .criteria();
     const sql =

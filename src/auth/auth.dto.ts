@@ -26,6 +26,12 @@ export class ResetPasswordDto {
   @ApiProperty()
   otp: string;
 }
+export class ResetCurrentPasswordDto {
+  @ApiProperty()
+  password: string;
+  @ApiProperty()
+  newPassword: string;
+}
 export class OtpDto {
   @ApiProperty()
   mobile: string;

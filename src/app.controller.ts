@@ -15,6 +15,7 @@ import {
   LoginDto,
   OtpDto,
   RegisterDto,
+  ResetCurrentPasswordDto,
   ResetPasswordDto,
 } from './auth/auth.dto';
 import { AuthService } from './auth/auth.service';
@@ -97,6 +98,12 @@ export class AppController {
     } catch (error) {
       return false;
     }
+  }
+
+  @Post('/reset_password')
+  async resetPassword(@Body() dto: ResetCurrentPasswordDto, @Req() { user }) {
+    await this.authService.resetPassword(dto, user.user.mobile);
+    return true;
   }
 
   @Public()

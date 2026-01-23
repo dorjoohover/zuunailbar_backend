@@ -102,6 +102,21 @@ export class OrderError {
       HttpStatus.BAD_REQUEST,
     );
   }
+  // ajiltnii uilchilgee tus buriin uniin dung oruulaagui bn 
+  get EMPLOYEE_SERVICE_PRICE_REQUIRED() {
+    throw new HttpException(
+      'Ажилтны үйлчилгээ тус бүрийн үнийн дүнг заавал оруулах шаардлагатай.',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+  // tolbor tolson uniin dung oruulaagui bn 
+  get PAID_AMOUNT_REQUIRED() {
+    throw new HttpException(
+      'Төлсөн үнийн дүнг заавал оруулах шаардлагатай.',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+
 
   // Алдаатай цаг (жишээ нь 25)
   get invalidHour() {

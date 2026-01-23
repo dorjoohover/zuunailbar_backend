@@ -2,7 +2,12 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AdminUserService } from 'src/app/admin.user/admin.user.service';
-import { LoginDto, RegisterDto, ResetPasswordDto } from './auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  ResetCurrentPasswordDto,
+  ResetPasswordDto,
+} from './auth.dto';
 import { MobileFormat } from 'src/common/formatter';
 import { UserService } from 'src/app/user/user.service';
 import { ADMIN, CLIENT } from 'src/base/constants';
@@ -187,5 +192,10 @@ export class AuthService {
   async reset(dto: ResetPasswordDto) {
     if (!this.checkOtp(dto.otp, dto.mobile)) return;
     return await this.userService.resetPassword(dto.mobile, dto.password);
+  }
+  async resetPassword(dto: ResetCurrentPasswordDto, mobile: string) {
+    await this.validateAdminUser(mobile, dto.password);
+    const res = await this.userService.resetPassword(mobile, dto.newPassword);
+    return res;
   }
 }
