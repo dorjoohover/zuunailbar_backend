@@ -83,13 +83,14 @@ export class UserServiceService {
     services: string[];
     user?: string;
     parallel: boolean;
+    branch_id: string;
   }) {
-    const { services, parallel } = input;
+    const { services, parallel, branch_id } = input;
     console.log(parallel, services.length);
     if (parallel || services.length == 1) {
-      return await this.dao.getByServices(services);
+      return await this.dao.getByServices({ services, branch_id });
     } else {
-      return await this.dao.getByServicesAll(services);
+      return await this.dao.getByServicesAll({ services, branch_id });
     }
   }
 
