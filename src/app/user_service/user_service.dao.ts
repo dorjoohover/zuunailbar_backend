@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { STATUS } from 'src/base/constants';
+import { STATUS, UserStatus } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { UserService } from './user_service.entity';
@@ -89,12 +89,13 @@ export class UserServiceDao {
     return await this._db.select(
       `
     SELECT user_id
-    FROM "${tableName}"
-    WHERE status = $1
-      AND service_id = ANY($2) and branch_id = $3
+    FROM "${tableName}" us
+    inner join users u on u.id = us.user_id 
+    WHERE us.status = $1 
+      AND service_id = ANY($2) and us.branch_id = $3 and u.user_status = $4
       group by user_id
     `,
-      [STATUS.Active, services, branch_id],
+      [STATUS.Active, services, branch_id, UserStatus.Active],
     );
   }
   async getByServicesAll(input: {
@@ -106,13 +107,14 @@ export class UserServiceDao {
     return await this._db.select(
       `
     SELECT user_id
-    FROM "${tableName}"
-    WHERE status = $1
-      AND service_id = ANY($2) and branch_id = $3
+    FROM "${tableName}" us
+        inner join users u on u.id = us.user_id 
+    WHERE us.status = $1
+      AND service_id = ANY($2) and us.branch_id = $3 and u.user_status = $4
     GROUP BY user_id
-    HAVING COUNT(DISTINCT service_id) = $4
+    HAVING COUNT(DISTINCT service_id) = $5
     `,
-      [STATUS.Active, services, branch_id, services.length],
+      [STATUS.Active, services, branch_id, UserStatus.Active, services.length],
     );
   }
 

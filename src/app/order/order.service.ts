@@ -144,7 +144,7 @@ export class OrderService {
       console.log(result, 'queue');
     } else {
       result = await this.dao.getSlots({
-        branch_id: pg.branch_id,
+        branch_id: branch_id,
         artists,
       });
       console.log(result, 'other');
