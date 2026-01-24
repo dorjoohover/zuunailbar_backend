@@ -87,7 +87,7 @@ export class BranchServiceDao {
       .conditionIfNotEmpty('id', '=', query.id)
       .conditionIfNotEmpty('service_id', '=', query.service_id)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
-      .conditionIfNotEmpty('status', '=', query.status);
+      .conditionIfNotEmpty('status', '=', STATUS.Active);
 
     const criteria = builder.criteria();
     let sql = `SELECT ${columns ?? '*'} FROM "${tableName}" ${criteria} order by ${query.order_by ?? 'created_at'} ${query.sort === 'false' ? 'asc' : 'desc'} `;

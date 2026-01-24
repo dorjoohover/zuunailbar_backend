@@ -53,7 +53,7 @@ export class BranchService {
   }
 
   public async remove(id: string) {
-    const res = await this.dao.updateStatus(id, STATUS.Hidden);
+    const res = await this.dao.remove(id);
     return res;
   }
 }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Branch } from './branch.entity';
+import { STATUS } from 'src/base/constants';
 
 const tableName = 'branches';
 
@@ -31,6 +32,96 @@ export class BranchDao {
       `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
       [status, id],
     );
+  }
+
+  public async remove(branchId: string) {
+    return this._db.withTransaction(async (trx) => {
+      // 1️⃣ Branch hidden
+      await trx.query(`UPDATE branches SET status = $1 WHERE id = $2`, [
+        STATUS.Hidden,
+        branchId,
+      ]);
+
+      // 2️⃣ Schedules
+      await trx.query(
+        `delete from schedules
+       WHERE branch_id = $1`,
+        [branchId],
+      );
+      await trx.query(
+        `delete from bookings
+       WHERE branch_id = $1`,
+        [branchId],
+      );
+
+      await trx.query(
+        `UPDATE branch_services
+       SET status = $1
+       WHERE branch_id = $2`,
+        [STATUS.Hidden, branchId],
+      );
+      await trx.query(
+        `UPDATE costs
+       SET status = $1
+       WHERE branch_id = $2`,
+        [STATUS.Hidden, branchId],
+      );
+      await trx.query(
+        `UPDATE discounts
+       SET status = $1
+       WHERE branch_id = $2`,
+        [STATUS.Hidden, branchId],
+      );
+      await trx.query(
+        `UPDATE product_transactions
+       SET status = $1
+       WHERE branch_id = $2`,
+        [STATUS.Hidden, branchId],
+      );
+      await trx.query(
+        `UPDATE users
+       SET status = $1
+       WHERE branch_id = $2`,
+        [STATUS.Hidden, branchId],
+      );
+      await trx.query(
+        `UPDATE user_products
+       SET status = $1
+       WHERE branch_id = $2`,
+        [STATUS.Hidden, branchId],
+      );
+      await trx.query(
+        `UPDATE user_services
+       SET status = $1
+       WHERE branch_id = $2`,
+        [STATUS.Hidden, branchId],
+      );
+      await trx.query(
+        `UPDATE orders
+       SET status = $1
+       WHERE branch_id = $2`,
+        [STATUS.Hidden, branchId],
+      );
+      await trx.query(
+        `UPDATE orders
+       SET status = $1
+       WHERE branch_id = $2`,
+        [STATUS.Hidden, branchId],
+      );
+
+      // 4️⃣ Orders (ХАМГИЙН ЧУХАЛ)
+      await trx.query(
+        `UPDATE order_details od
+       SET view_status = $1
+       FROM orders o
+       WHERE o.id = od.order_id
+         AND o.branch_id = $2
+`,
+        [STATUS.Hidden, branchId],
+      );
+
+      return true;
+    });
   }
 
   async getById(id: string) {

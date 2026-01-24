@@ -10,5 +10,6 @@ export class OrderDetail {
   public end_time: string;
   public price: number;
   public status: number;
+  public view_status?: number;
   public created_at?: Date;
 }

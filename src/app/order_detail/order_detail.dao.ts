@@ -3,6 +3,7 @@ import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { OrderDetail } from './order_detail.entity';
 import { BadRequest, OrderError } from 'src/common/error';
+import { STATUS } from 'src/base/constants';
 
 const tableName = 'order_details';
 
@@ -119,7 +120,7 @@ export class OrderDetailDao {
       .conditionIfNotEmpty('order_id', '=', query.order_id)
       .conditionIfNotEmpty('service_id', '=', query.service_id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
-
+      .conditionIfNotEmpty('view_status', '=', STATUS.Active)
       .criteria();
     const sql =
       `SELECT * FROM "${tableName}"  ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
@@ -142,6 +143,7 @@ export class OrderDetailDao {
     const builder = new SqlBuilder(filter);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('view_status', '=', STATUS.Active)
       .criteria();
     return await this._db.select(
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
