@@ -6,6 +6,6 @@ export class UserService {
   public branch_id: string;
   public user_name: string;
   public status: number;
-  public updated_at?: Date;
+  // public updated_at?: Date;
   public created_at?: Date;
 }

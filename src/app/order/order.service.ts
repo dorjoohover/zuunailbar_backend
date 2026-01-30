@@ -553,7 +553,7 @@ export class OrderService {
       const paidAmount = +(payload.paid_amount ?? 0);
       const preAmount = +(payload.pre_amount ?? 0);
       let status = order.order_status;
-      if (preAmount > 0 && status == OrderStatus.Active) {
+      if (status == OrderStatus.Active) {
         if (!hasAnyPrice) {
           this.orderError.EMPLOYEE_SERVICE_PRICE_REQUIRED;
         }
@@ -599,6 +599,7 @@ export class OrderService {
 
       await Promise.all(
         details.map(async (d) => {
+          const order_detail_date = order_date ?? order.order_date;
           const prev = d.id ? existingMap.get(d.id) : null;
           const service = await this.service.findOne(d.service_id);
 
@@ -612,28 +613,32 @@ export class OrderService {
               startDate % 1 !== 0,
             ),
             status: status,
+            order_date: order_detail_date,
             end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
           };
-
+          console.log(d);
           if (prev) {
             await this.orderDetail.update(d.id, detailPayload);
           } else {
-            await this.orderDetail.create({
+            const artist = await this.userService.findOne(d.user_id);
+            const detail = await this.orderDetail.create({
               ...detailPayload,
               order_id: id,
+              nickname: artist?.nickname ?? null,
             });
           }
 
           startDate = endDate;
         }),
       );
+      console.log(existingDetails);
 
       // 4️⃣ Delete removed details
       const toDelete = existingDetails.filter(
         (d) => !incomingIds.includes(d.id),
       );
 
-      await Promise.all(toDelete.map((d) => this.orderDetail.remove(d.id)));
+      await Promise.all(toDelete.map((d) => this.orderDetail.delete(d.id)));
     } catch (error) {
       console.error('Order update failed:', error);
       throw error;

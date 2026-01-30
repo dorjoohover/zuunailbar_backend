@@ -84,6 +84,17 @@ export class OrderDetailDao {
       [status, id],
     );
   }
+  async updateViewStatus(id: string, status: number): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "view_status"=$1 WHERE "order_id"=$2`,
+      [status, id],
+    );
+  }
+  async delete(id: string): Promise<number> {
+    return await this._db._update(`delete from "${tableName}" where id = $1`, [
+      id,
+    ]);
+  }
 
   async getByMobile(mobile: string) {
     return await this._db.select(

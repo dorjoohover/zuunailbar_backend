@@ -57,6 +57,9 @@ export class OrderDetailService {
     return await this.dao.updateStatus(id, status);
   }
   public async remove(id: string) {
-    return await this.dao.updateStatus(id, STATUS.Hidden);
+    return await this.dao.updateViewStatus(id, STATUS.Hidden);
+  }
+  public async delete(id: string) {
+    return await this.dao.delete(id);
   }
 }
