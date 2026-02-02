@@ -91,7 +91,7 @@ export class OrderDetailDao {
     );
   }
   async delete(id: string): Promise<number> {
-    return await this._db._update(`delete from "${tableName}" where id = $1`, [
+    return await this._db._update(`delete from "${tableName}" where order_id = $1`, [
       id,
     ]);
   }
