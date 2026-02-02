@@ -802,12 +802,7 @@ export class OrderService {
   }
 
   public async remove(id: string) {
-    const details = await this.orderDetail.findByOrder(id);
-    await Promise.all(
-      details.map(async (detail) => {
-        await this.orderDetail.remove(detail.id);
-      }),
-    );
+    await this.orderDetail.remove(id);
     await this.dao.updateStatus(id, STATUS.Hidden);
   }
 
