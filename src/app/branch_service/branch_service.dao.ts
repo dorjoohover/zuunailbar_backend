@@ -24,6 +24,7 @@ export class BranchServiceDao {
       'view',
       'index',
       'meta',
+      'service_count',
       'created_by',
       'status',
     ]);

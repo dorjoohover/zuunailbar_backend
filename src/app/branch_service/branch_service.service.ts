@@ -86,8 +86,13 @@ export class BranchServiceService {
   }
 
   public async update(id: string, dto: BranchServiceDto) {
-    return await this.dao.update({ ...dto, id, updated_at: mnDate() }, [
-      ...getDefinedKeys(dto),
+    const body = {
+      ...dto,
+      service_count:
+        dto.service_count == 0 || !dto.service_count ? null : dto.service_count,
+    };
+    return await this.dao.update({ ...body, id, updated_at: mnDate() }, [
+      ...getDefinedKeys(body, true),
       'updated_at',
     ]);
   }

@@ -128,13 +128,11 @@ export class OrderService {
         artists = artists_res.map((r) => r.user_id);
       }
     }
-    console.log(artists, 'artists');
     if (services?.length > 1 && !p) {
       const service = [services.split(',')];
       duration =
         (await this.userService.getDurationOfServices(service))?.[0]?.sum ?? 0;
     }
-    console.log(duration, 'duration');
     if (!p && services?.length > 1 && +duration > 30) {
       result = await this.dao.getSlotsQueue({
         branch_id: pg.branch_id,

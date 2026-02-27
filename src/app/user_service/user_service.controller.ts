@@ -40,7 +40,7 @@ export class UserServiceController {
   @Post('client')
   @PQ(UserServiceController.clientFields)
   findClient(@Body() pg: any, @Req() { user }) {
-    return this.userServiceService.etParallelArtists(pg.branch_id, pg.services);
+    return this.userServiceService.etParallelArtists(pg);
   }
 
   @Get('get/:id')

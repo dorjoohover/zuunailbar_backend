@@ -220,7 +220,6 @@ export class OrdersDao {
     duration: number; // minutes
   }) {
     const { branch_id, artists, date, duration } = input;
-
     const params: any[] = [];
     let i = 1;
 

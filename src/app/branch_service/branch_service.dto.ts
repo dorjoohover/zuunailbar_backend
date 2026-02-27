@@ -35,4 +35,5 @@ export class BranchServiceDto {
   @ApiProperty({ description: 'Үйлчилгээг нэмсэн хэрэглэгчийн ID' })
   created_by?: string;
   meta?: BranchServiceMeta;
+  service_count?: number;
 }

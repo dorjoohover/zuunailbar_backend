@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { STATUS, UserStatus } from 'src/base/constants';
+import { OrderStatus, STATUS, UserStatus } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { UserService } from './user_service.entity';
@@ -21,7 +21,31 @@ export class UserServiceDao {
       'status',
     ]);
   }
+  async checkUsersOrder(
+    user_id: string,
+    order_date: string,
+    start_time: string,
+  ) {
+    const sql = `
+    SELECT o.id
+    FROM orders o
+    INNER JOIN order_details od ON o.id = od.order_id
+    WHERE od.user_id = $1
+      AND o.order_date = $2
+      AND od.start_time = $3
+      AND o.order_status IN ($4, $5, $6, $7)
+  `;
 
+    return await this._db.select(sql, [
+      user_id,
+      order_date,
+      start_time,
+      OrderStatus.Active,
+      OrderStatus.Finished,
+      OrderStatus.Friend,
+      OrderStatus.Pending,
+    ]);
+  }
   async addMany(data: UserService[]) {
     // Нэг ч мөр байхгүй бол шууд
     if (!data?.length) return [];

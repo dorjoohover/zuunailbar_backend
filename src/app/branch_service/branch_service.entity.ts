@@ -18,6 +18,7 @@ export class BranchService {
   public index?: number; // UI дараалалд ашиглана
   public status?: number;
   public created_by: string;
+  public service_count?: number; // тухайн салбар дахь нийт үйлчилгээний тоо
   public created_at?: Date;
   public updated_at?: Date;
   public meta?: BranchServiceMeta;

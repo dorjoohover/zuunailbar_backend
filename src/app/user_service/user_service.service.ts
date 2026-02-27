@@ -132,8 +132,9 @@ export class UserServiceService {
     ]);
   }
 
-  private async getServiceArtists(branch_id: string, services: string[]) {
-    // Тухайн үйлчилгээ бүрийг хэн хийж чаддаг вэ?
+  private async getServiceArtists(input: any) {
+    const { services, branch_id, order_date, start_time } = input;
+
     const mapping: Record<string, string[]> = {};
 
     for (const service of services) {
@@ -141,16 +142,31 @@ export class UserServiceService {
         branch_id,
         service_id: service,
       });
-      console.log(items);
 
-      mapping[service] = items.map((i) => i.user_id);
+      const availableArtists: string[] = [];
+
+      for (const item of items) {
+        const orders = await this.dao.checkUsersOrder(
+          item.user_id,
+          order_date,
+          start_time,
+        );
+
+        const isBusy = orders.length > 0;
+
+        if (!isBusy) {
+          availableArtists.push(item.user_id);
+        }
+      }
+
+      mapping[service] = availableArtists;
     }
 
-    return mapping; // { service1: [artist1, artist5], service2: [artist2], ... }
+    return mapping;
   }
 
-  public async etParallelArtists(branch_id: string, services: string[]) {
-    const mapping = await this.getServiceArtists(branch_id, services);
+  public async etParallelArtists(input: any) {
+    const mapping = await this.getServiceArtists(input);
     return mapping;
   }
 }
