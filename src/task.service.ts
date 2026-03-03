@@ -28,7 +28,7 @@ export class TasksService {
     console.log(new Date());
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   public async handleCron() {
     const date = new Date();
     const users = await this.user.findAll(
