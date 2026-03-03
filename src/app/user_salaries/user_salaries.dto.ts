@@ -7,9 +7,9 @@ export class UserSalaryDto {
   @ApiProperty()
   status: number;
   @ApiProperty()
+  salary_status: number;
+  @ApiProperty()
   duration: number;
   @ApiProperty()
   percent: number;
-  @ApiProperty()
-  date: Date;
 }

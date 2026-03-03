@@ -17,7 +17,7 @@ export class UserDto {
   @ApiProperty()
   branch_id?: string;
   branch_name?: string;
-  duration?: number;
+  salary_day?: number;
   date?: Date;
   percent?: number;
   @ApiProperty()
@@ -37,5 +37,6 @@ export class UserDto {
 
   @ApiProperty()
   user_status?: number;
+
   level?: number;
 }

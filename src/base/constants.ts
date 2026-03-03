@@ -50,7 +50,6 @@ export function toYMD(d: Date) {
 }
 
 export function timeToDecimal(time: string): number {
-  console.log(time, 'time');
   if (time.length <= 2) return +time;
   const [h, m, s = '0'] = time.split(':');
   return Number(h) + Number(m) / 60 + Number(s) / 3600;
@@ -205,12 +204,15 @@ export enum PaymentMethod {
 }
 export enum SALARY_LOG_STATUS {
   Pending = 10,
-  Paid = 20,
+  Approved = 20,
+  Completed = 30,
+
 }
 
 export const SalaryLogValue = {
   [SALARY_LOG_STATUS.Pending]: 'Өгөөгүй',
-  [SALARY_LOG_STATUS.Paid]: 'Өгсөн',
+  [SALARY_LOG_STATUS.Approved]: 'Баталсан',
+  [SALARY_LOG_STATUS.Completed]: 'Дууссан',
 };
 export enum PRODUCT_TRANSACTION_STATUS {
   Used = 10,
@@ -235,6 +237,15 @@ export enum EmployeeStatus {
   DEKIRIT = 20,
   VACATION = 30,
   FIRED = 40,
+  BANNED = 50,
+}
+export enum PaymentType {
+  SALARY = 10,
+  ADVANCE = 20,
+}
+export enum SalaryStatus {
+  ACTIVE = 10,
+  INACTIVE = 20,
   BANNED = 50,
 }
 

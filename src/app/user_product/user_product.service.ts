@@ -38,14 +38,10 @@ export class UserProductService {
     const results = await Promise.all(
       dto.items.map(async (item) => {
         const product = await this.productService.findOne(item.product_id);
-        console.log(product.quantity, item.quantity);
-        console.log(+product.quantity);
-        console.log(+(item.quantity ?? '0'));
-        console.log(+product.quantity < +(item.quantity ?? '0'));
         if (+product.quantity == 0) this.badRequestError.STOCK_EMPTY;
         if (+product.quantity < +(item.quantity ?? '0'))
           this.badRequestError.STOCK_INSUFFICIENT;
-        return this.dao.add({
+        const res = await this.dao.add({
           ...item,
           id: AppUtils.uuid4(),
           branch_id: user.branch_id,
@@ -54,6 +50,10 @@ export class UserProductService {
           date: dto.date ?? ubDateAt00(),
           user_name: usernameFormatter(user),
         });
+        await this.productService.update(product.id, {
+          quantity: +product.quantity - +(item.quantity ?? '0'),
+        });
+        return res;
       }),
     );
     return results;
@@ -79,10 +79,7 @@ export class UserProductService {
       payload.product_name = product.name;
     }
 
-    return await this.dao.update(payload, [
-      ...getDefinedKeys(payload),
-      'updated_at',
-    ]);
+    return await this.dao.update({ ...payload }, [...getDefinedKeys(payload)]);
   }
 
   public async updateUserProductStatus(id: string, status: number) {

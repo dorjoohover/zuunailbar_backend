@@ -57,6 +57,11 @@ export class BranchLeavesDao {
       [id, date],
     );
   }
+  async getUser(user: string) {
+    return await this._db.selectOne(`SELECT * FROM "users" where id = $1`, [
+      user,
+    ]);
+  }
 
   async list(query) {
     if (query.id) {

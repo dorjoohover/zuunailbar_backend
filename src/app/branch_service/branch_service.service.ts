@@ -38,6 +38,7 @@ export class BranchServiceService {
         meta,
         created_by: u.id,
       });
+      await this.updateServiceCountById(res.id, dto.service_count);
       return res;
     } catch (error) {
       console.log(error);
@@ -46,7 +47,6 @@ export class BranchServiceService {
 
   public async updateByService(branch: string, user: User) {
     const { items } = await this.service.findAll({}, CLIENT);
-    console.log(items.length);
     await Promise.all(
       items.map(async (service) => {
         await this.create(
@@ -91,14 +91,26 @@ export class BranchServiceService {
       service_count:
         dto.service_count == 0 || !dto.service_count ? null : dto.service_count,
     };
+    await this.updateServiceCountById(id, body.service_count);
     return await this.dao.update({ ...body, id, updated_at: mnDate() }, [
       ...getDefinedKeys(body, true),
       'updated_at',
     ]);
   }
+
+  public async updateServiceCountById(service_id: string, count: number) {
+    const item = await this.dao.getServicesCategoryById(service_id);
+    for (const key in item) {
+      const id = item[key].id;
+      await this.updateServiceCountById(id, count);
+      await this.dao.update(
+        { id, service_count: count, updated_at: mnDate() },
+        ['id', 'service_count', 'updated_at'],
+      );
+    }
+  }
   public async updateByServiceAndBranch(dto: BranchServiceDto) {
     try {
-      console.log(dto, dto.branch_id);
       const items = await this.dao.list({
         branch_id: dto.branch_id,
         service_id: dto.service_id,

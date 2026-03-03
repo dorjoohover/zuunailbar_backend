@@ -1,26 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { UserSalaryDto } from './user_salaries.dto';
 import { UserSalariesDao } from './user_salaries.dao';
 import { AppUtils } from 'src/core/utils/app.utils';
-import { getDefinedKeys, STATUS } from 'src/base/constants';
+import { getDefinedKeys, SalaryStatus, STATUS } from 'src/base/constants';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class UserSalariesService {
-  constructor(private dao: UserSalariesDao) {}
+  constructor(
+    private dao: UserSalariesDao,
+    @Inject(forwardRef(() => UserService))
+    private user: UserService,
+  ) {}
   public async create(dto: UserSalaryDto) {
     const us = await this.dao.getByUser(dto.user_id, dto.status);
     if (!us && us.length > 0) {
       const user = us[0];
-      if (user.percent == dto.percent)
-        return await this.update(user.id, {
-          duration: dto.duration,
-          date: dto.date,
-          percent: dto.percent,
-          status: dto.status,
-          user_id: dto.user_id,
-        });
+      return await this.update(user.id, {
+        salary_status: SalaryStatus.ACTIVE,
+      });
     }
     const res = await this.dao.add({
       duration: dto.duration,
@@ -28,19 +28,35 @@ export class UserSalariesService {
       percent: dto.percent,
       status: dto.status ?? STATUS.Active,
       user_id: dto.user_id,
-      date: dto.date,
+      salary_status: dto.salary_status,
     });
     return res;
   }
+
   public async findAll(pg: PaginationDto, role: number) {
+    let data = { count: 0, items: [] };
     if (pg.status)
-      return await this.dao.list({
+      data = await this.dao.list({
         ...applyDefaultStatusFilter(pg, role),
       });
-    return await this.dao.list({
+    data = await this.dao.list({
       ...applyDefaultStatusFilter(pg, role),
       status: 0,
     });
+
+    if (pg.user_status) {
+      data.items = await Promise.all(
+        data.items.map(async (item) => {
+          const user = await this.user.findOneByStatus(
+            item.user_id,
+            pg.user_status,
+          );
+          if (user) return item;
+        }),
+      );
+      data.items = data.items.filter((i) => i);
+    }
+    return data;
   }
 
   public async findOne(id: string) {
@@ -52,7 +68,7 @@ export class UserSalariesService {
     return res[0];
   }
 
-  public async update(id: string, dto: UserSalaryDto) {
+  public async update(id: string, dto: any) {
     return await this.dao.update({ ...dto, id }, [...getDefinedKeys(dto)]);
   }
 

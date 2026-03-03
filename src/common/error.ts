@@ -12,7 +12,18 @@ export class BadRequest {
       throw new HttpException('Branch id not found', HttpStatus.BAD_REQUEST);
     }
   }
-
+  get integrationNotFound() {
+    throw new HttpException(
+      'Цалингийн нэгтгэл олдсонгүй.',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+  static integrationAmountExceeded(balance: number) {
+    throw new HttpException(
+      `Төлөх дүн үлдэгдлээс их байна. Үлдэгдэл: ${balance}₮`,
+      HttpStatus.BAD_REQUEST,
+    );
+  }
   get registered() {
     throw new HttpException(
       'Бүртгэлтэй хэрэглэгч байна',
@@ -102,21 +113,20 @@ export class OrderError {
       HttpStatus.BAD_REQUEST,
     );
   }
-  // ajiltnii uilchilgee tus buriin uniin dung oruulaagui bn 
+  // ajiltnii uilchilgee tus buriin uniin dung oruulaagui bn
   get EMPLOYEE_SERVICE_PRICE_REQUIRED() {
     throw new HttpException(
       'Ажилтны үйлчилгээ тус бүрийн үнийн дүнг заавал оруулах шаардлагатай.',
       HttpStatus.BAD_REQUEST,
     );
   }
-  // tolbor tolson uniin dung oruulaagui bn 
+  // tolbor tolson uniin dung oruulaagui bn
   get PAID_AMOUNT_REQUIRED() {
     throw new HttpException(
       'Төлсөн үнийн дүнг заавал оруулах шаардлагатай.',
       HttpStatus.BAD_REQUEST,
     );
   }
-
 
   // Алдаатай цаг (жишээ нь 25)
   get invalidHour() {

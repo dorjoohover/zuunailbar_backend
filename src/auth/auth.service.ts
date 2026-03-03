@@ -177,7 +177,6 @@ export class AuthService {
         },
       });
       const { result, message, data } = res.data;
-      console.log(message, data, result);
       return true;
     } catch (error) {
       console.log(error);

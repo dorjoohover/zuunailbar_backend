@@ -139,13 +139,11 @@ export class OrderService {
         artists,
         duration,
       });
-      console.log(result, 'queue');
     } else {
       result = await this.dao.getSlots({
         branch_id: branch_id,
         artists,
       });
-      console.log(result, 'other');
     }
     return result;
   }
@@ -163,7 +161,6 @@ export class OrderService {
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
       const admin = user.role < ADMIN;
-      console.log(new Date(), 'start');
       const parallel = dto.parallel;
 
       // artists.length == 0 || artists?.[0] == '0' && artists =
@@ -188,7 +185,6 @@ export class OrderService {
       const durationHours = duration / 60; // 👈 хамгийн зөв
 
       const startHour = timeToDecimal(dto.start_time.toString()); // ж: 12.5
-      console.log(durationHours, startHour);
       const endHourRaw = startHour + durationHours;
       const endHour = endHourRaw;
 
@@ -201,7 +197,6 @@ export class OrderService {
         ? dto.end_time
         : toTimeString(Math.floor(endHour), endHour % 1 != 0);
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
-      console.log(start_time, end_time);
       const order_status =
         user.role == ADMIN
           ? OrderStatus.Active
@@ -416,8 +411,8 @@ export class OrderService {
     }
   }
 
-  public async getOrders(user: string) {
-    const res = await this.dao.getOrders(user);
+  public async getOrders(user: string, day: number) {
+    const res = await this.dao.getOrders(user, day);
     return res;
   }
 
@@ -513,7 +508,6 @@ export class OrderService {
 
   public async checkOrders() {
     const res = await this.dao.getCancelOrders();
-    console.log(res);
     await Promise.all(
       res.map(async (r) => {
         await this.updateStatus(r.id, OrderStatus.Cancelled);
@@ -590,19 +584,16 @@ export class OrderService {
       // 2️⃣ Existing details
       const existingDetails = await this.orderDetail.findByOrder(id);
       const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
-      const incomingIds = details.map((d) => d.id).filter(Boolean);
 
-      // 3️⃣ Create / Update
       let startDate = start_time;
-
       await Promise.all(
         details.map(async (d) => {
           const order_detail_date = order_date ?? order.order_date;
           const prev = d.id ? existingMap.get(d.id) : null;
           const service = await this.service.findOne(d.service_id);
 
-          const duration = +service.duration / 60;
-          const endDate = startDate + duration;
+          const dura = +service.duration / 60;
+          const endDate = startDate + dura;
 
           const detailPayload = {
             ...d,
@@ -614,29 +605,21 @@ export class OrderService {
             order_date: order_detail_date,
             end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
           };
-          console.log(d);
+          const { category_id, duration, ...updatePayload } =
+            detailPayload as any;
           if (prev) {
-            await this.orderDetail.update(d.id, detailPayload);
+            await this.orderDetail.update(d.id, updatePayload);
           } else {
             const artist = await this.userService.findOne(d.user_id);
-            const detail = await this.orderDetail.create({
-              ...detailPayload,
+            await this.orderDetail.create({
+              ...updatePayload,
               order_id: id,
               nickname: artist?.nickname ?? null,
             });
           }
-
           startDate = endDate;
         }),
       );
-      console.log(existingDetails);
-
-      // 4️⃣ Delete removed details
-      const toDelete = existingDetails.filter(
-        (d) => !incomingIds.includes(d.id),
-      );
-
-      await Promise.all(toDelete.map((d) => this.orderDetail.delete(d.id)));
     } catch (error) {
       console.error('Order update failed:', error);
       throw error;
@@ -682,7 +665,7 @@ export class OrderService {
       order_date: Date; // хамгийн эртний/сүүлийн захиалгын огноо
       day: number; // цалин авах өдөр (5 | 15)
       order_count: number; // нийт авсан захиалгын тоо
-      order_status: number;
+      salary_status: number;
     };
 
     const users: Record<string, UserSalaryInfo> = {};
@@ -711,17 +694,15 @@ export class OrderService {
             order_date: new Date(order.order_date),
             day: currentUser.day,
             order_count: 0,
-            order_status: order.order_status,
+            salary_status: order.salary_status,
           };
         }
 
         const userData = users[detail.user_id];
-        console.log(detail.price);
         const amount = +detail.price || 0;
         const orderDate = new Date(order.order_date);
 
         // 🔹 Цалин нэмэх
-        console.log(userData.amount, amount);
         userData.amount += amount;
 
         // 🔹 Захиалгын тоо нэмэх
@@ -750,8 +731,8 @@ export class OrderService {
           date: data.order_date,
           day: data.day,
           order_count: data.order_count,
-          order_status: data.order_status,
-          user_id: userId,
+          salary_status: data.salary_status,
+          artist_id: userId,
         });
       }),
     );

@@ -39,4 +39,18 @@ export class ArtistLeavesController {
   ) {
     return this.service.removeByDate(id, user.user.id, dto.dates);
   }
+  @Admin()
+  @Get('update/status/:status/:id')
+  updateStatus(
+    @Param('id') id: string,
+    @Param('status') status: number,
+    @Req() { user },
+  ) {
+    return this.service.updateStatus(id, status);
+  }
+  @Admin()
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.service.remove(id);
+  }
 }

@@ -29,7 +29,6 @@ export class OrderDetailDao {
   }
   async create(client: any, body: any) {
     try {
-      console.log(body);
       await this._db.insertTx(
         client,
         tableName,

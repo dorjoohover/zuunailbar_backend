@@ -30,7 +30,6 @@ export class BrandService {
       merchant,
       status: STATUS.Active,
     });
-    console.log(res);
     return res;
   }
   public async update(id: string, dto: BrandDto) {

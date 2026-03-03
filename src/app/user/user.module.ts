@@ -12,7 +12,7 @@ import { UserService } from './user.service';
   imports: [
     AppDbModule,
     BaseModule,
-    UserSalariesModule,
+    forwardRef(() => UserSalariesModule),
     forwardRef(() => UserServiceModule),
     forwardRef(() => BranchModule),
   ],

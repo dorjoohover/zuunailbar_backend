@@ -46,9 +46,7 @@ export class UserDao {
 
   async update(data: any, attr: string[]): Promise<number> {
     try {
-      console.log(tableName, data, attr, [
-        new SqlCondition('id', '=', data.id),
-      ]);
+
       return await this._db.update(tableName, data, attr, [
         new SqlCondition('id', '=', data.id),
       ]);
@@ -94,6 +92,13 @@ export class UserDao {
     return await this._db.select(
       `SELECT * FROM "${tableName}" WHERE "device"=$1`,
       [device],
+    );
+  }
+
+  async getByStatus(id: string, status: UserStatus) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "user_status"=$1 and "id"=$2 and status = ${UserStatus.Active}  `,
+      [status, id],
     );
   }
 

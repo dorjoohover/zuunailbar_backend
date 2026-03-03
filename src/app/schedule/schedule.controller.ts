@@ -69,7 +69,6 @@ export class ScheduleController {
   @SAP()
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: ScheduleDto) {
-    console.log(dto);
     return this.scheduleService.update(id, dto);
   }
 

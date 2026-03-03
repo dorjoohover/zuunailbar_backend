@@ -298,11 +298,10 @@ ORDER BY r.date, start_time;
 `;
 
     // params.push(`'${duration} min'`);
-    console.log(sql, params);
     return this._db.select(sql, params);
   }
 
-  async getOrders(userId: string) {
+  async getOrders(userId: string, salary_day: number) {
     const today = ubDateAt00(); // moment эсвэл өөр date util
     const year = today.getUTCFullYear();
     const month = today.getUTCMonth();
@@ -311,11 +310,9 @@ ORDER BY r.date, start_time;
     // Хэрэв өнөөдөр 1-15 бол эхлэл нь 15, эсвэл 16-31 бол эхлэл нь 30
     let startDate: Date;
     if (day <= 15) {
-      // тухайн сарын 15
-      startDate = new Date(year, month, 15);
+      startDate = new Date(year, month, salary_day);
     } else {
-      // тухайн сарын 30
-      startDate = new Date(year, month, 30);
+      startDate = new Date(year, month, salary_day);
     }
 
     const endDate = new Date(startDate);
@@ -323,13 +320,13 @@ ORDER BY r.date, start_time;
 
     const sql = `
     SELECT *
-    FROM ${tableName}
-    inner join order_details od on od.order_id = orders.id
-    WHERE order_status = $1
-    AND order_status != ${OrderStatus.Friend}
+    FROM ${tableName} o
+    inner join order_details od on od.order_id = o.id
+    WHERE o.order_status = $1
+    AND o.order_status != ${OrderStatus.Friend}
       AND od.user_id = $2
-      AND order_date >= $3
-      AND order_date < $4
+      AND o.order_date >= $3
+      AND o.order_date < $4
   `;
 
     return this._db.select(sql, [
@@ -414,7 +411,6 @@ ORDER BY r.date, start_time;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
-    console.log(sql, builder.values, builder.values);
     return { count, items };
   }
 
@@ -493,7 +489,6 @@ WHERE key = 'availability_days';`;
       `SELECT ${columns ?? '*'} FROM "${tableName}"   ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    console.log(sql);
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);

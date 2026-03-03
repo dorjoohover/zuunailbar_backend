@@ -1,6 +1,6 @@
 export class Integration {
   id: string;
-  user_id: string;
+  artist_id: string;
   approved_by: string;
   date: Date;
   amount: number;

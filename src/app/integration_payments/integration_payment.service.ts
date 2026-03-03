@@ -1,6 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { IntegrationDao } from './integrations.dao';
-import { IntegrationLogDto, IntegrationDto } from './integrations.dto';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
@@ -8,6 +6,7 @@ import {
   mnDate,
   SALARY_LOG_STATUS,
   SalaryLogValue,
+  SalaryStatus,
   STATUS,
   ubDateAt00,
   usernameFormatter,
@@ -16,22 +15,54 @@ import { AppUtils } from 'src/core/utils/app.utils';
 import { ExcelService } from 'src/excel.service';
 import { UserService } from '../user/user.service';
 import { Response } from 'express';
+import { IntegrationPaymentDto } from './integration_payment.dto';
+import { IntegrationPaymentDao } from './integration_payment.dao';
+import { IntegrationService } from '../integrations/integrations.service';
+import { BadRequest } from 'src/common/error';
 
 @Injectable()
-export class IntegrationService {
+export class IntegrationPaymentService {
   constructor(
-    private readonly dao: IntegrationDao,
+    private readonly dao: IntegrationPaymentDao,
     private user: UserService,
+    private integration: IntegrationService,
     private excel: ExcelService,
   ) {}
-  public async create(dto: IntegrationDto) {
-    return await this.dao.add({
-      ...dto,
-      id: AppUtils.uuid4(),
-      status: STATUS.Active,
+  public async create(dto: IntegrationPaymentDto) {
+    return this.dao.transaction(async (trx) => {
+      const integrationRes = await this.dao.getIntegrationForUpdate(
+        trx,
+        dto.artist_id,
+      );
+      if (!integrationRes.rows.length) {
+        throw new BadRequest().integrationNotFound;
+      }
+
+      const integration = integrationRes.rows[0];
+      const integration_id = integration.id;
+      const paidRes = await this.dao.getPaidAmount(trx, integration_id);
+
+      const paidAmount = Number(paidRes.rows[0].total);
+      const totalAmount = Number(integration.amount);
+      const balance = totalAmount - paidAmount;
+
+      if (Number(dto.amount) > balance) {
+        BadRequest.integrationAmountExceeded(balance);
+      }
+
+      await this.dao.insertPayment(trx, {
+        ...dto,
+        id: AppUtils.uuid4(),
+        integration_id,
+      });
+
+      if (Number(dto.amount) === balance) {
+        await this.dao.updateIntegrationStatus(trx, integration_id, SALARY_LOG_STATUS.Approved);
+      }
+
+      return true;
     });
   }
-
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
@@ -116,61 +147,11 @@ export class IntegrationService {
     );
   }
 
-  public async update(id: string, dto: IntegrationDto) {
+  public async update(id: string, dto: IntegrationPaymentDto) {
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }
 
   public async remove(id: string) {
     return await this.dao.updateStatus(id, STATUS.Hidden);
-  }
-
-  public async updateSalaryLog(dto: IntegrationLogDto) {
-    const today = new Date();
-    const baseDate = new Date(dto.date);
-    const salaryDay = dto.day + 15;
-
-    let lastSalaryDate = new Date(baseDate);
-    lastSalaryDate.setDate(salaryDay);
-
-    if (today.getDate() < salaryDay) {
-      lastSalaryDate.setMonth(today.getMonth() - 1);
-      lastSalaryDate.setFullYear(today.getFullYear());
-    } else {
-      lastSalaryDate.setMonth(today.getMonth());
-      lastSalaryDate.setFullYear(today.getFullYear());
-    }
-
-    const salaries = await this.dao.getByDate(
-      dto.artist_id,
-      mnDate(lastSalaryDate),
-    );
-    console.log(salaries);
-    if (salaries.length > 0) {
-      const { amount, id, order_count } = salaries[0];
-      await this.update(id, {
-        amount: +amount + +dto.amount,
-        approved_by: dto.approved_by,
-        date: dto.date,
-        order_count: +order_count + +dto.order_count,
-        artist_id: dto.artist_id,
-        salary_status: dto.salary_status,
-      });
-    } else {
-      await this.create({
-        amount: +dto.amount,
-        salary_status: dto.salary_status,
-        approved_by: dto.approved_by,
-        date: dto.date,
-        order_count: +dto.order_count,
-        artist_id: dto.artist_id,
-      });
-    }
-    console.log(salaries);
-  }
-
-  // cron
-  // @Cron(CronExpression.EVERY_30_SECONDS)
-  createSalaryLog() {
-    // await this.create()
   }
 }

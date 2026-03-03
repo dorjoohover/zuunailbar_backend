@@ -6,6 +6,7 @@ import {
   getDatesBetween,
   getDefinedKeys,
   STATUS,
+  usernameFormatter,
 } from 'src/base/constants';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
@@ -34,7 +35,13 @@ export class BranchLeavesService {
     return await this.dao.getById(id);
   }
   public async findAll(pg: PaginationDto, role: number) {
-    return await this.dao.list(applyDefaultStatusFilter(pg, role));
+    const result = await this.dao.list(applyDefaultStatusFilter(pg, role));
+    let results = { count: result.count, items: [] };
+    for (const item of result.items) {
+      const user = await this.dao.getUser(item.created_by);
+      results.items.push({ ...item, creater_name: usernameFormatter(user) });
+    }
+    return results;
   }
 
   public async removeByDate(branch: string, user: string, dates?: Date[]) {

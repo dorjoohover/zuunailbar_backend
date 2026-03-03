@@ -9,6 +9,7 @@ import {
   EMPLOYEE,
   getDefinedKeys,
   MANAGER,
+  SalaryStatus,
   saltOrRounds,
   STATUS,
   UserLevel,
@@ -82,14 +83,13 @@ export class UserService {
       profile_img: dto.profile_img ?? '',
       role: dto.role ?? CLIENT,
     });
-    if (dto.duration || dto.percent || dto.date) {
-      console.log(dto.duration, dto.percent, dto.date);
+    if (dto.salary_day || dto.percent || dto.date) {
       await this.userSalary.create({
         user_id: result,
-        duration: dto.duration ?? salary_day,
+        duration: dto.salary_day ?? salary_day,
         percent: dto.percent,
         status: STATUS.Active,
-        date: dto.date ?? new Date(),
+        salary_status: SalaryStatus.ACTIVE,
       });
     }
   }
@@ -199,6 +199,9 @@ export class UserService {
   public async findDevice(id: string) {
     return await this.dao.getByDevice(id);
   }
+  public async findOneByStatus(id: string, status: UserStatus) {
+    return await this.dao.getByStatus(id, status);
+  }
   public async resetPassword(mobile: string, password: string) {
     let user = await this.dao.getByMobile(mobile);
     if (!user) user = await this.dao.getByMail(mobile);
@@ -209,7 +212,7 @@ export class UserService {
   }
   public async update(id: string, dto: UserDto) {
     try {
-      let body = dto;
+      let { ...body } = dto;
       body.id = id;
       if (body.password) {
         body.password = await bcrypt.hash(dto.password, saltOrRounds);
@@ -219,7 +222,29 @@ export class UserService {
           await this.branchService.findOne(body.branch_id)
         ).name;
       }
+
       const res = await this.dao.update(body, getDefinedKeys(body));
+      if (body.percent || body.salary_day) {
+        const userSalary = await this.userSalary.findByUser(id);
+        if (userSalary) {
+          if (
+            userSalary.salary_status == SalaryStatus.ACTIVE &&
+            userSalary.duration == body.salary_day &&
+            userSalary.percent == body.percent
+          )
+            return;
+          await this.userSalary.update(userSalary.id, {
+            salary_status: SalaryStatus.INACTIVE,
+          });
+        }
+        await this.userSalary.create({
+          duration: body.salary_day,
+          percent: body.percent,
+          salary_status: SalaryStatus.ACTIVE,
+          status: STATUS.Active,
+          user_id: id,
+        });
+      }
       return res;
     } catch (error) {
       console.log(error);

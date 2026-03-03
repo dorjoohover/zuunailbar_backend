@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { UserSalariesService } from './user_salaries.service';
 import { UserSalariesController } from './user_salaries.controller';
 import { AppDbModule } from 'src/core/db/database.module';
@@ -7,7 +7,7 @@ import { UserModule } from '../user/user.module';
 import { UserSalariesDao } from './user_salaries.dao';
 
 @Module({
-  imports: [AppDbModule, BaseModule],
+  imports: [AppDbModule, BaseModule, forwardRef(() => UserModule)],
   controllers: [UserSalariesController],
   providers: [UserSalariesService, UserSalariesDao],
   exports: [UserSalariesService],

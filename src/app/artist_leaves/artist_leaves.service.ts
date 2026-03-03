@@ -6,6 +6,7 @@ import {
   EmployeeStatus,
   getDatesBetween,
   getDefinedKeys,
+  usernameFormatter,
 } from 'src/base/constants';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
@@ -37,7 +38,19 @@ export class ArtistLeavesService {
     return await this.dao.getById(id);
   }
   public async findAll(pg: PaginationDto, role: number) {
-    return await this.dao.list(applyDefaultStatusFilter(pg, role));
+    const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
+    let result = { count: res.count, items: [] };
+    for (const item of res.items) {
+      const user = await this.dao.getByUserStatus(item.artist_id);
+      const creater = await this.dao.getByUserStatus(item.created_by);
+      if (user) {
+        result.items.push({
+          ...item,
+          creater_name: usernameFormatter(creater),
+        });
+      }
+    }
+    return result;
   }
   public async updateByArtist(id: string, dto: ArtistLeaveDto, user: string) {
     const { dates, artist_id, ...body } = dto;
@@ -56,6 +69,10 @@ export class ArtistLeavesService {
     const res = await this.dao.deleteByArtist(artist, dates);
 
     return res;
+  }
+
+  public async updateStatus(id: string, status: number) {
+    return await this.dao.update({ id, status }, ['status']);
   }
   public async remove(id: string) {
     return await this.dao.deleteOne(id);

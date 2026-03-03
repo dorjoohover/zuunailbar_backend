@@ -80,7 +80,6 @@ export class AppController {
     let merchantId = req.headers['merchant-id'] as string;
     BadRequest.merchantNotFound(merchantId, CLIENT);
     const res = await this.authService.checkOtp(dto.otp, dto.mobile);
-    console.log(res);
     if (res) return await this.authService.register(dto, merchantId);
     throw new BadRequest().OTP_INVALID;
   }
@@ -91,7 +90,6 @@ export class AppController {
     // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
     // send otp
     try {
-      console.log(mobile);
       const res = await this.authService.checkMobile(mobile);
       if (res) await this.authService.sendOtp(mobile);
       return true;

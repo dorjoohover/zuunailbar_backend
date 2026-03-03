@@ -185,13 +185,13 @@ export class UserServiceDao {
       query.id = `%${query.id}%`;
     }
     const builder = new SqlBuilder(query);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('user_id', '=', query.user_id)
-      .conditionIfNotEmpty('service_id', '=', query.service_id)
-      .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfArray('service_id', query.services?.split(','))
-      .criteria();
+    builder
+      .conditionIfNotEmpty('us.id', 'LIKE', query.id)
+      .conditionIfNotEmpty('us.user_id', '=', query.user_id)
+      .conditionIfNotEmpty('us.service_id', '=', query.service_id)
+      .conditionIfArray('us.service_id', query.services?.split(','));
+
+    const criteria = builder.criteria();
     const sql = `
   SELECT
     user_id,
@@ -199,11 +199,14 @@ export class UserServiceDao {
       'service_id', service_id,
       'service_name', service_name
     )) AS services
-  FROM user_services
-
+  FROM user_services us
+  inner join users u on u.id = us.user_id
+  
   ${criteria}
+  ${query.user_status ? ` and u.user_status = ${query.user_status} and u.status = ${STATUS.Active}` : ''}
+  and us.status = ${STATUS.Active}
   GROUP BY user_id
-  ORDER BY MIN(created_at) DESC
+  ORDER BY MIN(us.created_at) DESC
   LIMIT ${query.limit ?? 20}
   OFFSET ${+query.skip * +(query.limit ?? 20)}
 `;

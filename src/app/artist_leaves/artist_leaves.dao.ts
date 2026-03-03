@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { STATUS } from 'src/base/constants';
+import { STATUS, UserStatus } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { ArtistLeave } from './artist_leaves.entity';
@@ -35,7 +35,7 @@ export class ArtistLeavesDao {
   }
 
   async deleteOne(id: string) {
-    return await this._db._update(`delete from "${tableName}"  WHERE "id"=$2`, [
+    return await this._db._update(`delete from "${tableName}"  WHERE "id"=$1`, [
       id,
     ]);
   }
@@ -67,7 +67,14 @@ export class ArtistLeavesDao {
       [id, date],
     );
   }
+  async getByUserStatus(user: string) {
+    return await this._db.selectOne(
+      `SELECT * FROM users WHERE "id"=$1 and "user_status" = ${UserStatus.Active} and "status" = ${STATUS.Active}`,
+      [user],
+    );
+  }
 
+ 
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;
@@ -93,10 +100,10 @@ export class ArtistLeavesDao {
     }
 
     const criteria = builder.criteria();
-    let sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
+    let sql = `SELECT * FROM "${tableName}" ${criteria} order by date ${query.sort === 'false' ? 'asc' : 'desc'} `;
     if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
     if (query.skip) sql += ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+    const countSql = `SELECT COUNT(t.*) FROM "${tableName}" t inner join users u on u.id = t.artist_id ${criteria} and u.status = ${STATUS.Active} and u.user_status = ${UserStatus.Active}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

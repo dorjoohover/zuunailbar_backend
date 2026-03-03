@@ -1,25 +1,75 @@
 import { Injectable } from '@nestjs/common';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
-import { Integration } from './integrations.entity';
+import { IntegrationPayment } from './integration_payment.entity';
+import { SALARY_LOG_STATUS } from 'src/base/constants';
 
-const tableName = 'integrations';
+const tableName = 'integration_payments';
 
 @Injectable()
-export class IntegrationDao {
+export class IntegrationPaymentDao {
   constructor(private readonly _db: AppDB) {}
 
-  async add(data: Integration) {
+  async add(data: IntegrationPayment) {
     return await this._db.insert(tableName, data, [
       'id',
+      'integration_id',
       'artist_id',
-      'date',
-      'status',
-      'approved_by',
+      'type',
       'amount',
-      'order_count',
-      'salary_status',
+      'paid_by',
+      'paid_at',
     ]);
+  }
+  async transaction<T>(callback: (trx: any) => Promise<T>): Promise<T> {
+    return this._db.withTransaction(async (trx) => {
+      return await callback(trx);
+    });
+  }
+
+  // ---- Existing methods ----
+
+  async getIntegrationForUpdate(trx, artist_id: string) {
+    return trx.query(
+      `SELECT * FROM integrations
+       WHERE artist_id = $1 and salary_status = ${SALARY_LOG_STATUS.Pending}
+       FOR UPDATE`,
+      [artist_id],
+    );
+  }
+
+  async getPaidAmount(trx, integrationId: string) {
+    return trx.query(
+      `SELECT COALESCE(SUM(amount),0) as total
+       FROM integration_payments
+       WHERE integration_id = $1`,
+      [integrationId],
+    );
+  }
+
+  async insertPayment(trx, dto: any) {
+    return trx.query(
+      `INSERT INTO integration_payments
+       (id, integration_id, artist_id, type, amount, paid_by, paid_at)
+       VALUES ($1,$2,$3,$4,$5,$6,now())`,
+      [
+        dto.id,
+        dto.integration_id,
+        dto.artist_id,
+        dto.type,
+        dto.amount,
+        dto.paid_by,
+      ],
+    );
+  }
+
+  async updateIntegrationStatus(trx, integrationId: string, status: number) {
+    return trx.query(
+      `UPDATE integrations
+       SET salary_status = $1
+       WHERE id = $2`,
+      [status, integrationId],
+    );
   }
 
   async update(data: any, attr: string[]): Promise<number> {
@@ -49,29 +99,21 @@ export class IntegrationDao {
     );
   }
 
-  async getByMobile(mobile: string) {
-    return await this._db.select(
-      `SELECT * FROM "${tableName}" WHERE "mobile"=$1`,
-      [mobile],
-    );
-  }
+  async getByDate(integration: string, date: string) {
+    const sql = `
+      SELECT *
+      FROM ${tableName}
+      WHERE integration_id = $1
+        AND paid_at >= $2
+    `;
 
+    return this._db.select(sql, [integration, date]);
+  }
   async getById(id: string) {
     return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "id"=$1`,
       [id],
     );
-  }
-
-  async getByDate(userId: string, date: string) {
-    const sql = `
-      SELECT *
-      FROM ${tableName}
-      WHERE artist_id = $1
-        AND date >= $2
-    `;
-
-    return this._db.select(sql, [userId, date]);
   }
 
   async list(query, cols?: string) {
@@ -83,13 +125,13 @@ export class IntegrationDao {
     const builder = new SqlBuilder(query);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('artist_id', '=', query.artist_id)
-      .conditionIfNotEmpty('integration_status', '=', query.integration_status)
-      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('integration_id', '=', query.integration_id)
+      .conditionIfNotEmpty('paid_by', '=', query.paid_by)
+      .conditionIfNotEmpty('type', '=', query.type)
 
       .criteria();
     const sql =
-      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by paid_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
@@ -113,53 +155,5 @@ export class IntegrationDao {
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
       builder.values,
     );
-  }
-
-  async pairs(query) {
-    const items = await this._db.select(
-      `SELECT "id" as "key", CONCAT("id", '-', "name") as "value" FROM "${tableName}" order by "id" asc`,
-      {},
-    );
-    return items;
-  }
-
-  async getMerchantsByTag(value: string) {
-    return await this._db.select(
-      `SELECT * FROM "${tableName}" m 
-             WHERE $1 = ANY(m."tags")`,
-      [value],
-    );
-  }
-
-  async terminalList(merchantId: string) {
-    return this._db.select(
-      `SELECT "id", "udid", "name" FROM "TERMINALS" WHERE "merchantId"=$1 order by "id" asc`,
-      [merchantId],
-    );
-  }
-
-  async updateTerminalStatus(id: string, status: number) {
-    return await this._db._update(
-      `UPDATE "TERMINALS" SET "status"=$1 WHERE "id"=$2`,
-      [status, id],
-    );
-  }
-
-  async updateDeviceStatus(udid: string, status: number) {
-    return await this._db._update(
-      `UPDATE "DEVICES" SET "status"=$1 WHERE "udid"=$2`,
-      [status, udid],
-    );
-  }
-  async getTerminal(terminalId: string) {
-    return await this._db.selectOne(`SELECT * FROM "TERMINALS" WHERE "id"=$1`, [
-      terminalId,
-    ]);
-  }
-
-  async getDevice(udid: string) {
-    return await this._db.selectOne(`SELECT * FROM "DEVICES" WHERE "udid"=$1`, [
-      udid,
-    ]);
   }
 }

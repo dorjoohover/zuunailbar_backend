@@ -142,7 +142,7 @@ export class ProductService {
     return await this.dao.getById(id);
   }
 
-  public async update(id: string, dto: ProductDto) {
+  public async update(id: string, dto: any) {
     const headers = [];
     try {
       if (dto.brand_id && dto.brand_id != '') {
@@ -172,7 +172,6 @@ export class ProductService {
   }
   public async updateQuantity(id: string, qty: number) {
     const { quantity } = await this.findOne(id);
-    console.log(quantity, 'q')
     if (quantity + qty < 0) new BadRequest().STOCK_INSUFFICIENT;
     const body = {
       id,

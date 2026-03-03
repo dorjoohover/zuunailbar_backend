@@ -47,6 +47,7 @@ import { SystemLogger } from './system-logger.service';
 import { BranchLeavesModule } from './app/branch_leaves/branch_leaves.module';
 import { ArtistLeavesModule } from './app/artist_leaves/artist_leaves.module';
 import { PaymentModule } from './app/payment/payment.module';
+import { IntegrationPaymentModule } from './app/integration_payments/integration_payment.module';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { PaymentModule } from './app/payment/payment.module';
     BranchLeavesModule,
     ArtistLeavesModule,
     PaymentModule,
+    IntegrationPaymentModule
   ],
   controllers: [AppController],
   providers: [

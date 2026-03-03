@@ -77,7 +77,30 @@ export class BranchServiceDao {
       [id],
     );
   }
+  async getServicesCategoryById(id: string) {
+    const sql = `
+    SELECT  t.id
+    FROM "${tableName}" t
+    INNER JOIN services s ON s.id = t.service_id
+    WHERE s.category_id = (
+      SELECT s2.category_id
+      FROM "${tableName}" t2
+      INNER JOIN services s2 ON s2.id = t2.service_id
+      WHERE t2.id = $1
+        AND t2.status = $2
+      LIMIT 1
+    )
+    AND t.status = $2
+  `;
 
+    const result = await this._db.select(sql, [id, STATUS.Active]);
+
+    if (!result.length) {
+      return;
+    }
+
+    return result;
+  }
   async list(query, columns?: string) {
     if (query.id) {
       query.id = `%${query.id}%`;
