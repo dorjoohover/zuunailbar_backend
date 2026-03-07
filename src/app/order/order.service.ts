@@ -115,10 +115,10 @@ export class OrderService {
     let { parallel, branch_id, services } = pg;
     let artists = [];
     let result: Slot[] = [];
-    let duration = 30;
+
     const p = parallel === 'true';
+    const service = services ? services.split(',') : [];
     if (services) {
-      const service = [services.split(',')];
       if (service.length > 0) {
         const artists_res = await this.userService.getByServices({
           services: service,
@@ -128,21 +128,28 @@ export class OrderService {
         artists = artists_res.map((r) => r.user_id);
       }
     }
-    if (services?.length > 1 && !p) {
-      const service = [services.split(',')];
-      duration =
-        (await this.userService.getDurationOfServices(service))?.[0]?.sum ?? 0;
-    }
-    if (!p && services?.length > 1 && +duration > 30) {
-      result = await this.dao.getSlotsQueue({
-        branch_id: pg.branch_id,
+    console.log(p, service, service?.length > 1, artists);
+    const categories = (await this.service.getCategories(service)).map(
+      (d) => d?.category_id,
+    );
+    if (p) {
+      result = await this.dao.getSlotsParallel({
+        branch_id,
         artists,
-        duration,
+        categories,
+      });
+    } else if (service?.length > 1) {
+      result = await this.dao.getSlotsQueue({
+        branch_id,
+        artists,
+        services: service,
+        categories,
       });
     } else {
       result = await this.dao.getSlots({
-        branch_id: branch_id,
+        branch_id,
         artists,
+        category_id: categories?.[0],
       });
     }
     return result;
@@ -217,6 +224,7 @@ export class OrderService {
         is_pre_amount_paid: pre == 0,
         order_status,
         status: STATUS.Active,
+        parallel,
         created_by: user.id,
         branch_id: dto.branch_id,
       } as const;

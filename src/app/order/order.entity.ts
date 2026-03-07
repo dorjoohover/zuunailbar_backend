@@ -19,6 +19,7 @@ export class Order {
   salary_date?: Date;
   updated_at?: Date;
   branch_id?: string;
+  parallel?: boolean;
 }
 
 export class Slot {

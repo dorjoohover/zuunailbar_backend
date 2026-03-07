@@ -102,7 +102,6 @@ export class BranchServiceService {
     const item = await this.dao.getServicesCategoryById(service_id);
     for (const key in item) {
       const id = item[key].id;
-      await this.updateServiceCountById(id, count);
       await this.dao.update(
         { id, service_count: count, updated_at: mnDate() },
         ['id', 'service_count', 'updated_at'],

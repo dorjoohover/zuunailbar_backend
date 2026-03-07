@@ -57,6 +57,7 @@ export class OrdersDao {
           'total_amount',
           'paid_amount',
           'description',
+          'parallel',
           'order_status',
         ]);
         await Promise.all(
@@ -189,55 +190,21 @@ export class OrdersDao {
   async getSlots(input: {
     branch_id: string;
     artists?: string[];
+    category_id?: string;
     date?: Date;
     time?: Date;
   }) {
-    const { branch_id, date, time, artists } = input;
-    const params = [];
-    params.push(branch_id);
-    let sql = `
-  SELECT branch_id, artist_id, date, start_time, end_time
-  FROM availability_slots
-  WHERE branch_id = $1
+    const { branch_id, artists, category_id, date, time } = input;
 
-
-`;
-
-    if (artists && artists.length > 0) {
-      sql += `   AND artist_id = ANY($2)`;
-      params.push(artists);
-    }
-
-    sql += '  ORDER BY date;';
-    const res = await this._db.select(sql, params);
-    return res;
-  }
-
-  async getSlotsQueue(input: {
-    branch_id: string;
-    artists?: string[];
-    date?: Date;
-    duration: number; // minutes
-  }) {
-    const { branch_id, artists, date, duration } = input;
     const params: any[] = [];
     let i = 1;
 
     let sql = `
-WITH ordered AS (
-  SELECT
-    branch_id,
-    artist_id,
-    date,
-    start_time,
-    end_time,
-    LAG(end_time) OVER (
-      PARTITION BY branch_id, artist_id, date
-      ORDER BY start_time
-    ) AS prev_end
-  FROM availability_slots
-  WHERE branch_id = $${i++}
+SELECT branch_id, artist_id, date, start_time
+FROM availability_service_slots
+WHERE branch_id = $${i++}
 `;
+
     params.push(branch_id);
 
     if (artists && artists.length > 0) {
@@ -245,62 +212,112 @@ WITH ordered AS (
       params.push(artists);
     }
 
+    if (category_id) {
+      sql += ` AND category_id = $${i++}`;
+      params.push(category_id);
+    }
+
     if (date) {
       sql += ` AND date = $${i++}`;
       params.push(date);
     }
 
-    sql += `
-),
+    if (time) {
+      sql += ` AND start_time >= $${i++}`;
+      params.push(time);
+    }
 
-grp AS (
-  SELECT *,
-    SUM(
-      CASE
-        WHEN prev_end = start_time THEN 0
-        ELSE 1
-      END
-    ) OVER (
-      PARTITION BY branch_id, artist_id, date
-      ORDER BY start_time
-    ) AS grp_id
-  FROM ordered
-),
+    sql += ` GROUP BY date, start_time, artist_id, branch_id
+HAVING MIN(available) > 0
+ORDER BY date, start_time`;
 
-ranges AS (
-  SELECT
-    branch_id,
-    artist_id,
-    date,
-    MIN(start_time) AS range_start,
-    MAX(end_time)   AS range_end
-  FROM grp
-  GROUP BY branch_id, artist_id, date, grp_id
-  HAVING MAX(end_time) - MIN(start_time) >= interval '${duration} min'
-)
-
-SELECT
-  r.branch_id,
-  r.artist_id,
-  r.date,
-
-  gs.start_ts::time AS start_time,
-  (gs.start_ts + interval '${duration} min')::time AS end_time
-
-FROM ranges r
-CROSS JOIN LATERAL generate_series(
-  r.date + r.range_start,
-  r.date + r.range_end - interval '2 hours',
-  interval '1 hour'
-) gs(start_ts)
-
-ORDER BY r.date, start_time;
-`;
-
-    // params.push(`'${duration} min'`);
     return this._db.select(sql, params);
   }
+  async getSlotsParallel(input: {
+    branch_id: string;
+    artists?: string[];
+    categories?: string[];
+    services?: string[];
+  }) {
+    const { services, branch_id, artists, categories } = input;
 
+    const params: any[] = [];
+    let i = 1;
+
+    let sql = `
+SELECT date, start_time, artist_id
+FROM availability_service_slots
+WHERE branch_id = $${i++}
+`;
+
+    params.push(branch_id);
+
+    if (artists?.length) {
+      sql += ` AND artist_id = ANY($${i++}::text[])`;
+      params.push(artists);
+    }
+    // if (services?.length) {
+    //   sql += ` AND service_id = ANY($${i++}::text[])`;
+    //   params.push(services);
+    // }
+
+    if (categories?.length) {
+      sql += ` AND category_id = ANY($${i++}::text[])`;
+      params.push(categories);
+    }
+
+    sql += `
+GROUP BY date, start_time, artist_id
+HAVING MIN(available) > 0
+ORDER BY date, start_time
+`;
+
+    return this._db.select(sql, params);
+  }
+  async getSlotsQueue(input: {
+    branch_id: string;
+    artists?: string[];
+    services?: string[];
+    categories: string[];
+  }) {
+    const { branch_id, artists, categories, services } = input;
+
+    const params: any[] = [];
+    let i = 1;
+
+    let filters = `branch_id = $${i++}`;
+    params.push(branch_id);
+
+    if (artists?.length) {
+      filters += ` AND artist_id = ANY($${i++}::text[])`;
+      params.push(artists);
+    }
+
+    if (categories?.length) {
+      filters += ` AND category_id = ANY($${i++}::text[])`;
+      params.push(categories);
+    }
+    // if (services?.length) {
+    //   filters += ` AND service_id = ANY($${i++}::text[])`;
+    //   params.push(services);
+    // }
+
+    const sql = `
+SELECT
+  branch_id,
+  artist_id,
+  date,
+  start_time
+FROM availability_service_slots
+WHERE ${filters}
+GROUP BY date, start_time, artist_id, branch_id
+HAVING MIN(available) > 0
+ORDER BY date, start_time
+`;
+
+    console.log(sql, params);
+    return this._db.select(sql, params);
+  }
   async getOrders(userId: string, salary_day: number) {
     const today = ubDateAt00(); // moment эсвэл өөр date util
     const year = today.getUTCFullYear();
