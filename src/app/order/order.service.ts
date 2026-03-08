@@ -132,26 +132,13 @@ export class OrderService {
     const categories = (await this.service.getCategories(service)).map(
       (d) => d?.category_id,
     );
-    if (p) {
-      result = await this.dao.getSlotsParallel({
-        branch_id,
-        artists,
-        categories,
-      });
-    } else if (service?.length > 1) {
-      result = await this.dao.getSlotsQueue({
-        branch_id,
-        artists,
-        services: service,
-        categories,
-      });
-    } else {
-      result = await this.dao.getSlots({
-        branch_id,
-        artists,
-        category_id: categories?.[0],
-      });
-    }
+
+    result = await this.dao.getSlotsUnified({
+      branch_id,
+      artists,
+      categories,
+      parallel: p,
+    });
     return result;
   }
   public async updateOrderLimit(limit: number) {
