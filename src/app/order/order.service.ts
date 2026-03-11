@@ -247,6 +247,7 @@ export class OrderService {
           nickname: artist.nickname,
           description: d.description,
           status: order_status,
+          view_status: STATUS.Active,
           user_id: artist.id ?? d.user_id,
         });
 
