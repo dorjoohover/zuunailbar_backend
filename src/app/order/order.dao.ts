@@ -40,6 +40,7 @@ export class OrdersDao {
 
   async create(order: any, details: any) {
     try {
+      console.log(order, details?.length);
       return this._db.withTransaction(async (client) => {
         const orderId = await this._db.insertTx(client, tableName, order, [
           'id',
@@ -62,6 +63,7 @@ export class OrdersDao {
         ]);
         await Promise.all(
           details.map(async (detail) => {
+            console.log(detail);
             await this.details.create(client, { ...detail, order_id: orderId });
           }),
         );
