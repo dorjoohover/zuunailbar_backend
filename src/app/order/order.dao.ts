@@ -61,12 +61,9 @@ export class OrdersDao {
           'parallel',
           'order_status',
         ]);
-        await Promise.all(
-          details.map(async (detail) => {
-            console.log(detail);
-            await this.details.create(client, { ...detail, order_id: orderId });
-          }),
-        );
+        for (const detail of details) {
+          await this.details.create(client, { ...detail, order_id: orderId });
+        }
 
         return orderId;
       });
