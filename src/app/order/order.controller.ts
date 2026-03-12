@@ -118,7 +118,7 @@ export class OrderController {
     return this.orderService.getSlots(pg);
   }
   @Public()
-  @Get('public/ƒslots')
+  @Get('public/slots')
   @PQ(['artists', 'date', 'branch_id', 'parellel', 'artist_id'])
   findPublicSlots(@Pagination() pg: PaginationDto, ) {
     return this.orderService.getSlots(pg);
