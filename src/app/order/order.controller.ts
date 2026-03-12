@@ -117,6 +117,12 @@ export class OrderController {
   findSlots(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.orderService.getSlots(pg);
   }
+  @Public()
+  @Get('public/ƒslots')
+  @PQ(['artists', 'date', 'branch_id', 'parellel', 'artist_id'])
+  findPublicSlots(@Pagination() pg: PaginationDto, ) {
+    return this.orderService.getSlots(pg);
+  }
 
   @Get('user_count')
   async userCount(@Req() { user }) {
