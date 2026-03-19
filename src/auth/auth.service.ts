@@ -14,7 +14,7 @@ import { ADMIN, CLIENT } from 'src/base/constants';
 import { FirebaseService } from 'src/base/firebase.service';
 import { AuthError, BadRequest } from 'src/common/error';
 import axios from 'axios';
-import { MailerService } from '@nestjs-modules/mailer';
+import { ResendService } from './resend.service';
 
 @Injectable()
 export class AuthService {
@@ -22,7 +22,7 @@ export class AuthService {
     private adminUsersService: AdminUserService,
     private userService: UserService,
     private jwtService: JwtService,
-    private mailer: MailerService,
+    private readonly mailer: ResendService,
   ) {}
   private authError = new AuthError();
   private otps: Record<string, string> = {};
@@ -92,9 +92,9 @@ export class AuthService {
         branch_id: null,
         id: id,
       }),
-      firstname: null,
+      firstname: dto.firstname,
       role: CLIENT,
-      lastname: null,
+      lastname: dto.lastname,
       phone: mobile,
       merchant_id: merchant,
       branch_id: null,
@@ -141,7 +141,7 @@ export class AuthService {
   <div class="container">
     <div class="card">
       <div class="header">
-        <img src="https://zunailbar.mn/_next/image?url=%2Flogo%2Fzu-white.png&w=128&q=7" width="120" alt="Zunailbar Logo">
+        <img src="https://api.zunailbar.mn/api/v1/file/1773920646644_zu-white.png" width="120" alt="Zunailbar Logo">
       </div>
       <div class="body">
         <p>Өдрийн мэнд,</p>
@@ -190,11 +190,11 @@ export class AuthService {
 
   async reset(dto: ResetPasswordDto) {
     if (!this.checkOtp(dto.otp, dto.mobile)) return;
-    return await this.userService.resetPassword(dto.mobile, dto.password);
+    return await this.userService.resetPassword(dto.mobile, dto.password, dto.lastname, dto.firstname);
   }
   async resetPassword(dto: ResetCurrentPasswordDto, mobile: string) {
     await this.validateAdminUser(mobile, dto.password);
-    const res = await this.userService.resetPassword(mobile, dto.newPassword);
+    const res = await this.userService.resetPassword(mobile, dto.newPassword, dto.lastname, dto.firstname);
     return res;
   }
 }

@@ -1,7 +1,8 @@
 // src/qpay/qpay.service.ts
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, lastValueFrom } from 'rxjs';
+import { MobileFormat, MobileParser } from 'src/common/formatter';
 @Injectable()
 export class QpayService {
   private readonly logger = new Logger(QpayService.name);
@@ -149,16 +150,18 @@ export class QpayService {
     order_id: string,
     userId: string,
     branch: string,
+    mobile: string
   ) {
     try {
+      const phone = MobileParser(mobile)
       const res = this.requestWithToken('POST', 'invoice', {
         // invoice_code: 'Zuunailbar',
         invoice_code: process.env.QPAY_INVOICE_CODE,
-        sender_invoice_no: `${order_id}`,
+        sender_invoice_no: `${phone}`,
         sender_branch_code: branch,
         invoice_receiver_code: `${userId}`,
         amount,
-        invoice_description: 'Худалдан авалт.',
+        invoice_description: 'Урьдчилгаа төлбөр.',
         invoice_due_date: null,
         allow_partial: false,
         minimum_amount: null,
@@ -177,10 +180,15 @@ export class QpayService {
   // ✅ Invoice харах
   async getInvoice(id: string) {
     try {
-      const res = await this.requestWithToken('GET', `payment/${id}`, {});
+      const res = await this.requestWithToken('GET', `invoice/${id}`, {});
+      const payment = res?.payments?.[0]
+      if(!payment) {
+        throw new HttpException('Төлбөр олдсонгүй', HttpStatus.BAD_REQUEST)
+      }
       return {
-        status: res.payment_status,
-        amount: res.payment_amount,
+        status: payment.payment_status,
+        amount: payment.payment_amount,
+        transaction_type: payment.payment_type
       };
     } catch (error) {}
   }

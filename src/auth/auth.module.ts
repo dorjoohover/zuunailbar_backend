@@ -8,6 +8,7 @@ import { AdminUserModule } from 'src/app/admin.user/admin.user.module';
 import { AuthService } from './auth.service';
 import { BranchModule } from 'src/app/branch/branch.module';
 import { UserModule } from 'src/app/user/user.module';
+import { ResendService } from './resend.service';
 
 @Module({
   imports: [
@@ -16,12 +17,14 @@ import { UserModule } from 'src/app/user/user.module';
     PassportModule,
     BranchModule,
     UserModule,
+    
+
     JwtModule.register({
       secret: jwtConstants.secret,
       signOptions: { expiresIn: '30d' },
     }),
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, ResendService,],
   exports: [AuthService],
 })
 export class AuthModule {}

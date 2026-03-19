@@ -16,6 +16,8 @@ export class RegisterDto {
   title?: string;
   body?: string;
   percent?: number;
+  lastname: string
+  firstname: string
 }
 
 export class ResetPasswordDto {
@@ -25,12 +27,16 @@ export class ResetPasswordDto {
   mobile: string;
   @ApiProperty()
   otp: string;
+  lastname: string
+  firstname: string
 }
 export class ResetCurrentPasswordDto {
   @ApiProperty()
   password: string;
   @ApiProperty()
   newPassword: string;
+  lastname: string
+  firstname: string
 }
 export class OtpDto {
   @ApiProperty()

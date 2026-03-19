@@ -20,6 +20,7 @@ export class Order {
   updated_at?: Date;
   branch_id?: string;
   parallel?: boolean;
+  paid_at?: Date
 }
 
 export class Slot {

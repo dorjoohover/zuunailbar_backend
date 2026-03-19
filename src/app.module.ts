@@ -41,13 +41,13 @@ import { ExcelService } from './excel.service';
 import { UserSalariesModule } from './app/user_salaries/user_salaries.module';
 import { BranchServiceModule } from './app/branch_service/branch_service.module';
 import { ServiceCategoryModule } from './app/service_category/service_category.module';
-import { EmailModule } from './auth/email.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { SystemLogger } from './system-logger.service';
 import { BranchLeavesModule } from './app/branch_leaves/branch_leaves.module';
 import { ArtistLeavesModule } from './app/artist_leaves/artist_leaves.module';
 import { PaymentModule } from './app/payment/payment.module';
 import { IntegrationPaymentModule } from './app/integration_payments/integration_payment.module';
+import { ResendService } from './auth/resend.service';
 
 @Module({
   imports: [
@@ -86,7 +86,6 @@ import { IntegrationPaymentModule } from './app/integration_payments/integration
     UserSalariesModule,
     BranchServiceModule,
     ServiceCategoryModule,
-    EmailModule,
     BranchLeavesModule,
     ArtistLeavesModule,
     PaymentModule,

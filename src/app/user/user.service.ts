@@ -202,12 +202,12 @@ export class UserService {
   public async findOneByStatus(id: string, status: UserStatus) {
     return await this.dao.getByStatus(id, status);
   }
-  public async resetPassword(mobile: string, password: string) {
+  public async resetPassword(mobile: string, password: string, lastname: string, firstname: string) {
     let user = await this.dao.getByMobile(mobile);
     if (!user) user = await this.dao.getByMail(mobile);
     if (!user) return;
     const pass = await this.hash(password);
-    const body = { id: user.id, password: pass };
+    const body = { id: user.id, password: pass , lastname, firstname};
     await this.dao.update(body, getDefinedKeys(body));
   }
   public async update(id: string, dto: UserDto) {

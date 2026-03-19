@@ -84,6 +84,13 @@ export class OrdersDao {
       [status, id],
     );
   }
+
+  async updatePaidDate(id: string, date: Date, type: string) {
+    return await this._db._update(
+      `UPDATE ${tableName} set "paid_at"=$1 , "transaction_type"=$2 where "id"=$3`,
+      [date, type, id],
+    );
+  }
   async updateSalaryProcessStatus(id: string, date?: Date): Promise<number> {
     const query = `
     UPDATE "${tableName}"
@@ -185,7 +192,26 @@ export class OrdersDao {
 
     return await this._db.select(sql, params);
   }
+ async get_order_details(input: { date: Date[]; artists: string[] }) {
+  const { date, artists } = input;
 
+  return await this._db.select(
+    `
+    SELECT 
+      od.user_id, 
+      od.start_ts, 
+      od.end_ts
+    FROM order_details od
+    JOIN orders o ON o.id = od.order_id
+    WHERE o.order_date = ANY($1)
+      AND od.user_id = ANY($2)
+      and od.view_status = 10
+      and od.status != 50
+      and od.status != 60
+    `,
+    [date, artists],
+  );
+}
   async getSlotsUnified(input: {
     branch_id: string;
     artists?: string[];
@@ -413,6 +439,7 @@ WHERE key = 'availability_days';`;
     if (!query?.order_status) {
       builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);
       builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Cancelled);
+      builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Absent);
     }
     if (!query.friend && query?.order_status != OrderStatus.Friend) {
       builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);

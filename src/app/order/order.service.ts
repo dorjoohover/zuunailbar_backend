@@ -129,9 +129,13 @@ export class OrderService {
       }
     }
     console.log(p, service, service?.length > 1, artists);
-    const categories = (await this.service.getCategories(service)).map(
-      (d) => d?.category_id,
-    );
+    const selected_services = await this.service.getCategories(service);
+
+    const categories = selected_services.map((d) => d?.category_id);
+    const durations = selected_services.map((d) => Number(d.duration) || 0);
+    const needDuration = parallel
+      ? Math.max(0, ...durations)
+      : durations.reduce((a, b) => a + b, 0);
 
     result = await this.dao.getSlotsUnified({
       branch_id,
@@ -139,8 +143,57 @@ export class OrderService {
       categories,
       parallel: p,
     });
-    return result;
+    const validSlots = [];
+    const dates = [...new Set(result.map((r) => r.date))];
+    const valid_artists = [...new Set(result.map((r) => r.artist_id))];
+
+    const details = await this.dao.get_order_details({
+      date: dates,
+      artists: valid_artists,
+    });
+
+    // 🔥 group by artist_id
+    const ordersByArtist: Record<string, any[]> = {};
+
+    for (const d of details) {
+      if (!ordersByArtist[d.user_id]) {
+        ordersByArtist[d.user_id] = [];
+      }
+      ordersByArtist[d.user_id].push(d);
+    }
+
+    for (const slot of result) {
+     const start = this.combineDateTime(slot.date, slot.start_time.toString());
+      const end = new Date(start.getTime() + needDuration * 60000);
+      const artistOrders = ordersByArtist[slot.artist_id] || [];
+
+      const hasConflict = artistOrders.some((order) =>
+      {
+        return this.isOverlapping(start, end, order.start_ts, order.end_ts)
+      }
+      );
+
+      if (!hasConflict) {
+        validSlots.push(slot);
+      } 
+      else {
+        console.log(slot)
+      }
+    }
+    return validSlots;
   }
+  private isOverlapping(startA: Date, endA: Date, startB: Date, endB: Date) {
+    return startA < endB && endA > startB;
+  }
+  private combineDateTime(date: Date, time: string) {
+  const d = new Date(date);
+
+  const [h, m, s] = time.split(':').map(Number);
+
+  d.setHours(h, m, s || 0, 0);
+
+  return d;
+}
   public async updateOrderLimit(limit: number) {
     await this.dao.orderLimit(limit);
     // this.slot.updateOrderLimit(limit);
@@ -154,7 +207,7 @@ export class OrderService {
 
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
-      const admin = user.role < ADMIN;
+      const admin = user.role <= ADMIN;
       const parallel = dto.parallel;
 
       // artists.length == 0 || artists?.[0] == '0' && artists =
@@ -162,6 +215,7 @@ export class OrderService {
       const orderDate = toYMD(new Date(dto.order_date));
       let pre = 0;
       let duration = admin && dto.duration ? +dto.duration : 0;
+      console.log(duration);
       for (const detail of dto.details ?? []) {
         const service = await this.service.findOne(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
@@ -191,6 +245,7 @@ export class OrderService {
         ? dto.end_time
         : toTimeString(Math.floor(endHour), endHour % 1 != 0);
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
+      console.log(start_time, end_time);
       const order_status =
         user.role == ADMIN
           ? OrderStatus.Active
@@ -232,7 +287,10 @@ export class OrderService {
         const service = await this.service.findOne(d.service_id);
         const artist = await this.user.findOne(d.user_id);
 
-        const duration = +service.duration / 60;
+        const duration =
+          admin && dto.duration
+            ? +dto.duration / dto.details.length / 60
+            : +service.duration / 60;
         const endDate = startDate + duration;
 
         orderDetails.push({
@@ -254,17 +312,18 @@ export class OrderService {
         if (dto.parallel !== true) startDate = endDate;
       }
       const order = await this.dao.create(payload, orderDetails);
-
       if (
         dto.method == PaymentMethod.P2P &&
         +(dto.pre_amount ?? pre ?? '0') > 0
       ) {
         const invoice = await this.qpay.createInvoice(
           pre,
-          order.id,
+          order,
           user.id,
           dto.branch_name,
+          user.mobile,
         );
+        console.log(invoice);
         await this.payment.create(
           {
             amount: pre,
@@ -317,6 +376,10 @@ export class OrderService {
     const res = await this.qpay.checkPayment(invoiceId);
     if (res?.paid_amount) {
       await this.updateStatus(id, OrderStatus.Active);
+      const row = res?.rows?.[0];
+      if (row) {
+        await this.updatePaidDate(id, new Date(), row.payment_type);
+      }
       return {
         status: OrderStatus.Active,
         paid: true,
@@ -542,13 +605,13 @@ export class OrderService {
       const preAmount = +(payload.pre_amount ?? 0);
       let status = order.order_status;
       if (status == OrderStatus.Active) {
-        if (!hasAnyPrice) {
-          this.orderError.EMPLOYEE_SERVICE_PRICE_REQUIRED;
-        }
+        // if (!hasAnyPrice) {
+        //   this.orderError.EMPLOYEE_SERVICE_PRICE_REQUIRED;
+        // }
 
-        if (paidAmount <= 0) {
-          this.orderError.PAID_AMOUNT_REQUIRED;
-        }
+        // if (paidAmount <= 0) {
+        //   this.orderError.PAID_AMOUNT_REQUIRED;
+        // }
 
         const total = preAmount + paidAmount;
 
@@ -623,6 +686,9 @@ export class OrderService {
   }
   public async updateStatus(id: string, status: OrderStatus) {
     return await this.dao.updateOrderStatus(id, status);
+  }
+  public async updatePaidDate(id: string, date: Date, type: string) {
+    return await this.dao.updatePaidDate(id, date, type);
   }
   private isFullDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
   public async confirmSalaryProcessStatus(
@@ -788,6 +854,7 @@ export class OrderService {
       try {
         await this.dao.getById(order_id);
         await this.updateStatus(order_id, OrderStatus.Active);
+        await this.updatePaidDate(order_id, new Date(), res.transaction_type);
       } catch (error) {
         throw error;
       }
