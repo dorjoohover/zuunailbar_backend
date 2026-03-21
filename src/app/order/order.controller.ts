@@ -63,6 +63,20 @@ export class OrderController {
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.orderService.find(pg, user.user.role, user.user.id);
   }
+  @Admin()
+  @Get('logs')
+  @PQ([
+    'new_status',
+    'old_status',
+    'order_id',
+    'old_order_status',
+    'new_order_status',
+    'changed_by',
+    'changed_at'
+  ])
+  findLogs(@Pagination() pg: PaginationDto) {
+    return this.orderService.get_status_logs(pg);
+  }
 
   @Get('get/:id')
   findOne(@Param('id') id: string) {
@@ -120,7 +134,7 @@ export class OrderController {
   @Public()
   @Get('public/slots')
   @PQ(['artists', 'date', 'branch_id', 'parellel', 'artist_id'])
-  findPublicSlots(@Pagination() pg: PaginationDto, ) {
+  findPublicSlots(@Pagination() pg: PaginationDto) {
     return this.orderService.getSlots(pg);
   }
 
@@ -138,8 +152,12 @@ export class OrderController {
   @Get('check/:invoice/:id')
   @ApiParam({ name: 'id' })
   @ApiParam({ name: 'invoice' })
-  async check(@Param('id') id: string, @Param('invoice') invoice: string) {
-    return this.orderService.checkPayment(invoice, id);
+  async check(
+    @Param('id') id: string,
+    @Param('invoice') invoice: string,
+    @Req() { user },
+  ) {
+    return this.orderService.checkPayment(invoice, id, user.user.id);
   }
   @Get('cancel/:id')
   @ApiParam({ name: 'id' })
@@ -149,8 +167,8 @@ export class OrderController {
 
   @Employee()
   @Patch('/update/:id')
-  update(@Param('id') id: string, @Body() dto: OrderDto) {
-    return this.orderService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: OrderDto, @Req() { user }) {
+    return this.orderService.update(id, dto, user.user.id);
   }
 
   @Public()
@@ -167,8 +185,16 @@ export class OrderController {
   }
   @Employee()
   @Patch('status/:id/:status')
-  updateStatus(@Param('id') id: string, @Param('status') status: string) {
-    return this.orderService.updateStatus(id, +status);
+  updateStatus(
+    @Param('id') id: string,
+    @Param('status') status: string,
+    @Req() { user },
+  ) {
+    return this.orderService.updateStatus({
+      id,
+      order_status: +status,
+      user: user.user.id,
+    });
   }
   @Admin()
   @Patch('level')
@@ -185,8 +211,11 @@ export class OrderController {
   }
   @Admin()
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.orderService.remove(id);
+  remove(@Param('id') id: string, @Req() { user }) {
+    return this.orderService.remove({
+      id,
+      user: user.user.id,
+    });
   }
   @Public()
   @Get('excel')

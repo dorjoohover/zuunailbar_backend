@@ -43,10 +43,10 @@ export class OrderDetailController {
     return this.orderDetailService.update(id, dto);
   }
 
-  @SAP()
-  @Manager()
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.orderDetailService.remove(id);
-  }
+  // @SAP()
+  // @Manager()
+  // @Delete(':id')
+  // remove(@Param('id') id: string) {
+  //   return this.orderDetailService.remove(id);
+  // }
 }

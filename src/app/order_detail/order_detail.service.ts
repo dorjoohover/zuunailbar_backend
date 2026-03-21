@@ -22,7 +22,6 @@ export class OrderDetailService {
     return await this.dao.add({
       ...dto,
       id: AppUtils.uuid4(),
-      status: STATUS.Active,
       description: dto.description,
     });
   }

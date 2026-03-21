@@ -15,6 +15,7 @@ import { FileErrorLogService } from 'src/error-log.service';
 import { UserServiceModule } from '../user_service/user_service.module';
 import { IntegrationModule } from '../integrations/integrations.module';
 import { PaymentModule } from '../payment/payment.module';
+import { OrderLogDao } from './order.log.dao';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { PaymentModule } from '../payment/payment.module';
     ExcelService,
     FileErrorLogService,
     AllExceptionsFilter,
+    OrderLogDao,
   ],
   exports: [OrderService, QpayService],
 })

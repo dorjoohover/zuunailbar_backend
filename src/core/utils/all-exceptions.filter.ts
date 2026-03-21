@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { Request, Response } from 'express';
+import { OrderError } from 'src/common/error';
 import { FileErrorLogService } from 'src/error-log.service';
 
 @Catch(HttpException, Error)
@@ -30,12 +31,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (exception instanceof HttpException) {
         status = exception.getStatus();
         const res = exception.getResponse();
-        console.log(res)
+        console.log(res);
         if (typeof res === 'string') message = res;
         else if (typeof res === 'object' && (res as any).message)
           message = (res as any).message;
       } else if (exception instanceof Error) {
         message = exception.message;
+      }
+
+      if ((exception as any)?.message?.includes('no_artist_time_overlap')) {
+        message = 'Сонгосон артистын энэ цаг боломжгүй байна';
       }
 
       // File log

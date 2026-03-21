@@ -59,6 +59,7 @@ export class OrdersDao {
           'paid_amount',
           'description',
           'parallel',
+          
           'order_status',
         ]);
         for (const detail of details) {
@@ -119,6 +120,8 @@ export class OrdersDao {
       [mobile],
     );
   }
+
+
   async getCancelOrders() {
     return this._db.select(
       `
@@ -206,8 +209,10 @@ export class OrdersDao {
     WHERE o.order_date = ANY($1)
       AND od.user_id = ANY($2)
       and od.view_status = 10
-      and od.status != 50
-      and od.status != 60
+      and o.status = 10
+      and o.order_status != 50
+      and o.order_status != 60
+  
     `,
     [date, artists],
   );
@@ -267,7 +272,7 @@ AND COUNT(*) FILTER (WHERE end_time IS NOT NULL) = 0
     }
     sql += ` ORDER BY date, start_time    
     `;
-    console.log(sql, params);
+
 
     return this._db.select(sql, params);
   }

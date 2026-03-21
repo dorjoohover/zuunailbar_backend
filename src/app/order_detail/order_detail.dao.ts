@@ -45,6 +45,7 @@ export class OrderDetailDao {
           'end_time',
           'order_date',
           'description',
+          'view_status',
           'service_name',
           'price',
           'status',
@@ -90,9 +91,10 @@ export class OrderDetailDao {
     );
   }
   async delete(id: string): Promise<number> {
-    return await this._db._update(`delete from "${tableName}" where order_id = $1`, [
-      id,
-    ]);
+    return await this._db._update(
+      `delete from "${tableName}" where order_id = $1`,
+      [id],
+    );
   }
 
   async getByMobile(mobile: string) {
