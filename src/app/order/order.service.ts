@@ -175,11 +175,16 @@ export class OrderService {
           order.start_ts,
           order.end_ts,
         );
+        if (res) {
+          console.log(start, end, order.start_ts, order.end_ts);
+        }
         return res;
       });
 
       if (!hasConflict) {
         validSlots.push(slot);
+      } else {
+        console.log(slot);
       }
     }
     return validSlots;
