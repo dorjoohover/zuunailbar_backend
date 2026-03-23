@@ -292,12 +292,14 @@ export class OrderService {
         const service = await this.service.findOne(d.service_id);
         const artist = await this.user.findOne(d.user_id);
 
-        const duration =
+        let duration =
           admin && dto.duration
-            ? +dto.duration / (parallel ? 1 : dto.details.length) / 60
-            : +service.duration / 60;
-        const endDate = startDate + duration;
+            ? Math.ceil(
+                (+dto.duration / (parallel ? 1 : dto.details.length) / 60) * 2,
+              ) / 2
+            : Math.ceil((+service.duration / 60) * 2) / 2;
 
+        const endDate = startDate + duration;
         orderDetails.push({
           id: AppUtils.uuid4(),
           start_time: toTimeString(Math.floor(startDate), startDate % 1 != 0),
