@@ -431,51 +431,73 @@ export class OrderService {
 
   public async find(pg: PaginationDto, role: number, id?: string) {
     try {
+      let q = { ...pg };
+
+      // 🔹 customer filter
+      if (pg.customer && role < EMPLOYEE) {
+        const users = await this.user.search(
+          { id: pg.customer, skip: undefined, limit: undefined },
+          '3f86c0b23a5a4ef89a745269e7849640',
+        );
+
+        q.customers = users.map((u) => u.id);
+      }
+
       const query = applyDefaultStatusFilter(
-        role == CLIENT ? { ...pg, customer_id: id } : pg,
+        role === CLIENT ? { ...q, customer_id: id } : q,
         role,
       );
+
       const res = await this.dao.list(query);
-      const items = (
-        await Promise.all(
-          res.items.map(async (item) => {
-            const detail = await this.orderDetail.find(
-              { ...pg, order_id: item.id },
-              role,
-            );
-            if (detail.items.length == 0) return;
 
-            // Давхар user-уудыг арилгах
-            const users = Array.from(
-              new Map(
-                (detail.items ?? [])
-                  ?.filter((d) => d.user)
-                  .map((d) => [d.user.id, d.user]),
-              ).values(),
-            );
+      // 🔥 1. order ids цуглуулах
+      const orderIds = res.items.map((i) => i.id);
 
-            const firstArtist = users[0];
+      // 🔥 2. бүх detail-ийг нэг query-гаар авах
+      const detailsRes = await this.orderDetail.findByOrderIds(orderIds);
+      const detailsMap = new Map<string, any[]>();
+      for (const d of detailsRes) {
+        if (!detailsMap.has(d.order_id)) {
+          detailsMap.set(d.order_id, []);
+        }
+        detailsMap.get(d.order_id)!.push(d);
+      }
 
-            const branch_id = firstArtist?.branch_id ?? null;
+      // 🔥 3. customer ids цуглуулах
+      const customerIds = [...new Set(res.items.map((i) => i.customer_id))];
 
-            const user = await this.user.findOne(item.customer_id);
+      const customers = await this.user.findMany(customerIds); // 🔥 өөрөө хийвэл сайн
+      const customerMap = new Map(customers.map((u) => [u.id, u]));
 
-            const order_date = mnDate(new Date(item.order_date));
-            const created_by = item.created_by
-              ? await this.user.findOne(item.created_by)
-              : undefined;
+      // 🔥 4. created_by ids
+      const createdByIds = [
+        ...new Set(res.items.map((i) => i.created_by).filter(Boolean)),
+      ];
+      const creators = await this.user.findMany(createdByIds);
+      const creatorMap = new Map(creators.map((u) => [u.id, u]));
 
-            return {
-              ...item,
-              order_date,
-              customer: user,
-              branch_id,
-              created_by,
-              details: detail.items,
-            };
-          }),
-        )
-      )?.filter((d): d is NonNullable<typeof d> => d !== undefined); // ⬅️ энд шүүнэ
+      // 🔥 5. merge
+      const items = res.items.map((item) => {
+        const detailItems = detailsMap.get(item.id) ?? [];
+
+        const users = Array.from(
+          new Map(
+            detailItems.filter((d) => d.user).map((d) => [d.user.id, d.user]),
+          ).values(),
+        );
+
+        const firstArtist = users[0];
+        const branch_id = firstArtist?.branch_id ?? null;
+        return {
+          ...item,
+          order_date: mnDate(new Date(item.order_date)),
+          customer: customerMap.get(item.customer_id),
+          created_by: creatorMap.get(item.created_by),
+          branch_id,
+          details: detailItems,
+        };
+      });
+
       return {
         items,
         count: res.count,
@@ -581,7 +603,8 @@ export class OrderService {
   }
   public async get_status_logs(pg) {
     const query = applyDefaultStatusFilter({ ...pg }, ADMIN);
-    return await this.orderLog.list(query);
+    const res = await this.orderLog.list(query);
+    return res;
   }
   private async register_status_logs(input: {
     user: string;

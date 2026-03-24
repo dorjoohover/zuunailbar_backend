@@ -149,7 +149,7 @@ export class AdminUserDao {
 
   get = async (mobile: any) => {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE mobile = $1 or mobile = $2`,
+      `SELECT * FROM "${tableName}" WHERE mobile = $1 or mobile = $2 and status = 10`,
       [MobileFormat(mobile), MobileParser(mobile)],
     );
   };

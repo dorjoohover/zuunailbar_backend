@@ -35,13 +35,18 @@ export class OrderDetailService {
     const items = await Promise.all(
       res.items?.map(async (item) => {
         const user = await this.user.findOne(item.user_id);
+        const { password, ...body } = user;
         return {
           ...item,
-          user,
+          user: body,
         };
       }),
     );
     return { items, count: res.count };
+  }
+
+  public async findByOrderIds(ids: string[]) {
+    return await this.dao.listOrderIds(ids);
   }
 
   public async findByOrder(order: string) {

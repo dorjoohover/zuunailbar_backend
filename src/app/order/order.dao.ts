@@ -59,7 +59,7 @@ export class OrdersDao {
           'paid_amount',
           'description',
           'parallel',
-          
+
           'order_status',
         ]);
         for (const detail of details) {
@@ -120,7 +120,6 @@ export class OrdersDao {
       [mobile],
     );
   }
-
 
   async getCancelOrders() {
     return this._db.select(
@@ -195,11 +194,11 @@ export class OrdersDao {
 
     return await this._db.select(sql, params);
   }
- async get_order_details(input: { date: Date[]; artists: string[] }) {
-  const { date, artists } = input;
+  async get_order_details(input: { date: Date[]; artists: string[] }) {
+    const { date, artists } = input;
 
-  return await this._db.select(
-    `
+    return await this._db.select(
+      `
     SELECT 
       od.user_id, 
       od.start_ts, 
@@ -214,9 +213,9 @@ export class OrdersDao {
       and o.order_status != 60
   
     `,
-    [date, artists],
-  );
-}
+      [date, artists],
+    );
+  }
   async getSlotsUnified(input: {
     branch_id: string;
     artists?: string[];
@@ -272,7 +271,6 @@ AND COUNT(*) FILTER (WHERE end_time IS NOT NULL) = 0
     }
     sql += ` ORDER BY date, start_time    
     `;
-
 
     return this._db.select(sql, params);
   }
@@ -449,7 +447,7 @@ WHERE key = 'availability_days';`;
     if (!query.friend && query?.order_status != OrderStatus.Friend) {
       builder.conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend);
     }
-    if (query.date) {
+    if (query.date && !query.customer) {
       query.end_date
         ? builder.conditionIfDateBetweenValues(
             query.date,
@@ -458,14 +456,20 @@ WHERE key = 'availability_days';`;
           )
         : builder.conditionIfNotEmpty('order_date', '=', query.date);
     }
-    builder.conditionIfNotEmpty('order_status', '=', query.order_status);
+    let additional = '';
 
+    builder.conditionIfNotEmpty('order_status', '=', query.order_status);
+    if (query.customers?.length) {
+      builder.values.push(query.customers);
+      const index = builder.values.length;
+      additional = ` AND customer_id = ANY($${index})`;
+    }
     const criteria = builder.criteria();
     const sql =
-      `SELECT ${columns ?? '*'} FROM "${tableName}"   ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${columns ?? '*'} FROM "${tableName}"   ${criteria} ${additional} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria} ${additional}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

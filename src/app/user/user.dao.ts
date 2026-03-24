@@ -115,6 +115,10 @@ export class UserDao {
     );
   }
 
+  async listMany(ids: string[]) {
+    return await this._db.select(`select * from "${tableName}" where id = any($1)`, [ids])
+  } 
+
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;

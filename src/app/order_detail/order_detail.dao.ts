@@ -117,7 +117,15 @@ export class OrderDetailDao {
       [id],
     );
   }
-
+  async listOrderIds(ids: string[]) {
+    return await this._db.select(
+      `SELECT *
+     FROM "${tableName}" od
+     INNER JOIN users u ON u.id = od.user_id
+     WHERE order_id = ANY($1)`,
+      [ids],
+    );
+  }
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;

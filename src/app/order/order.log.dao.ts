@@ -49,11 +49,19 @@ export class OrderLogDao {
     AND changed_at < '${query.changed_at} 23:59:59'
   `;
     }
-    const sql =
-      `SELECT ${columns ?? '*'} FROM "${tableName}"   ${criteria} ${date_sql} order by changed_at desc ` +
-      `${query.limit ? `limit ${query.limit}` : ''}` +
-      ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria} ${date_sql} `;
+    const sql = `SELECT ${columns ?? `oh.*, u.mobile AS customer_mobile`}
+   FROM "${tableName}" oh
+   LEFT JOIN orders o ON o.id = oh.order_id
+   LEFT JOIN users u ON u.id = o.customer_id
+   ${criteria} ${date_sql}
+   ORDER BY oh.changed_at DESC
+   ${query.limit ? `LIMIT ${query.limit}` : ''}
+   OFFSET ${+query.skip * +(query.limit ?? 0)}`;
+    const countSql = `
+  SELECT COUNT(*)
+  FROM "${tableName}" oh
+  ${criteria} ${date_sql}
+`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
