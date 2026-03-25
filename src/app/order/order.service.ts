@@ -627,11 +627,21 @@ export class OrderService {
     const res = await this.dao.getCancelOrders();
     await Promise.all(
       res.map(async (r) => {
+        const invoice = await this.payment.findByOrder(r.id)
+        let payment 
+       try {
+     
+         payment = await this.qpay.checkPayment(invoice?.invoice_id)
+       } catch (error) {
+        payment = null
+       }
+     
+       const order_status = payment?.paid_amount ? OrderStatus.Active : OrderStatus.Cancelled
         await this.updateStatus({
           id: r.id,
-          order_status: OrderStatus.Cancelled,
+          order_status,
         });
-        await this.orderDetail.updateStatusByOrder(r.id, OrderStatus.Cancelled);
+        await this.orderDetail.updateStatusByOrder(r.id, order_status);
       }),
     );
   }

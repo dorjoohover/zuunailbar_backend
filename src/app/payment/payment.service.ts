@@ -105,6 +105,9 @@ export class PaymentService {
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }
+  public async findByOrder(order_id) {
+    return await this.dao.getByOrder(order_id)
+  }
 
   public async update(id: string, dto: PaymentDto) {
     const headers = [];

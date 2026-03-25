@@ -127,7 +127,7 @@ export class OrdersDao {
     SELECT *
     FROM "${tableName}"
     WHERE order_status = $1
-      AND created_at < now() - interval '10 minutes'
+      AND created_at < now() - interval '1 minutes' and status = ${STATUS.Active}
     `,
       [OrderStatus.Pending],
     );

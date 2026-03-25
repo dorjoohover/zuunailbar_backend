@@ -47,6 +47,12 @@ export class PaymentDao {
       [id],
     );
   }
+  async getByOrder(id: string) {
+    return await this._db.selectOne(
+      `SELECT invoice_id FROM "${tableName}" WHERE "order_id"=$1`,
+      [id],
+    );
+  }
 
   async list(query, cols?: string) {
     if (query.id) {
