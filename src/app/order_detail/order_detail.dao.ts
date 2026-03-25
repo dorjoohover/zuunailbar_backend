@@ -118,14 +118,24 @@ export class OrderDetailDao {
     );
   }
   async listOrderIds(ids: string[]) {
-    return await this._db.select(
-      `SELECT *
+  return await this._db.select(
+    `SELECT 
+       od.*,
+       u.id as artist_id,   
+       u.nickname,
+       u.firstname, 
+       u.lastname, 
+       u.mobile, 
+       u.color,  
+       u.branch_id  , 
+       u.branch_name 
+
      FROM "${tableName}" od
      INNER JOIN users u ON u.id = od.user_id
-     WHERE order_id = ANY($1)`,
-      [ids],
-    );
-  }
+     WHERE od.order_id = ANY($1)`,
+    [ids],
+  );
+}
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;

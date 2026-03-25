@@ -457,12 +457,10 @@ export class OrderService {
       const detailsRes = await this.orderDetail.findByOrderIds(orderIds);
       const detailsMap = new Map<string, any[]>();
       for (const d of detailsRes) {
-        if (!detailsMap.has(d.order_id)) {
-          detailsMap.set(d.order_id, []);
-        }
-        detailsMap.get(d.order_id)!.push(d);
+        const arr = detailsMap.get(d.order_id) ?? [];
+        arr.push(d);
+        detailsMap.set(d.order_id, arr);
       }
-
       // 🔥 3. customer ids цуглуулах
       const customerIds = [...new Set(res.items.map((i) => i.customer_id))];
 
@@ -479,15 +477,7 @@ export class OrderService {
       // 🔥 5. merge
       const items = res.items.map((item) => {
         const detailItems = detailsMap.get(item.id) ?? [];
-
-        const users = Array.from(
-          new Map(
-            detailItems.filter((d) => d.user).map((d) => [d.user.id, d.user]),
-          ).values(),
-        );
-
-        const firstArtist = users[0];
-        const branch_id = firstArtist?.branch_id ?? null;
+        const branch_id = detailItems?.[0]?.branch_id;
         return {
           ...item,
           order_date: mnDate(new Date(item.order_date)),
@@ -647,7 +637,7 @@ export class OrderService {
   }
 
   public async update(id: string, dto: OrderDto, user: string) {
-    let { details, parallel, order_date, ...body } = dto;
+    let { details = [], parallel, order_date, ...body } = dto;
     let payload = { order_date, ...body };
     try {
       const order = await this.findOne(id);
@@ -655,7 +645,7 @@ export class OrderService {
 
       const start_time = timeToDecimal(dto.start_time.toString());
 
-      // ⏱ end_time автоматаар бодох
+      // ⏱ end_time auto calculate
       if (!payload.end_time) {
         const hasHalfHour = start_time % 1 !== 0;
         const duration = +order.duration + (hasHalfHour ? 30 : 0);
@@ -666,18 +656,12 @@ export class OrderService {
         );
       }
 
+      // 💰 PAYMENT LOGIC
       const paidAmount = +(payload.paid_amount ?? 0);
       const preAmount = +(payload.pre_amount ?? 0);
       let status = payload.order_status || order.order_status;
-      if (status == OrderStatus.Finished) {
-        // if (!hasAnyPrice) {
-        //   this.orderError.EMPLOYEE_SERVICE_PRICE_REQUIRED;
-        // }
 
-        // if (paidAmount <= 0) {
-        //   this.orderError.PAID_AMOUNT_REQUIRED;
-        // }
-
+      if (status === OrderStatus.Finished) {
         const total = preAmount + paidAmount;
 
         const artistAmounts =
@@ -688,63 +672,76 @@ export class OrderService {
         if (total !== artistAmounts) {
           this.orderError.PAID_AMOUNT_REQUIRED;
         }
+
         payload.total_amount = total;
 
-        // ганц detail байвал автоматаар үнэ суулгах
         if (details.length === 1 && +details[0].price === 0) {
           details[0].price = total;
         }
       }
-      if (order.order_status != payload.order_status) {
+
+      if (order.order_status !== payload.order_status) {
         payload.updated_at = new Date();
       }
+
       await this.register_status_logs({
         user,
         order_id: id,
         order_status: payload.order_status,
       });
-      // 1️⃣ Order update
+
+      // 1️⃣ UPDATE ORDER
       await this.dao.update({ id, ...payload }, getDefinedKeys(payload));
 
-      // 2️⃣ Existing details
+      // 2️⃣ EXISTING DETAILS
       const existingDetails = await this.orderDetail.findByOrder(id);
       const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
+      // 🔥 STEP 1: DELETE removed details
+      const incomingIds = details.filter((d) => d.id).map((d) => d.id);
 
+      for (const existing of existingDetails) {
+        if (!incomingIds.includes(existing.id)) {
+          await this.orderDetail.delete(existing.id);
+        }
+      }
+
+      // 🔥 STEP 2: UPSERT (NO Promise.all)
       let startDate = start_time;
-      await Promise.all(
-        details.map(async (d) => {
-          const order_detail_date = order_date ?? order.order_date;
-          const prev = d.id ? existingMap.get(d.id) : null;
-          const service = await this.service.findOne(d.service_id);
-          const dura = +service.duration / 60;
-          const endDate = startDate + dura;
 
-          const detailPayload = {
-            ...d,
-            start_time: toTimeString(
-              Math.floor(startDate),
-              startDate % 1 !== 0,
-            ),
-            view_status: order.status,
-            status: status,
-            order_date: order_detail_date,
-            end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
-          };
-          const { category_id, duration, ...updatePayload } =
-            detailPayload as any;
-          if (prev) {
-            await this.orderDetail.update(d.id, updatePayload);
-          } else {
-            const artist = await this.userService.findOne(d.user_id);
-            await this.orderDetail.create({
-              ...updatePayload,
-              order_id: id,
-              nickname: artist?.nickname ?? null,
-            });
-          }
-          startDate = endDate;
-        }),
-      );
+      for (const d of details) {
+        const order_detail_date = order_date ?? order.order_date;
+        const prev = d.id ? existingMap.get(d.id) : null;
+
+        const service = await this.service.findOne(d.service_id);
+        const dura = +service.duration / 60;
+        const endDate = startDate + dura;
+
+        const detailPayload: any = {
+          ...d,
+          start_time: toTimeString(Math.floor(startDate), startDate % 1 !== 0),
+          end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
+          status: status,
+          view_status: order.status,
+          order_date: order_detail_date,
+        };
+
+        const { category_id, duration, ...updatePayload } = detailPayload;
+        if (prev) {
+          // ✅ UPDATE
+          await this.orderDetail.update(d.id, updatePayload);
+        } else {
+          // ✅ CREATE
+          const artist = await this.userService.findOne(d.user_id);
+
+          await this.orderDetail.create({
+            ...updatePayload,
+            order_id: id,
+            nickname: artist?.nickname ?? null,
+          });
+        }
+
+        startDate = endDate;
+      }
     } catch (error) {
       console.error('Order update failed:', error);
       throw error;
