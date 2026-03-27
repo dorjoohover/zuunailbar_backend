@@ -226,7 +226,7 @@ export class OrderService {
         const service = await this.service.findOne(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
         if (+(service.pre ?? '0') > pre) pre = +service.pre;
-        let d = +(service.duration ?? '0');
+        let d = +(detail.duration ?? service.duration ?? '0');
         if (parallel) {
           duration = duration < d ? d : duration;
         } else {
@@ -604,7 +604,6 @@ export class OrderService {
   }) {
     const { user, order_status, status, order_id } = input;
     const order = await this.findOne(order_id);
-    console.log(user);
     if (!order) return;
     if (
       order_status &&
@@ -627,16 +626,17 @@ export class OrderService {
     const res = await this.dao.getCancelOrders();
     await Promise.all(
       res.map(async (r) => {
-        const invoice = await this.payment.findByOrder(r.id)
-        let payment 
-       try {
-     
-         payment = await this.qpay.checkPayment(invoice?.invoice_id)
-       } catch (error) {
-        payment = null
-       }
-     
-       const order_status = payment?.paid_amount ? OrderStatus.Active : OrderStatus.Cancelled
+        const invoice = await this.payment.findByOrder(r.id);
+        let payment;
+        try {
+          payment = await this.qpay.checkPayment(invoice?.invoice_id);
+        } catch (error) {
+          payment = null;
+        }
+
+        const order_status = payment?.paid_amount
+          ? OrderStatus.Active
+          : OrderStatus.Cancelled;
         await this.updateStatus({
           id: r.id,
           order_status,
@@ -654,11 +654,13 @@ export class OrderService {
       if (!order) return;
 
       const start_time = timeToDecimal(dto.start_time.toString());
-
+      const orderDuration = parallel
+        ? Math.max(...details.map((d) => d.duration))
+        : details.reduce((sum, d) => sum + (d.duration ?? 0), 0);
       // ⏱ end_time auto calculate
       if (!payload.end_time) {
         const hasHalfHour = start_time % 1 !== 0;
-        const duration = +order.duration + (hasHalfHour ? 30 : 0);
+        const duration = +orderDuration + (hasHalfHour ? 30 : 0);
 
         payload.end_time = toTimeString(
           Math.floor(start_time + Math.ceil(duration / 60)),
@@ -721,9 +723,8 @@ export class OrderService {
       for (const d of details) {
         const order_detail_date = order_date ?? order.order_date;
         const prev = d.id ? existingMap.get(d.id) : null;
-
         const service = await this.service.findOne(d.service_id);
-        const dura = +service.duration / 60;
+        const dura = Number(d.duration ?? +service.duration) / 60;
         const endDate = startDate + dura;
 
         const detailPayload: any = {
@@ -735,8 +736,9 @@ export class OrderService {
           order_date: order_detail_date,
         };
 
-        const { category_id, duration, ...updatePayload } = detailPayload;
+        const { category_id, ...updatePayload } = detailPayload;
         if (prev) {
+          console.log(updatePayload, 'update');
           // ✅ UPDATE
           await this.orderDetail.update(d.id, updatePayload);
         } else {
@@ -749,8 +751,11 @@ export class OrderService {
             nickname: artist?.nickname ?? null,
           });
         }
-
-        startDate = endDate;
+        if (parallel) {
+          startDate = start_time;
+        } else {
+          startDate = endDate;
+        }
       }
     } catch (error) {
       console.error('Order update failed:', error);
