@@ -7,7 +7,7 @@ import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
   getDefinedKeys,
   ScheduleStatus,
-  toTimeString,
+  slotRangeToTimes,
 } from 'src/base/constants';
 import { OrderService } from '../order/order.service';
 import { BadRequest } from 'src/common/error';
@@ -36,15 +36,7 @@ export class ScheduleService {
         'Боломжтой сул цагтай артист энэ цагт байхгүй байна',
         400,
       );
-    const times = dto.times.map((time) => {
-      let format = +time.slice(0, 2);
-      if (time.includes(':30')) format += 0.5;
-      return format;
-    });
-    const start = Math.min(...times);
-    const end = Math.max(...times);
-    const start_time = toTimeString(Math.floor(start), start % 1 == 0);
-    const end_time = toTimeString(Math.floor(end), end % 1 == 0);
+    const { times, start_time, end_time } = slotRangeToTimes(dto.times);
     const meta = {
       mobile: artist.mobile,
       nickname: artist.nickname,
@@ -56,7 +48,7 @@ export class ScheduleService {
       approved_by: u,
       schedule_status: ScheduleStatus.Active,
       index: dto.index,
-      times: dto.times?.join('|'),
+      times,
       start_time,
       end_time,
       user_id: dto.user_id,
@@ -84,26 +76,14 @@ export class ScheduleService {
     return await this.dao.search(pg)
   }
   public async update(id: string, dto: ScheduleDto) {
-    const times = dto.times ? dto.times?.join('|') : null;
     const schedule = await this.findOne(id);
     if (!schedule) return;
-    let start_time = null,
-      end_time = null;
-    if (dto.times && times != '') {
-      const times = dto.times.map((time) => {
-        let format = +time.slice(0, 2);
-        if (time.includes(':30')) format += 0.5;
-        return format;
-      });
-      const start = Math.min(...times);
-      const end = Math.max(...times);
-      start_time = toTimeString(Math.floor(start), start % 1 == 0);
-      end_time = toTimeString(Math.floor(end), end % 1 == 0);
-    }
+    const range = dto.times === undefined ? {} : slotRangeToTimes(dto.times);
+    const payload = { ...dto, ...range, id };
 
     const res = await this.dao.update(
-      { ...dto, start_time, end_time, times, id },
-      getDefinedKeys({ ...dto, start_time, end_time }, true),
+      payload,
+      getDefinedKeys(payload, true),
     );
     return res;
   }

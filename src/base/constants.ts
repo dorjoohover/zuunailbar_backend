@@ -38,6 +38,32 @@ export function toTimeString(hour: number | string, half?: boolean): string {
   return half ? `${h}:30:00` : `${h}:00:00`;
 }
 
+export function slotTimeToDecimal(time: string): number {
+  let value = +time.slice(0, 2);
+  if (time.includes(':30')) value += 0.5;
+  return value;
+}
+
+export function slotRangeToTimes(times?: string[] | null) {
+  if (!times || times.length === 0) {
+    return {
+      times: null,
+      start_time: null,
+      end_time: null,
+    };
+  }
+
+  const values = times.map(slotTimeToDecimal);
+  const start = Math.min(...values);
+  const end = Math.max(...values);
+
+  return {
+    times: times.join('|'),
+    start_time: toTimeString(Math.floor(start), start % 1 !== 0),
+    end_time: toTimeString(Math.floor(end), end % 1 !== 0),
+  };
+}
+
 export const firstLetterUpper = (value: string) => {
   if (value.length == 0) return value;
   return `${value.substring(0, 1).toUpperCase()}${value.substring(1)}`;
