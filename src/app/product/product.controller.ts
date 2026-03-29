@@ -42,7 +42,7 @@ export class ProductController {
   @Get()
   @PQ(['status'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
-    let p = pg;
+    const p = pg;
 
     return this.productService.findAll(p, user.user.role);
   }

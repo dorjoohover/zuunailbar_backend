@@ -36,7 +36,7 @@ export class BranchLeavesService {
   }
   public async findAll(pg: PaginationDto, role: number) {
     const result = await this.dao.list(applyDefaultStatusFilter(pg, role));
-    let results = { count: result.count, items: [] };
+    const results = { count: result.count, items: [] };
     for (const item of result.items) {
       const user = await this.dao.getUser(item.created_by);
       results.items.push({ ...item, creater_name: usernameFormatter(user) });

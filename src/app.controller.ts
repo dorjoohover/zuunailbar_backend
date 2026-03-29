@@ -77,7 +77,7 @@ export class AppController {
   @Post('/register')
   async register(@Body() dto: RegisterDto, @Req() req) {
     // await this.firebase.sendPushNotification(dto.token, dto.title, dto.body);
-    let merchantId = req.headers['merchant-id'] as string;
+    const merchantId = req.headers['merchant-id'] as string;
     BadRequest.merchantNotFound(merchantId, CLIENT);
     const res = await this.authService.checkOtp(dto.otp, dto.mobile);
     if (res) return await this.authService.register(dto, merchantId);

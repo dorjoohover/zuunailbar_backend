@@ -80,7 +80,7 @@ export class CategoryDao {
   }
 
   async search(filter: any): Promise<any[]> {
-    let nameCondition = ``;
+    const nameCondition = ``;
     if (filter.id) {
       filter.id = `%${filter.id.toLowerCase()}%`;
     }

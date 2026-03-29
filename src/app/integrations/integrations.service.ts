@@ -129,7 +129,7 @@ export class IntegrationService {
     const baseDate = new Date(dto.date);
     const salaryDay = dto.day + 15;
 
-    let lastSalaryDate = new Date(baseDate);
+    const lastSalaryDate = new Date(baseDate);
     lastSalaryDate.setDate(salaryDay);
 
     if (today.getDate() < salaryDay) {

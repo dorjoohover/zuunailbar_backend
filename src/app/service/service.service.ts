@@ -60,7 +60,7 @@ export class ServiceService {
   }
 
   public async findAll(pg: PaginationDto, role: number) {
-    let res: { count: number; items: any[] } = {
+    const res: { count: number; items: any[] } = {
       count: 0,
       items: [],
     };
@@ -97,6 +97,34 @@ export class ServiceService {
   public async getCategories(ids: string[]) {
     return await this.dao.getCategories(ids);
   }
+  public async getBookingConfigs(ids: string[], branch_id?: string) {
+    const branchServices =
+      branch_id && ids?.length
+        ? await this.branchServiceService.findByBranchAndServices(branch_id, ids)
+        : [];
+    const branchMap = new Map(
+      branchServices.map((item) => [item.service_id, item]),
+    );
+
+    return await Promise.all(
+      ids.map(async (id) => {
+        const service = await this.findOne(id);
+        if (!service) throw new BadRequest().notFound('Үйлчилгээ');
+        const branchService = branchMap.get(id);
+        return {
+          ...service,
+          name: branchService?.custom_name ?? service.name,
+          description:
+            branchService?.custom_description ?? service.description ?? '',
+          duration: branchService?.duration ?? service.duration,
+          min_price: branchService?.min_price ?? service.min_price,
+          max_price: branchService?.max_price ?? service.max_price,
+          pre: branchService?.pre ?? service.pre,
+          branch_service_id: branchService?.id,
+        };
+      }),
+    );
+  }
   public async getDurationOfServices(ids: string[]) {
     return await this.dao.getDurationOfServices(ids);
   }
@@ -118,7 +146,7 @@ export class ServiceService {
     const branches = await this.branchService.findByMerchant(merchant);
     const service = await this.dao.getById(id);
     if (!service) throw new BadRequest().notFound('Үйлчилгээ');
-    let category = null;
+    const category = null;
     if (dto.category_id) {
       const res = await this.categoryService.getById(dto.category_id);
       if (!res) throw new BadRequest().notFound('Ангилал');

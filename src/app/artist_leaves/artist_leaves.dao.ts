@@ -74,7 +74,6 @@ export class ArtistLeavesDao {
     );
   }
 
- 
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;

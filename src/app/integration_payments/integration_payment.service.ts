@@ -57,7 +57,11 @@ export class IntegrationPaymentService {
       });
 
       if (Number(dto.amount) === balance) {
-        await this.dao.updateIntegrationStatus(trx, integration_id, SALARY_LOG_STATUS.Approved);
+        await this.dao.updateIntegrationStatus(
+          trx,
+          integration_id,
+          SALARY_LOG_STATUS.Approved,
+        );
       }
 
       return true;

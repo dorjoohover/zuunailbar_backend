@@ -69,7 +69,7 @@ export class UserProductService {
   }
 
   public async update(id: string, dto: UpdateUserProductDto) {
-    let payload = { ...dto, id, updated_at: mnDate() } as any;
+    const payload = { ...dto, id, updated_at: mnDate() } as any;
     if (dto.user_id) {
       const user = await this.userService.findOne(dto.user_id);
       payload.user_name = usernameFormatter(user);

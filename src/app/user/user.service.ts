@@ -222,7 +222,7 @@ export class UserService {
   }
   public async update(id: string, dto: UserDto) {
     try {
-      let { ...body } = dto;
+      const { ...body } = dto;
       body.id = id;
       if (body.password) {
         body.password = await bcrypt.hash(dto.password, saltOrRounds);

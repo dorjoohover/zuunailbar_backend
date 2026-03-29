@@ -52,10 +52,11 @@ export class ServiceDao {
   async getCategories(id: string[]) {
     return await this._db.select(
       `
-      select category_id, duration from "${tableName}" where id = ANY($1) order by duration desc limit ${id.length} `, [id]
-    )
+      select category_id, duration from "${tableName}" where id = ANY($1) order by duration desc limit ${id.length} `,
+      [id],
+    );
   }
-  async getDurationOfServices(id: string[], ) {
+  async getDurationOfServices(id: string[]) {
     return await this._db.select(
       `
        SELECT sum(duration)

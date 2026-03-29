@@ -6,4 +6,3 @@ export const MobileFormat = (mobile: string) => {
 export const MobileParser = (mobile: string) => {
   return mobile ? mobile.replace('+976', '') : '';
 };
-

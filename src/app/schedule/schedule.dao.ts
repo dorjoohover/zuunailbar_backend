@@ -101,9 +101,10 @@ export class ScheduleDao {
     const builder = new SqlBuilder(filter);
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('index', '=', filter.index)
       .criteria();
     return await this._db.select(
-      `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
+      `SELECT "id", "user_id" FROM "${tableName}" ${criteria}${nameCondition}`,
       builder.values,
     );
   }

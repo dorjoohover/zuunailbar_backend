@@ -85,6 +85,14 @@ export class BranchServiceService {
     return await this.dao.getById(id);
   }
 
+  public async findByBranchAndService(branch_id: string, service_id: string) {
+    return await this.dao.getByBranchAndService(branch_id, service_id);
+  }
+
+  public async findByBranchAndServices(branch_id: string, service_ids: string[]) {
+    return await this.dao.getByBranchAndServices(branch_id, service_ids);
+  }
+
   public async update(id: string, dto: BranchServiceDto) {
     const body = {
       ...dto,

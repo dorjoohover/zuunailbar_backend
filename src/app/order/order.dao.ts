@@ -34,13 +34,12 @@ export class OrdersDao {
         'order_status',
       ]);
     } catch (error) {
-      console.log(error);
+      console.error('Order insert failed:', error);
     }
   }
 
   async create(order: any, details: any) {
     try {
-      console.log(order, details?.length);
       return this._db.withTransaction(async (client) => {
         const orderId = await this._db.insertTx(client, tableName, order, [
           'id',
@@ -69,12 +68,18 @@ export class OrdersDao {
         return orderId;
       });
     } catch (error) {
-      console.log(error);
+      console.error('Order transaction failed:', error);
     }
   }
 
   async update(data: any, attr: string[]): Promise<number> {
     return await this._db.update(tableName, data, attr, [
+      new SqlCondition('id', '=', data.id),
+    ]);
+  }
+
+  async updateTx(client: any, data: any, attr: string[]): Promise<number> {
+    return await this._db.updateTx(client, tableName, data, attr, [
       new SqlCondition('id', '=', data.id),
     ]);
   }

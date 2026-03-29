@@ -25,6 +25,13 @@ export class OrderDetailService {
       description: dto.description,
     });
   }
+  public async createTx(client: any, dto: OrderDetailDto) {
+    return await this.dao.create(client, {
+      ...dto,
+      id: AppUtils.uuid4(),
+      description: dto.description,
+    });
+  }
 
   async findOne(id: string) {
     return await this.dao.getById(id);
@@ -57,6 +64,10 @@ export class OrderDetailService {
     const { ...body } = dto;
     return await this.dao.update({ ...body, id }, getDefinedKeys(body));
   }
+  public async updateTx(client: any, id: string, dto: OrderDetailDto) {
+    const { ...body } = dto;
+    return await this.dao.updateTx(client, { ...body, id }, getDefinedKeys(body));
+  }
   public async updateStatusByOrder(id: string, status: OrderStatus) {
     return await this.dao.updateStatus(id, status);
   }
@@ -65,5 +76,8 @@ export class OrderDetailService {
   }
   public async delete(id: string) {
     return await this.dao.delete(id);
+  }
+  public async deleteTx(client: any, id: string) {
+    return await this.dao.deleteTx(client, id);
   }
 }

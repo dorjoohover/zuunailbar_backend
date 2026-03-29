@@ -18,7 +18,7 @@ export function applyDefaultStatusFilter(
   }
   if (pg?.status && pg.status !== STATUS.Hidden) {
     if (pg.status == 0) {
-      let { status, ...body } = pg;
+      const { status, ...body } = pg;
       return body;
     }
     return pg;

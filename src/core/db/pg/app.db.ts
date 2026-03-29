@@ -291,4 +291,24 @@ export class AppDB {
       builder.values,
     );
   }
+
+  async updateTx(
+    client: any,
+    tableName: string,
+    data: any,
+    columns: any[],
+    conditions: SqlCondition[],
+  ): Promise<number> {
+    const builder = new SqlBuilder(data, columns);
+    const { cols, indexes } = builder.create();
+    conditions.forEach((condition) => {
+      builder.condition(condition.column, condition.cond, condition.value);
+    });
+    const criteria = builder.criteria();
+    const result = await client.query(
+      `UPDATE "${tableName}" SET(${cols}) = ROW(${indexes}) ${criteria}`,
+      builder.values,
+    );
+    return result.rowCount;
+  }
 }

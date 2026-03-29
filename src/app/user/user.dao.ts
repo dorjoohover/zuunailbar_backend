@@ -46,7 +46,6 @@ export class UserDao {
 
   async update(data: any, attr: string[]): Promise<number> {
     try {
-
       return await this._db.update(tableName, data, attr, [
         new SqlCondition('id', '=', data.id),
       ]);
@@ -116,8 +115,11 @@ export class UserDao {
   }
 
   async listMany(ids: string[]) {
-    return await this._db.select(`select * from "${tableName}" where id = any($1)`, [ids])
-  } 
+    return await this._db.select(
+      `select * from "${tableName}" where id = any($1)`,
+      [ids],
+    );
+  }
 
   async list(query) {
     if (query.id) {
@@ -180,7 +182,7 @@ export class UserDao {
   }
 
   async search(filter: any): Promise<any[]> {
-    let nameCondition = ``;
+    const nameCondition = ``;
     if (filter.id) {
       filter.id = `%${filter.id.toLowerCase()}%`;
     }

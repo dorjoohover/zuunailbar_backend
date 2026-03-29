@@ -1,4 +1,3 @@
- 
 export class Voucher {
   public id: string;
   public user_id: string;

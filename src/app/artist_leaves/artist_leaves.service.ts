@@ -39,7 +39,7 @@ export class ArtistLeavesService {
   }
   public async findAll(pg: PaginationDto, role: number) {
     const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
-    let result = { count: res.count, items: [] };
+    const result = { count: res.count, items: [] };
     for (const item of res.items) {
       const user = await this.dao.getByUserStatus(item.artist_id);
       const creater = await this.dao.getByUserStatus(item.created_by);

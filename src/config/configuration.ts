@@ -5,5 +5,3 @@ export default () => ({
     port: parseInt(process.env.DATABASE_PORT, 10) || 5432,
   },
 });
-
-

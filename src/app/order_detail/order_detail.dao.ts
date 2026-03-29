@@ -64,6 +64,12 @@ export class OrderDetailDao {
     ]);
   }
 
+  async updateTx(client: any, data: any, attr: string[]): Promise<number> {
+    return await this._db.updateTx(client, tableName, data, attr, [
+      new SqlCondition('id', '=', data.id),
+    ]);
+  }
+
   async updateTags(data: any): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "tags"=$1 WHERE "id"=$2`,
@@ -92,9 +98,16 @@ export class OrderDetailDao {
   }
   async delete(id: string): Promise<number> {
     return await this._db._update(
-      `delete from "${tableName}" where order_id = $1`,
+      `delete from "${tableName}" where id = $1`,
       [id],
     );
+  }
+
+  async deleteTx(client: any, id: string): Promise<number> {
+    const result = await client.query(`delete from "${tableName}" where id = $1`, [
+      id,
+    ]);
+    return result.rowCount;
   }
 
   async getByMobile(mobile: string) {
@@ -118,8 +131,8 @@ export class OrderDetailDao {
     );
   }
   async listOrderIds(ids: string[]) {
-  return await this._db.select(
-    `SELECT 
+    return await this._db.select(
+      `SELECT 
        od.*,
        u.id as artist_id,   
        u.nickname,
@@ -133,9 +146,9 @@ export class OrderDetailDao {
      FROM "${tableName}" od
      INNER JOIN users u ON u.id = od.user_id
      WHERE od.order_id = ANY($1)`,
-    [ids],
-  );
-}
+      [ids],
+    );
+  }
   async list(query) {
     if (query.id) {
       query.id = `%${query.id}%`;

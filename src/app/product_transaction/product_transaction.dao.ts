@@ -77,7 +77,11 @@ export class ProductTransactionDao {
       .conditionIfNotEmpty('product_id', '=', query.product_id)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('product_transaction_status', '=', query.transaction_status)
+      .conditionIfNotEmpty(
+        'product_transaction_status',
+        '=',
+        query.transaction_status,
+      )
 
       .criteria();
     const sql =

@@ -22,24 +22,12 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
     if (!requiredRole) return true;
+    if (!user || !user.user || user.user.role === undefined) {
+      return false;
+    }
     const { role } = user.user;
-
-    if (!requiredRole) {
-      return false;
-    }
-
-    if (!user || !user.user || !user.user.role) {
-      return false;
-    }
-    const moduleRole = role;
-
-    if (!moduleRole) {
-      return false;
-    }
-
-    const userPermission = moduleRole
-      ? RolePermission.ALLOW
-      : RolePermission.DENY;
+    const allowed = requiredRole.includes(role);
+    const userPermission = allowed ? RolePermission.ALLOW : RolePermission.DENY;
     request.user.permission = userPermission;
 
     return userPermission === RolePermission.ALLOW;

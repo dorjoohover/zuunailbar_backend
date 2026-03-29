@@ -1,4 +1,3 @@
-
 export class BranchLeave {
   public id?: string;
   public branch_id?: string;

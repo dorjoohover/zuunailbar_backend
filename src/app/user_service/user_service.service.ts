@@ -34,7 +34,7 @@ export class UserServiceService {
       u.role == EMPLOYEE
         ? (user = u)
         : (user = await this.userService.findOne(dto.user_id));
-      let userServices = await this.findAll(
+      const userServices = await this.findAll(
         {
           user_id: dto.user_id,
           limit: -1,

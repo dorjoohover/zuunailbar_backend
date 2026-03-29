@@ -26,13 +26,31 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(req: DashRequest, payload: any) {
     let merchant;
     let branch;
-    const merchantId = req.headers['merchant-id'] as string;
-    const branchId = req.headers['branch-id'] as string;
+    const headerMerchantId = req.headers['merchant-id'] as string | undefined;
+    const headerBranchId = req.headers['branch-id'] as string | undefined;
+    const merchantId = payload.merchant_id ?? headerMerchantId;
+    const branchId = payload.branch_id ?? headerBranchId;
+    if (
+      payload.merchant_id &&
+      headerMerchantId &&
+      headerMerchantId !== payload.merchant_id
+    ) {
+      throw new UnauthorizedException();
+    }
+    if (payload.branch_id && headerBranchId && headerBranchId !== payload.branch_id) {
+      throw new UnauthorizedException();
+    }
     if (merchantId) {
       merchant = await this.merchantService.findOne(merchantId);
     }
     if (branchId) {
       branch = await this.branchService.findOne(branchId);
+    }
+    if (branch && merchant && branch.merchant_id !== merchant.id) {
+      throw new UnauthorizedException();
+    }
+    if (!merchant && branch) {
+      merchant = await this.merchantService.findOne(branch.merchant_id);
     }
     const user = await this.adminUsersService.getAdminUserById(payload);
 

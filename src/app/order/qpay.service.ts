@@ -30,12 +30,7 @@ export class QpayService {
     this.accessToken = data.access_token;
     this.refreshToken = data.refresh_token;
     this.expiresIn = new Date(Date.now() + data.expires_in * 1000);
-    console.log(
-      'Access token refreshed:',
-      this.accessToken.slice(0, 20),
-      '...',
-      new Date(),
-    );
+    this.logger.log('QPay access token refreshed');
   }
 
   private async ensureValidToken() {
@@ -47,10 +42,10 @@ export class QpayService {
         : 0;
 
       if (this.refreshToken && diff < 24 * 60 * 60 * 1000) {
-        console.log('Token expired → Refreshing...');
+        this.logger.warn('QPay access token expired, refreshing');
         await this.refreshAccessToken();
       } else {
-        console.log('24 цаг өнгөрсөн → Re-authenticating...');
+        this.logger.warn('QPay refresh window passed, re-authenticating');
         await this.authenticate();
       }
     }
@@ -76,7 +71,10 @@ export class QpayService {
       );
       return response.data;
     } catch (error) {
-      console.log(error.response.data.message);
+      this.logger.error(
+        'QPay request failed',
+        error?.response?.data?.message || error?.message,
+      );
       if (error.response?.status === 401) {
         await this.refreshAccessToken();
         const retryResponse = await firstValueFrom(
@@ -98,13 +96,17 @@ export class QpayService {
   private async authenticate() {
     try {
       const response = await lastValueFrom(
-        this.httpService.post(`${this.baseUrl}auth/token`,{}, {
-          auth: {
-            username: process.env.QPAY_CLIENT_ID,
-            password: process.env.QPAY_CLIENT_SECRET,
+        this.httpService.post(
+          `${this.baseUrl}auth/token`,
+          {},
+          {
+            auth: {
+              username: process.env.QPAY_CLIENT_ID,
+              password: process.env.QPAY_CLIENT_SECRET,
+            },
+            timeout: 10000,
           },
-          timeout: 10000,
-        }),
+        ),
       );
 
       this.accessToken = response.data.access_token;
@@ -150,10 +152,10 @@ export class QpayService {
     order_id: string,
     userId: string,
     branch: string,
-    mobile: string
+    mobile: string,
   ) {
     try {
-      const phone = MobileParser(mobile)
+      const phone = MobileParser(mobile);
       const res = this.requestWithToken('POST', 'invoice', {
         // invoice_code: 'Zuunailbar',
         invoice_code: process.env.QPAY_INVOICE_CODE,
@@ -173,7 +175,10 @@ export class QpayService {
 
       return res;
     } catch (error) {
-      console.log(error);
+      this.logger.error(
+        'QPay createInvoice failed',
+        error?.response?.data || error?.message,
+      );
     }
   }
 
@@ -181,14 +186,14 @@ export class QpayService {
   async getInvoice(id: string) {
     try {
       const res = await this.requestWithToken('GET', `invoice/${id}`, {});
-      const payment = res?.payments?.[0]
-      if(!payment) {
-        throw new HttpException('Төлбөр олдсонгүй', HttpStatus.BAD_REQUEST)
+      const payment = res?.payments?.[0];
+      if (!payment) {
+        throw new HttpException('Төлбөр олдсонгүй', HttpStatus.BAD_REQUEST);
       }
       return {
         status: payment.payment_status,
         amount: payment.payment_amount,
-        transaction_type: payment.payment_type
+        transaction_type: payment.payment_type,
       };
     } catch (error) {}
   }

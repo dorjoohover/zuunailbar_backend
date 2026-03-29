@@ -71,6 +71,21 @@ export class BranchServiceDao {
     );
   }
 
+  async getByBranchAndService(branch_id: string, service_id: string) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "branch_id"=$1 AND "service_id"=$2 AND "status"=$3`,
+      [branch_id, service_id, STATUS.Active],
+    );
+  }
+
+  async getByBranchAndServices(branch_id: string, service_ids: string[]) {
+    if (!service_ids?.length) return [];
+    return await this._db.select(
+      `SELECT * FROM "${tableName}" WHERE "branch_id"=$1 AND "service_id" = ANY($2) AND "status"=$3`,
+      [branch_id, service_ids, STATUS.Active],
+    );
+  }
+
   async getByUserId(id: string) {
     return await this._db.selectOne(
       `SELECT * FROM "${tableName}" WHERE "user_id"=$1`,

@@ -72,7 +72,7 @@ export class OrderController {
     'old_order_status',
     'new_order_status',
     'changed_by',
-    'changed_at'
+    'changed_at',
   ])
   findLogs(@Pagination() pg: PaginationDto) {
     return this.orderService.get_status_logs(pg);
@@ -157,18 +157,23 @@ export class OrderController {
     @Param('invoice') invoice: string,
     @Req() { user },
   ) {
-    return this.orderService.checkPayment(invoice, id, user.user.id);
+    return this.orderService.checkPayment(
+      invoice,
+      id,
+      user.user.id,
+      user.user.role,
+    );
   }
   @Get('cancel/:id')
   @ApiParam({ name: 'id' })
-  async cancel(@Param('id') id: string) {
-    return this.orderService.cancelOrder(id);
+  async cancel(@Param('id') id: string, @Req() { user }) {
+    return this.orderService.cancelOrder(id, user.user.id, user.user.role);
   }
 
   @Employee()
   @Patch('/update/:id')
   update(@Param('id') id: string, @Body() dto: OrderDto, @Req() { user }) {
-    return this.orderService.update(id, dto, user.user.id);
+    return this.orderService.update(id, dto, user.user.id, user.user.role);
   }
 
   @Public()

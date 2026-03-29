@@ -11,7 +11,7 @@ import {
 import { ScheduleService } from './schedule.service';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { ScheduleDto } from './schedule.dto';
-import { Employee } from 'src/auth/guards/role/role.decorator';
+import { Employee, Manager } from 'src/auth/guards/role/role.decorator';
 import { BadRequest } from 'src/common/error';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
@@ -65,6 +65,13 @@ export class ScheduleController {
   @Get('get/:id')
   findOne(@Param('id') id: string) {
     return this.scheduleService.findOne(id);
+  }
+
+  @Get('search')
+  @PQ(ScheduleController.fields)
+  @Manager()
+  search(@Pagination() pg: PaginationDto) {
+    return this.scheduleService.search(pg);
   }
   @SAP()
   @Patch(':id')

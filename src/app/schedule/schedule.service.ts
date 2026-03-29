@@ -80,7 +80,9 @@ export class ScheduleService {
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }
-
+  public async search(pg: PaginationDto) {
+    return await this.dao.search(pg)
+  }
   public async update(id: string, dto: ScheduleDto) {
     const times = dto.times ? dto.times?.join('|') : null;
     const schedule = await this.findOne(id);

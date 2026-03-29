@@ -35,39 +35,39 @@ export class VoucherService {
     return await this.dao.getById(id);
   }
 
-//   public async calculateDiscountedPrice(
-//     type: number,
-//     value: number,
-//     min_price: number,
-//     max_price?: number,
-//   ) {
-//     const calculate = (amount: number) => {
-//       if (type === DISCOUNT.Percent) {
-//         return {
-//           discountedAmount: round(((100 - value) * amount) / 100),
-//           discount: round((value * amount) / 100),
-//           discountValue: `${value}%`,
-//           discountType: DiscountValue[DISCOUNT.Percent],
-//         };
-//       }
+  //   public async calculateDiscountedPrice(
+  //     type: number,
+  //     value: number,
+  //     min_price: number,
+  //     max_price?: number,
+  //   ) {
+  //     const calculate = (amount: number) => {
+  //       if (type === DISCOUNT.Percent) {
+  //         return {
+  //           discountedAmount: round(((100 - value) * amount) / 100),
+  //           discount: round((value * amount) / 100),
+  //           discountValue: `${value}%`,
+  //           discountType: DiscountValue[DISCOUNT.Percent],
+  //         };
+  //       }
 
-//       if (type === DISCOUNT.Price) {
-//         return {
-//           discountedAmount: amount - value,
-//           discount: value,
-//           discountValue: value,
-//           discountType: DiscountValue[DISCOUNT.Price],
-//         };
-//       }
+  //       if (type === DISCOUNT.Price) {
+  //         return {
+  //           discountedAmount: amount - value,
+  //           discount: value,
+  //           discountValue: value,
+  //           discountType: DiscountValue[DISCOUNT.Price],
+  //         };
+  //       }
 
-//       return null;
-//     };
+  //       return null;
+  //     };
 
-//     return {
-//       min: calculate(min_price),
-//       ...(max_price ? { max: calculate(max_price) } : {}),
-//     };
-//   }
+  //     return {
+  //       min: calculate(min_price),
+  //       ...(max_price ? { max: calculate(max_price) } : {}),
+  //     };
+  //   }
   public async findByService(id: string) {
     return await this.dao.getByService(id);
   }

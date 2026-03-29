@@ -31,7 +31,7 @@ export class PaymentController {
   @Get()
   @PQ(['status'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
-    let p = pg;
+    const p = pg;
 
     return this.service.findAll(p, user.user.role);
   }

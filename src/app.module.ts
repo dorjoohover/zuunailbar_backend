@@ -89,7 +89,7 @@ import { ResendService } from './auth/resend.service';
     BranchLeavesModule,
     ArtistLeavesModule,
     PaymentModule,
-    IntegrationPaymentModule
+    IntegrationPaymentModule,
   ],
   controllers: [AppController],
   providers: [

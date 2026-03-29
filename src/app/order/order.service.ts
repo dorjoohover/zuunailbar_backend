@@ -1,4 +1,4 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AvailableTimeDto, OrderDto } from './order.dto';
 import { OrdersDao } from './order.dao';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
@@ -40,6 +40,7 @@ import { UserServiceService } from '../user_service/user_service.service';
 import { IntegrationService } from '../integrations/integrations.service';
 import { PaymentService } from '../payment/payment.service';
 import { OrderLogDao } from './order.log.dao';
+import { AppDB } from 'src/core/db/pg/app.db';
 
 @Injectable()
 export class OrderService {
@@ -60,6 +61,7 @@ export class OrderService {
     private orderLog: OrderLogDao,
     // @Inject(forwardRef(() => PaymentService))
     private payment: PaymentService,
+    private readonly db: AppDB,
   ) {}
   public async canPlaceOrder(
     dto: Order,
@@ -114,7 +116,7 @@ export class OrderService {
   }
 
   public async getSlots(pg: PaginationDto) {
-    let { parallel, branch_id, services } = pg;
+    const { parallel, branch_id, services } = pg;
     let artists = [];
     let result: Slot[] = [];
 
@@ -130,11 +132,14 @@ export class OrderService {
         artists = artists_res.map((r) => r.user_id);
       }
     }
-    const selected_services = await this.service.getCategories(service);
+    const selected_services = await this.service.getBookingConfigs(
+      service,
+      branch_id,
+    );
 
     const categories = selected_services.map((d) => d?.category_id);
     const durations = selected_services.map((d) => Number(d.duration) || 0);
-    const needDuration = parallel
+    const needDuration = p
       ? Math.max(0, ...durations)
       : durations.reduce((a, b) => a + b, 0);
 
@@ -175,16 +180,11 @@ export class OrderService {
           order.start_ts,
           order.end_ts,
         );
-        if (res) {
-          console.log(start, end, order.start_ts, order.end_ts);
-        }
         return res;
       });
 
       if (!hasConflict) {
         validSlots.push(slot);
-      } else {
-        console.log(slot);
       }
     }
     return validSlots;
@@ -215,7 +215,14 @@ export class OrderService {
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
       const admin = user.role <= ADMIN;
+      const canManagePreAmount = user.role < MANAGER;
+      if ((dto.details?.length ?? 0) <= 0) this.orderError.serviceNotSelected;
       const parallel = dto.parallel;
+      const serviceConfigs = await this.service.getBookingConfigs(
+        (dto.details ?? []).map((detail) => detail.service_id),
+        dto.branch_id,
+      );
+      const serviceMap = new Map(serviceConfigs.map((service) => [service.id, service]));
 
       // artists.length == 0 || artists?.[0] == '0' && artists =
 
@@ -223,10 +230,10 @@ export class OrderService {
       let pre = 0;
       let duration = admin && dto.duration ? +dto.duration : 0;
       for (const detail of dto.details ?? []) {
-        const service = await this.service.findOne(detail.service_id);
+        const service = serviceMap.get(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
         if (+(service.pre ?? '0') > pre) pre = +service.pre;
-        let d = +(detail.duration ?? service.duration ?? '0');
+        const d = +(detail.duration ?? service.duration ?? '0');
         if (parallel) {
           duration = duration < d ? d : duration;
         } else {
@@ -236,6 +243,9 @@ export class OrderService {
       if (admin && dto.pre_amount) {
         pre = +dto.pre_amount;
       }
+      const orderPreAmount = canManagePreAmount
+        ? +(dto.pre_amount ?? pre ?? 0)
+        : +(pre ?? 0);
       const durationHours = duration / 60; // 👈 хамгийн зөв
 
       const startHour = timeToDecimal(dto.start_time.toString()); // ж: 12.5
@@ -267,8 +277,8 @@ export class OrderService {
         discount: dto.discount ?? null,
         total_amount: dto.total_amount ?? null,
         paid_amount: dto.paid_amount ?? null,
-        pre_amount: dto.pre_amount ?? pre ?? 0,
-        is_pre_amount_paid: pre == 0,
+        pre_amount: orderPreAmount,
+        is_pre_amount_paid: orderPreAmount == 0,
         order_status,
         status: STATUS.Active,
         parallel,
@@ -289,10 +299,11 @@ export class OrderService {
       let startDate = startHour;
       const orderDetails = [];
       for (const d of dto.details ?? []) {
-        const service = await this.service.findOne(d.service_id);
+        const service = serviceMap.get(d.service_id);
+        if (!service) throw new BadRequest().notFound('Үйлчилгээ');
         const artist = await this.user.findOne(d.user_id);
 
-        let duration =
+        const duration =
           admin && dto.duration
             ? Math.ceil(
                 (+dto.duration / (parallel ? 1 : dto.details.length) / 60) * 2,
@@ -319,21 +330,17 @@ export class OrderService {
         if (dto.parallel !== true) startDate = endDate;
       }
       const order = await this.dao.create(payload, orderDetails);
-      if (
-        dto.method == PaymentMethod.P2P &&
-        +(dto.pre_amount ?? pre ?? '0') > 0
-      ) {
+      if (dto.method == PaymentMethod.P2P && orderPreAmount > 0) {
         const invoice = await this.qpay.createInvoice(
-          pre,
+          orderPreAmount,
           order,
           user.id,
           dto.branch_name,
           user.mobile,
         );
-        console.log(invoice?.invoice_id, order, user.id, new Date());
         await this.payment.create(
           {
-            amount: pre,
+            amount: orderPreAmount,
             is_pre_amount: true,
             created_by: user.id,
             invoice_id: invoice.invoice_id,
@@ -349,7 +356,7 @@ export class OrderService {
           id: order,
           invoice: {
             ...invoice,
-            price: pre,
+            price: orderPreAmount,
             status: OrderStatus.Pending,
             created: new Date(),
           },
@@ -370,7 +377,7 @@ export class OrderService {
         return { id: order };
       }
     } catch (error) {
-      console.log(error);
+      console.error('Order create failed:', error);
       throw error;
     }
   }
@@ -383,7 +390,28 @@ export class OrderService {
     }
   }
 
-  public async checkPayment(invoiceId: string, id: string, user: string) {
+  private async ensureOrderAccess(
+    orderId: string,
+    userId: string,
+    role: number,
+  ) {
+    const order = await this.findOne(orderId);
+    if (!order) {
+      throw new UnauthorizedException();
+    }
+    if (role === CLIENT && order.customer_id !== userId) {
+      throw new UnauthorizedException();
+    }
+    return order;
+  }
+
+  public async checkPayment(
+    invoiceId: string,
+    id: string,
+    user: string,
+    role: number,
+  ) {
+    await this.ensureOrderAccess(id, user, role);
     const res = await this.qpay.checkPayment(invoiceId);
     if (res?.paid_amount) {
       await this.updateStatus({
@@ -405,13 +433,14 @@ export class OrderService {
     };
   }
 
-  public async cancelOrder(id: string) {
+  public async cancelOrder(id: string, user: string, role: number) {
     try {
+      await this.ensureOrderAccess(id, user, role);
       await this.dao.updateOrderStatus(id, OrderStatus.Absent);
       await this.orderDetail.updateStatusByOrder(id, OrderStatus.Absent);
       return true;
     } catch (error) {
-      console.log(error);
+      console.error('Order cancel failed:', error);
     }
   }
 
@@ -425,13 +454,13 @@ export class OrderService {
         count: res.count,
       };
     } catch (error) {
-      console.log(error);
+      console.error('Client order lookup failed:', error);
     }
   }
 
   public async find(pg: PaginationDto, role: number, id?: string) {
     try {
-      let q = { ...pg };
+      const q = { ...pg };
 
       // 🔹 customer filter
       if (pg.customer && role < EMPLOYEE) {
@@ -493,7 +522,7 @@ export class OrderService {
         count: res.count,
       };
     } catch (error) {
-      console.log(error);
+      console.error('Order list lookup failed:', error);
     }
   }
 
@@ -601,8 +630,9 @@ export class OrderService {
     status?: number;
     order_status?: number;
     order_id: string;
+    client?: any;
   }) {
-    const { user, order_status, status, order_id } = input;
+    const { user, order_status, status, order_id, client } = input;
     const order = await this.findOne(order_id);
     if (!order) return;
     if (
@@ -612,14 +642,19 @@ export class OrderService {
       status == order.status
     )
       return;
-    await this.orderLog.add({
+    const payload = {
       changed_by: user,
       new_status: status ?? order.status,
       new_order_status: order_status ?? order.order_status,
       old_order_status: order.order_status,
       old_status: order.status,
       order_id,
-    });
+    };
+    if (client) {
+      await this.orderLog.addTx(client, payload);
+      return;
+    }
+    await this.orderLog.add(payload);
   }
 
   public async checkOrders() {
@@ -646,12 +681,13 @@ export class OrderService {
     );
   }
 
-  public async update(id: string, dto: OrderDto, user: string) {
-    let { details = [], parallel, order_date, ...body } = dto;
-    let payload = { order_date, ...body };
+  public async update(id: string, dto: OrderDto, user: string, role: number) {
+    const { details = [], parallel, order_date, ...body } = dto;
+    const payload = { order_date, ...body };
     try {
       const order = await this.findOne(id);
       if (!order) return;
+      if (details.length <= 0) this.orderError.serviceNotSelected;
 
       const start_time = timeToDecimal(dto.start_time.toString());
       const orderDuration = parallel
@@ -669,9 +705,16 @@ export class OrderService {
       }
 
       // 💰 PAYMENT LOGIC
+      const canManagePreAmount = role < MANAGER;
+      const preservedPreAmount = +(order.pre_amount ?? 0);
+      if (!canManagePreAmount) {
+        payload.pre_amount = preservedPreAmount;
+      }
       const paidAmount = +(payload.paid_amount ?? 0);
-      const preAmount = +(payload.pre_amount ?? 0);
-      let status = payload.order_status || order.order_status;
+      const preAmount = canManagePreAmount
+        ? +(payload.pre_amount ?? preservedPreAmount)
+        : preservedPreAmount;
+      const status = payload.order_status || order.order_status;
 
       if (status === OrderStatus.Finished) {
         const total = preAmount + paidAmount;
@@ -696,67 +739,63 @@ export class OrderService {
         payload.updated_at = new Date();
       }
 
-      await this.register_status_logs({
-        user,
-        order_id: id,
-        order_status: payload.order_status,
-      });
-
-      // 1️⃣ UPDATE ORDER
-      await this.dao.update({ id, ...payload }, getDefinedKeys(payload));
-
-      // 2️⃣ EXISTING DETAILS
       const existingDetails = await this.orderDetail.findByOrder(id);
       const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
-      // 🔥 STEP 1: DELETE removed details
       const incomingIds = details.filter((d) => d.id).map((d) => d.id);
 
-      for (const existing of existingDetails) {
-        if (!incomingIds.includes(existing.id)) {
-          await this.orderDetail.delete(existing.id);
+      await this.db.withTransaction(async (client) => {
+        await this.register_status_logs({
+          user,
+          order_id: id,
+          order_status: payload.order_status,
+          client,
+        });
+
+        await this.dao.updateTx(client, { id, ...payload }, getDefinedKeys(payload));
+
+        for (const existing of existingDetails) {
+          if (!incomingIds.includes(existing.id)) {
+            await this.orderDetail.deleteTx(client, existing.id);
+          }
         }
-      }
 
-      // 🔥 STEP 2: UPSERT (NO Promise.all)
-      let startDate = start_time;
+        let startDate = start_time;
 
-      for (const d of details) {
-        const order_detail_date = order_date ?? order.order_date;
-        const prev = d.id ? existingMap.get(d.id) : null;
-        const service = await this.service.findOne(d.service_id);
-        const dura = Number(d.duration ?? +service.duration) / 60;
-        const endDate = startDate + dura;
+        for (const d of details) {
+          const order_detail_date = order_date ?? order.order_date;
+          const prev = d.id ? existingMap.get(d.id) : null;
+          const service = await this.service.findOne(d.service_id);
+          const dura = Number(d.duration ?? +service.duration) / 60;
+          const endDate = startDate + dura;
 
-        const detailPayload: any = {
-          ...d,
-          start_time: toTimeString(Math.floor(startDate), startDate % 1 !== 0),
-          end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
-          status: status,
-          view_status: order.status,
-          order_date: order_detail_date,
-        };
+          const detailPayload: any = {
+            ...d,
+            start_time: toTimeString(Math.floor(startDate), startDate % 1 !== 0),
+            end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
+            status: status,
+            view_status: order.status,
+            order_date: order_detail_date,
+          };
 
-        const { category_id, ...updatePayload } = detailPayload;
-        if (prev) {
-          console.log(updatePayload, 'update');
-          // ✅ UPDATE
-          await this.orderDetail.update(d.id, updatePayload);
-        } else {
-          // ✅ CREATE
-          const artist = await this.userService.findOne(d.user_id);
+          const { category_id, ...updatePayload } = detailPayload;
+          if (prev) {
+            await this.orderDetail.updateTx(client, d.id, updatePayload);
+          } else {
+            const artist = await this.userService.findOne(d.user_id);
 
-          await this.orderDetail.create({
-            ...updatePayload,
-            order_id: id,
-            nickname: artist?.nickname ?? null,
-          });
+            await this.orderDetail.createTx(client, {
+              ...updatePayload,
+              order_id: id,
+              nickname: artist?.nickname ?? null,
+            } as any);
+          }
+          if (parallel) {
+            startDate = start_time;
+          } else {
+            startDate = endDate;
+          }
         }
-        if (parallel) {
-          startDate = start_time;
-        } else {
-          startDate = endDate;
-        }
-      }
+      });
     } catch (error) {
       console.error('Order update failed:', error);
       throw error;
@@ -784,7 +823,7 @@ export class OrderService {
     param?: string,
     id?: string,
   ) {
-    let date = this.isFullDate(param) ? param : undefined;
+    const date = this.isFullDate(param) ? param : undefined;
 
     const orders = await this.find(
       {
@@ -886,10 +925,6 @@ export class OrderService {
         });
       }),
     );
-
-    console.log(
-      `✅ Processed ${Object.keys(users).length} users for salary update.`,
-    );
     return {
       count: confirmedOrders.length,
     };
@@ -904,7 +939,7 @@ export class OrderService {
   public async updateLevel(dto: Record<UserLevel, number>) {
     await Promise.all(
       Object.entries(dto).map(([k, value], i) => {
-        let key = k as unknown as UserLevel;
+        const key = k as unknown as UserLevel;
         if (key == UserLevel.BRONZE) this.bronze = value;
         if (key == UserLevel.SILVER) this.silver = value;
         if (key == UserLevel.GOLD) this.gold = value;

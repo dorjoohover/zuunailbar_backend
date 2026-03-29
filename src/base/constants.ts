@@ -206,7 +206,6 @@ export enum SALARY_LOG_STATUS {
   Pending = 10,
   Approved = 20,
   Completed = 30,
-
 }
 
 export const SalaryLogValue = {
@@ -251,7 +250,7 @@ export enum SalaryStatus {
 
 export function getDatesBetween(start: Date, end: Date): Date[] {
   const dates: Date[] = [];
-  let current = new Date(start);
+  const current = new Date(start);
 
   while (current <= end) {
     dates.push(new Date(current)); // copy

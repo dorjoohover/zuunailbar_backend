@@ -15,8 +15,8 @@ export class AdminUserService extends BaseService {
 
   public async addAdminUser(dto: AdminUserDto): Promise<void> {
     try {
-      let user: any = dto;
-      let password = await bcrypt.hash(dto.password, saltOrRounds);
+      const user: any = dto;
+      const password = await bcrypt.hash(dto.password, saltOrRounds);
       user.id = AppUtils.uuid4();
       user.password = password;
       user.status = AdminUserStatus.Active;
@@ -56,7 +56,7 @@ export class AdminUserService extends BaseService {
 
   public async getAdminUser(dto: string) {
     try {
-      let mobile = dto.includes('+976') ? dto : `+976${dto}`;
+      const mobile = dto.includes('+976') ? dto : `+976${dto}`;
       const user = await this.dao.get(mobile);
       return {
         password: user.password ?? '',

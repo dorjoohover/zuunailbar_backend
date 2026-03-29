@@ -189,12 +189,22 @@ export class AuthService {
   }
 
   async reset(dto: ResetPasswordDto) {
-    if (!this.checkOtp(dto.otp, dto.mobile)) return;
-    return await this.userService.resetPassword(dto.mobile, dto.password, dto.lastname, dto.firstname);
+    if (!(await this.checkOtp(dto.otp, dto.mobile))) return;
+    return await this.userService.resetPassword(
+      dto.mobile,
+      dto.password,
+      dto.lastname,
+      dto.firstname,
+    );
   }
   async resetPassword(dto: ResetCurrentPasswordDto, mobile: string) {
     await this.validateAdminUser(mobile, dto.password);
-    const res = await this.userService.resetPassword(mobile, dto.newPassword, dto.lastname, dto.firstname);
+    const res = await this.userService.resetPassword(
+      mobile,
+      dto.newPassword,
+      dto.lastname,
+      dto.firstname,
+    );
     return res;
   }
 }

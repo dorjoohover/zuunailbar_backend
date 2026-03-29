@@ -17,14 +17,13 @@ import { ResendService } from './resend.service';
     PassportModule,
     BranchModule,
     UserModule,
-    
 
     JwtModule.register({
       secret: jwtConstants.secret,
       signOptions: { expiresIn: '30d' },
     }),
   ],
-  providers: [AuthService, JwtStrategy, ResendService,],
+  providers: [AuthService, JwtStrategy, ResendService],
   exports: [AuthService],
 })
 export class AuthModule {}

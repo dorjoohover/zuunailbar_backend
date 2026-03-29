@@ -20,8 +20,19 @@ export class OrderLogDao {
         'changed_by',
       ]);
     } catch (error) {
-      console.log(error);
+      console.error('Order status log insert failed:', error);
     }
+  }
+
+  async addTx(client: any, data) {
+    return await this._db.insertTx(client, tableName, data, [
+      'order_id',
+      'old_status',
+      'new_status',
+      'old_order_status',
+      'new_order_status',
+      'changed_by',
+    ]);
   }
 
   async list(query, columns?: string) {
