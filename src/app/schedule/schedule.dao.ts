@@ -104,7 +104,7 @@ export class ScheduleDao {
       .conditionIfNotEmpty('index', '=', filter.index)
       .criteria();
     return await this._db.select(
-      `SELECT "id", "user_id" FROM "${tableName}" ${criteria}${nameCondition}`,
+      `SELECT "id", "user_id", "times" as value FROM "${tableName}" ${criteria}${nameCondition}`,
       builder.values,
     );
   }
