@@ -6,11 +6,12 @@ import { UserModule } from '../user/user.module';
 import { IntegrationController } from './integrations.controller';
 import { IntegrationService } from './integrations.service';
 import { IntegrationDao } from './integrations.dao';
+import { IntegrationPaymentDao } from '../integration_payments/integration_payment.dao';
 
 @Module({
   imports: [AppDbModule, BaseModule, UserModule],
   controllers: [IntegrationController],
-  providers: [IntegrationService, IntegrationDao, ExcelService],
+  providers: [IntegrationService, IntegrationDao, IntegrationPaymentDao, ExcelService],
   exports: [IntegrationService],
 })
 export class IntegrationModule {}

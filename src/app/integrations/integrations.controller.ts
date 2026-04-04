@@ -45,6 +45,13 @@ export class IntegrationController {
   findOne(@Param('id') id: string) {
     return this.integrationService.findOne(id);
   }
+  @PQ(['from', 'to', 'artist_id'])
+  @Get('reconciliation')
+  reconciliation(@Pagination() pg: PaginationDto) {
+    return this.integrationService.getReconciliation(
+      pg as PaginationDto & { from?: string; to?: string; artist_id?: string },
+    );
+  }
   @Public()
   @Get('report')
   @PQ()

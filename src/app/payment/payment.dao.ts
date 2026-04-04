@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { PAYMENT_STATUS, PaymentMethod } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Payment } from './payment.entity';
@@ -47,11 +48,65 @@ export class PaymentDao {
       [id],
     );
   }
+  async getByInvoiceId(invoiceId: string) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "invoice_id"=$1 ORDER BY "created_at" DESC LIMIT 1`,
+      [invoiceId],
+    );
+  }
   async getByOrder(id: string) {
     return await this._db.selectOne(
-      `SELECT invoice_id FROM "${tableName}" WHERE "order_id"=$1`,
+      `SELECT invoice_id FROM "${tableName}" WHERE "order_id"=$1 AND "invoice_id" IS NOT NULL ORDER BY "created_at" DESC LIMIT 1`,
       [id],
     );
+  }
+  async listByOrder(orderId: string) {
+    return await this._db.select(
+      `SELECT * FROM "${tableName}" WHERE "order_id"=$1 ORDER BY "created_at" ASC`,
+      [orderId],
+    );
+  }
+  async getDailySummary(filter: {
+    merchant_id: string;
+    from: string;
+    to: string;
+  }) {
+    const sql = `
+      SELECT
+        COALESCE(SUM(CASE WHEN is_pre_amount = true THEN amount ELSE 0 END), 0) AS pre_amount,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN is_pre_amount = false AND method = $4 THEN amount
+              ELSE 0
+            END
+          ),
+          0
+        ) AS cash_amount,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN is_pre_amount = false AND method != $4 THEN amount
+              ELSE 0
+            END
+          ),
+          0
+        ) AS bank_amount
+      FROM "${tableName}"
+      WHERE "merchant_id" = $1
+        AND "status" != $2
+        AND ("paid_at" IS NOT NULL OR "status" != $3)
+        AND COALESCE("paid_at", "created_at")::date BETWEEN $5::date AND $6::date
+    `;
+
+    return await this._db.selectOne(sql, [
+      filter.merchant_id,
+      PAYMENT_STATUS.Cancelled,
+      PAYMENT_STATUS.Pending,
+      PaymentMethod.CASH,
+      filter.from,
+      filter.to,
+    ]);
   }
 
   async list(query, cols?: string) {

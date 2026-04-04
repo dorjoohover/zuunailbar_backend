@@ -7,5 +7,4 @@ export class UserServiceDto {
   branch_id: string;
   @ApiProperty()
   user_id: string;
-  level: number;
 }

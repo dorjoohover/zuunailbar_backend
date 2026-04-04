@@ -35,6 +35,11 @@ export class PaymentController {
 
     return this.service.findAll(p, user.user.role);
   }
+  @Get('summary')
+  @PQ(['from', 'to'])
+  dailySummary(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.service.getDailySummary(pg as PaginationDto & { from?: string; to?: string }, user?.merchant?.id);
+  }
 
   @Get('get/:id')
   findOne(@Param('id') id: string) {

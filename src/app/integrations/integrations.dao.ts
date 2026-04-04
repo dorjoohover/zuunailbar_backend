@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { OrderStatus, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Integration } from './integrations.entity';
@@ -86,6 +87,7 @@ export class IntegrationDao {
       .conditionIfNotEmpty('artist_id', '=', query.artist_id)
       .conditionIfNotEmpty('integration_status', '=', query.integration_status)
       .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfDateBetweenValues(query.from, query.to, 'date')
 
       .criteria();
     const sql =
@@ -96,6 +98,51 @@ export class IntegrationDao {
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
+  }
+  async getArtistIncomeTotals(filter: {
+    from?: string;
+    to?: string;
+    artist_id?: string;
+  }) {
+    const values: Array<string | number> = [
+      STATUS.Active,
+      STATUS.Active,
+      OrderStatus.Finished,
+      OrderStatus.Friend,
+    ];
+    let sql = `
+      SELECT
+        od."user_id" AS artist_id,
+        COALESCE(SUM(od."price"), 0) AS income_amount,
+        COUNT(od."id") AS order_count
+      FROM "order_details" od
+      INNER JOIN "orders" o ON o."id" = od."order_id"
+      WHERE od."view_status" = $1
+        AND o."status" = $2
+        AND od."status" IN ($3, $4)
+    `;
+
+    if (filter.from || filter.to) {
+      if (filter.from && filter.to) {
+        values.push(filter.from, filter.to);
+        sql += ` AND COALESCE(od."order_date", o."order_date") BETWEEN $${values.length - 1}::date AND $${values.length}::date`;
+      } else if (filter.from) {
+        values.push(filter.from);
+        sql += ` AND COALESCE(od."order_date", o."order_date") >= $${values.length}::date`;
+      } else if (filter.to) {
+        values.push(filter.to);
+        sql += ` AND COALESCE(od."order_date", o."order_date") <= $${values.length}::date`;
+      }
+    }
+
+    if (filter.artist_id) {
+      values.push(filter.artist_id);
+      sql += ` AND od."user_id" = $${values.length}`;
+    }
+
+    sql += ` GROUP BY od."user_id"`;
+
+    return await this._db.select(sql, values);
   }
 
   async search(filter: any): Promise<any[]> {

@@ -16,11 +16,13 @@ import { AppUtils } from 'src/core/utils/app.utils';
 import { ExcelService } from 'src/excel.service';
 import { UserService } from '../user/user.service';
 import { Response } from 'express';
+import { IntegrationPaymentDao } from '../integration_payments/integration_payment.dao';
 
 @Injectable()
 export class IntegrationService {
   constructor(
     private readonly dao: IntegrationDao,
+    private readonly integrationPaymentDao: IntegrationPaymentDao,
     private user: UserService,
     private excel: ExcelService,
   ) {}
@@ -41,6 +43,86 @@ export class IntegrationService {
   }
   public async findDate(id: string, date: string) {
     return await this.dao.getByDate(id, date);
+  }
+  public async getReconciliation(
+    pg: PaginationDto & { from?: string; to?: string; artist_id?: string },
+  ) {
+    const from = pg.from;
+    const to = pg.to;
+
+    const [incomeRows, transferRows] = await Promise.all([
+      this.dao.getArtistIncomeTotals({
+        from,
+        to,
+        artist_id: pg.artist_id,
+      }),
+      this.integrationPaymentDao.getArtistTransferTotals({
+        from,
+        to,
+        artist_id: pg.artist_id,
+      }),
+    ]);
+
+    const transferMap = new Map(
+      transferRows.map((row) => [
+        row.artist_id,
+        Number(row.transferred_amount ?? 0),
+      ]),
+    );
+    const incomeMap = new Map(
+      incomeRows.map((row) => [
+        row.artist_id,
+        {
+          income_amount: Number(row.income_amount ?? 0),
+          order_count: Number(row.order_count ?? 0),
+        },
+      ]),
+    );
+
+    const artistIds = new Set([
+      ...incomeRows.map((row) => row.artist_id),
+      ...transferRows.map((row) => row.artist_id),
+    ]);
+
+    const items = [...artistIds].map((artist_id) => {
+      const income = incomeMap.get(artist_id) ?? {
+        income_amount: 0,
+        order_count: 0,
+      };
+      const transferred_amount = transferMap.get(artist_id) ?? 0;
+
+      return {
+        artist_id,
+        income_amount: income.income_amount,
+        order_count: income.order_count,
+        transferred_amount,
+        balance_amount: income.income_amount - transferred_amount,
+      };
+    });
+
+    const summary = items.reduce(
+      (acc, item) => {
+        acc.income_amount += item.income_amount;
+        acc.transferred_amount += item.transferred_amount;
+        acc.balance_amount += item.balance_amount;
+        acc.order_count += item.order_count;
+        return acc;
+      },
+      {
+        income_amount: 0,
+        transferred_amount: 0,
+        balance_amount: 0,
+        order_count: 0,
+      },
+    );
+
+    return {
+      from: from ?? '',
+      to: to ?? '',
+      count: items.length,
+      summary,
+      items,
+    };
   }
 
   public async report(pg: PaginationDto, role: number, res: Response) {

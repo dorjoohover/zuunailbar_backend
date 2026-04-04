@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { IntegrationPayment } from './integration_payment.entity';
-import { SALARY_LOG_STATUS } from 'src/base/constants';
+import { SALARY_LOG_STATUS, STATUS } from 'src/base/constants';
 
 const tableName = 'integration_payments';
 
@@ -126,8 +126,10 @@ export class IntegrationPaymentDao {
     const criteria = builder
       .conditionIfNotEmpty('id', 'LIKE', query.id)
       .conditionIfNotEmpty('integration_id', '=', query.integration_id)
+      .conditionIfNotEmpty('artist_id', '=', query.artist_id)
       .conditionIfNotEmpty('paid_by', '=', query.paid_by)
       .conditionIfNotEmpty('type', '=', query.type)
+      .conditionIfDateBetweenValues(query.from, query.to, '"paid_at"::date')
 
       .criteria();
     const sql =
@@ -138,6 +140,42 @@ export class IntegrationPaymentDao {
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
+  }
+  async getArtistTransferTotals(filter: {
+    from?: string;
+    to?: string;
+    artist_id?: string;
+  }) {
+    const values: Array<string | number> = [STATUS.Active];
+    let sql = `
+      SELECT
+        artist_id,
+        COALESCE(SUM(amount), 0) AS transferred_amount
+      FROM "${tableName}"
+      WHERE "status" = $1
+    `;
+
+    if (filter.from || filter.to) {
+      if (filter.from && filter.to) {
+        values.push(filter.from, filter.to);
+        sql += ` AND "paid_at"::date BETWEEN $${values.length - 1}::date AND $${values.length}::date`;
+      } else if (filter.from) {
+        values.push(filter.from);
+        sql += ` AND "paid_at"::date >= $${values.length}::date`;
+      } else if (filter.to) {
+        values.push(filter.to);
+        sql += ` AND "paid_at"::date <= $${values.length}::date`;
+      }
+    }
+
+    if (filter.artist_id) {
+      values.push(filter.artist_id);
+      sql += ` AND "artist_id" = $${values.length}`;
+    }
+
+    sql += ` GROUP BY "artist_id"`;
+
+    return await this._db.select(sql, values);
   }
 
   async search(filter: any): Promise<any[]> {

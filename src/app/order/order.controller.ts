@@ -142,6 +142,22 @@ export class OrderController {
   async userCount(@Req() { user }) {
     return this.orderService.getUserCount(user.user.id);
   }
+  @Employee()
+  @Get('customer_count/:id')
+  @ApiParam({ name: 'id' })
+  async customerCount(@Param('id') id: string) {
+    return this.orderService.getCustomerOrderCount(id);
+  }
+  @Get('confirm')
+  @Admin()
+  @PQ(['from', 'to'])
+  async confirmOrders(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.orderService.confirmSalaryProcessStatus(
+      user.user.id,
+      pg.from,
+      pg.to,
+    );
+  }
   @Get('confirm/:date')
   @Admin()
   @ApiParam({ name: 'date' })
@@ -173,7 +189,13 @@ export class OrderController {
   @Employee()
   @Patch('/update/:id')
   update(@Param('id') id: string, @Body() dto: OrderDto, @Req() { user }) {
-    return this.orderService.update(id, dto, user.user.id, user.user.role);
+    return this.orderService.update(
+      id,
+      dto,
+      user.user.id,
+      user.user.role,
+      user?.merchant?.id,
+    );
   }
 
   @Public()

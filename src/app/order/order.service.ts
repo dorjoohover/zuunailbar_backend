@@ -157,6 +157,16 @@ export class OrderService {
       date: dates,
       artists: valid_artists,
     });
+    const availableTimesByArtistDate = result.reduce(
+      (acc, slot) => {
+        const key = `${slot.artist_id}_${toYMD(new Date(slot.date))}`;
+        const existing = acc.get(key) ?? new Set<number>();
+        existing.add(timeToDecimal(this.normalizeTimeValue(slot.start_time)));
+        acc.set(key, existing);
+        return acc;
+      },
+      new Map<string, Set<number>>(),
+    );
 
     // 🔥 group by artist_id
     const ordersByArtist: Record<string, any[]> = {};
@@ -169,6 +179,18 @@ export class OrderService {
     }
 
     for (const slot of result) {
+      const slotKey = `${slot.artist_id}_${toYMD(new Date(slot.date))}`;
+      const availableTimes = availableTimesByArtistDate.get(slotKey);
+      if (
+        !this.hasEnoughContinuousSlots(
+          timeToDecimal(this.normalizeTimeValue(slot.start_time)),
+          needDuration,
+          availableTimes,
+        )
+      ) {
+        continue;
+      }
+
       const start = this.combineDateTime(slot.date, slot.start_time.toString());
       const end = new Date(start.getTime() + needDuration * 60000);
       const artistOrders = ordersByArtist[slot.artist_id] || [];
@@ -192,14 +214,55 @@ export class OrderService {
   private isOverlapping(startA: Date, endA: Date, startB: Date, endB: Date) {
     return startA < endB && endA > startB;
   }
+  private normalizeTimeValue(time: Date | string) {
+    if (time instanceof Date) {
+      return time.toTimeString().slice(0, 8);
+    }
+
+    const raw = `${time}`;
+    const fullMatch = raw.match(/(\d{2}:\d{2}:\d{2})/);
+    if (fullMatch) return fullMatch[1];
+
+    const shortMatch = raw.match(/(\d{2}:\d{2})/);
+    if (shortMatch) return `${shortMatch[1]}:00`;
+
+    return raw;
+  }
+  private hasEnoughContinuousSlots(
+    startTime: number,
+    needDuration: number,
+    availableTimes?: Set<number>,
+  ) {
+    if (!availableTimes || availableTimes.size === 0) return false;
+
+    const slotCount = Math.max(1, Math.ceil(needDuration / 30));
+
+    for (let i = 0; i < slotCount; i++) {
+      const requiredTime = startTime + i * 0.5;
+      if (!availableTimes.has(requiredTime)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
   private combineDateTime(date: Date, time: string) {
     const d = new Date(date);
 
-    const [h, m, s] = time.split(':').map(Number);
+    const [h, m, s] = this.normalizeTimeValue(time).split(':').map(Number);
 
     d.setHours(h, m, s || 0, 0);
 
     return d;
+  }
+  private async syncOrderPaidMeta(
+    orderId: string,
+    paidAt?: Date,
+    method?: PaymentMethod,
+  ) {
+    if (!paidAt || method == null) return;
+
+    await this.updatePaidDate(orderId, paidAt, PaymentMethod[method]);
   }
   public async updateOrderLimit(limit: number) {
     await this.dao.orderLimit(limit);
@@ -209,6 +272,12 @@ export class OrderService {
     const res = await this.dao.customerCheck(user);
     return {
       count: res,
+    };
+  }
+  public async getCustomerOrderCount(customerId: string) {
+    const count = await this.dao.customerCheck(customerId);
+    return {
+      count,
     };
   }
 
@@ -362,16 +431,19 @@ export class OrderService {
           },
         };
       } else {
-        // if(payload.paid_amount) {
-
-        //   await this.payment.create({
-        //     amount: payload.paid_amount,
-        //     created_by: user.id,
-        //     is_pre_amount: false,
-        //     method: dto.method,
-        //     status: dto.order_status
-        //   }, merchant)
-        // }
+        const paymentSync = await this.payment.syncManualPayments({
+          merchant,
+          order_id: order,
+          created_by: user.id,
+          method: dto.method,
+          paid_amount: Number(dto.paid_amount ?? 0),
+          pre_amount: orderPreAmount,
+        });
+        await this.syncOrderPaidMeta(
+          order,
+          paymentSync.latestPaidAt,
+          paymentSync.latestMethod,
+        );
         await this.updatePrePaid(order, true);
         await this.dao.updateOrderStatus(order, OrderStatus.Active);
         return { id: order };
@@ -414,14 +486,19 @@ export class OrderService {
     await this.ensureOrderAccess(id, user, role);
     const res = await this.qpay.checkPayment(invoiceId);
     if (res?.paid_amount) {
+      const row = res?.rows?.[0];
+      const payment = await this.payment.markInvoicePaid({
+        invoice_id: invoiceId,
+        paid_at: new Date(),
+        payment_id: row?.payment_id,
+      });
       await this.updateStatus({
         id,
         order_status: OrderStatus.Active,
         user,
       });
-      const row = res?.rows?.[0];
       if (row) {
-        await this.updatePaidDate(id, new Date(), row.payment_type);
+        await this.updatePaidDate(id, payment?.paid_at ?? new Date(), row.payment_type);
       }
       return {
         status: OrderStatus.Active,
@@ -681,7 +758,13 @@ export class OrderService {
     );
   }
 
-  public async update(id: string, dto: OrderDto, user: string, role: number) {
+  public async update(
+    id: string,
+    dto: OrderDto,
+    user: string,
+    role: number,
+    merchant?: string,
+  ) {
     const { details = [], parallel, order_date, ...body } = dto;
     const payload = { order_date, ...body };
     try {
@@ -796,6 +879,20 @@ export class OrderService {
           }
         }
       });
+      const paymentSync = await this.payment.syncManualPayments({
+        merchant,
+        order_id: id,
+        created_by: user,
+        method: dto.method,
+        paid_amount: paidAmount,
+        pre_amount: preAmount,
+      });
+      await this.syncOrderPaidMeta(
+        id,
+        paymentSync.latestPaidAt,
+        paymentSync.latestMethod,
+      );
+      await this.updatePrePaid(id, preAmount == 0 ? true : !!paymentSync.hasPrePayment);
     } catch (error) {
       console.error('Order update failed:', error);
       throw error;
@@ -819,11 +916,12 @@ export class OrderService {
   }
   private isFullDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
   public async confirmSalaryProcessStatus(
-    approver: string,
+    approver?: string,
     param?: string,
-    id?: string,
+    endDateParam?: string,
   ) {
     const date = this.isFullDate(param) ? param : undefined;
+    const end_date = this.isFullDate(endDateParam) ? endDateParam : undefined;
 
     const orders = await this.find(
       {
@@ -831,18 +929,17 @@ export class OrderService {
         skip: 0,
         sort: false,
         date: date,
+        end_date,
       },
       ADMIN,
     );
 
     const items = await Promise.all(
       orders.items.map(async (order) => {
+        if (order.salary_date) return;
+
         const status = order.order_status;
-        if (
-          status == OrderStatus.Finished ||
-          status == OrderStatus.Friend ||
-          status == OrderStatus.Active
-        ) {
+        if (status == OrderStatus.Finished || status == OrderStatus.Friend) {
           await this.dao.updateSalaryProcessStatus(order.id, new Date());
           return order;
         }
@@ -982,13 +1079,25 @@ export class OrderService {
 
     if (res.status === 'PAID') {
       try {
+        const invoice = await this.payment.findByOrder(order_id);
+        const payment = invoice?.invoice_id
+          ? await this.payment.markInvoicePaid({
+              invoice_id: invoice.invoice_id,
+              paid_at: new Date(),
+              payment_id: id,
+            })
+          : null;
         await this.dao.getById(order_id);
         await this.updateStatus({
           id: order_id,
           order_status: OrderStatus.Active,
           user,
         });
-        await this.updatePaidDate(order_id, new Date(), res.transaction_type);
+        await this.updatePaidDate(
+          order_id,
+          payment?.paid_at ?? new Date(),
+          res.transaction_type,
+        );
       } catch (error) {
         throw error;
       }

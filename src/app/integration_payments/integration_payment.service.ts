@@ -1,12 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
   getDefinedKeys,
-  mnDate,
   SALARY_LOG_STATUS,
-  SalaryLogValue,
-  SalaryStatus,
+  PaymentType,
   STATUS,
   ubDateAt00,
   usernameFormatter,
@@ -19,6 +17,11 @@ import { IntegrationPaymentDto } from './integration_payment.dto';
 import { IntegrationPaymentDao } from './integration_payment.dao';
 import { IntegrationService } from '../integrations/integrations.service';
 import { BadRequest } from 'src/common/error';
+
+const paymentTypeLabel = {
+  [PaymentType.SALARY]: 'Цалин',
+  [PaymentType.ADVANCE]: 'Урьдчилгаа',
+};
 
 @Injectable()
 export class IntegrationPaymentService {
@@ -81,11 +84,11 @@ export class IntegrationPaymentService {
   public async report(pg: PaginationDto, role: number, res: Response) {
     const selectCols = [
       'id',
-      'user_id',
+      'artist_id',
       'amount',
-      'order_status',
-      'order_count',
-      'created_at',
+      'type',
+      'paid_by',
+      'paid_at',
     ];
 
     // 1) үндсэн жагсаалт
@@ -96,7 +99,7 @@ export class IntegrationPaymentService {
 
     // 2) user/customer-уудыг багцлаад авах (боломжтой бол findManyByIds ашигла)
     const userIds = Array.from(
-      new Set(items.map((x) => x.user_id).filter(Boolean)),
+      new Set(items.map((x) => x.artist_id).filter(Boolean)),
     );
 
     const [usersArr] = await Promise.all([
@@ -111,20 +114,18 @@ export class IntegrationPaymentService {
     type Row = {
       artist: string;
       amount: number;
-      status: string;
-      count: number;
+      type: string;
       date: Date | string;
     };
 
     const rows: Row[] = items.map((it: any) => {
-      const u = usersMap.get(it.user_id);
+      const u = usersMap.get(it.artist_id);
 
       return {
         artist: usernameFormatter(u) ?? '',
         amount: it.amount,
-        count: it.order_count,
-        status: SalaryLogValue[it.salary_status],
-        date: ubDateAt00(it.created_at),
+        type: paymentTypeLabel[it.type] ?? String(it.type ?? ''),
+        date: ubDateAt00(it.paid_at),
       };
     });
 
@@ -132,8 +133,7 @@ export class IntegrationPaymentService {
     const cols = [
       { header: 'Artist', key: 'artist', width: 24 },
       { header: 'Amount', key: 'amount', width: 16 },
-      { header: 'Count', key: 'count', width: 16 },
-      { header: 'Status', key: 'status', width: 16 },
+      { header: 'Type', key: 'type', width: 16 },
       { header: 'Date', key: 'date', width: 16 },
     ];
 
