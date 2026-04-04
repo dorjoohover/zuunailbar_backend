@@ -100,12 +100,12 @@ export class UserServiceDao {
       [status, id],
     );
   }
-  async updateLevel(id: string, level: number): Promise<number> {
-    return await this._db._update(
-      `UPDATE "${tableName}" SET "level"=$1 WHERE "id"=$2`,
-      [level, id],
-    );
-  }
+  // async updateLevel(id: string, level: number): Promise<number> {
+  //   return await this._db._update(
+  //     `UPDATE "${tableName}" SET "level"=$1 WHERE "id"=$2`,
+  //     [level, id],
+  //   );
+  // }
 
   async getByServices(input: { services: string[]; u?: string; branch_id }) {
     const { services, branch_id, u } = input;

@@ -1046,15 +1046,15 @@ export class OrderService {
   public async checkLevel(user: string) {
     const count = await this.dao.customerCheck(user);
     if (count >= this.gold) {
-      await this.userService.updateLevel(user, UserLevel.GOLD);
+      await this.user.updateLevel(user, UserLevel.GOLD);
       return;
     }
     if (count >= this.silver) {
-      await this.userService.updateLevel(user, UserLevel.SILVER);
+      await this.user.updateLevel(user, UserLevel.SILVER);
       return;
     }
     if (count >= this.bronze) {
-      await this.userService.updateLevel(user, UserLevel.BRONZE);
+      await this.user.updateLevel(user, UserLevel.BRONZE);
       return;
     }
   }

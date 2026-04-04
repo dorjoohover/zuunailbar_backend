@@ -110,9 +110,9 @@ export class UserServiceService {
     return await this.dao.getById(id);
   }
 
-  public async updateLevel(customer_id: string, level: number) {
-    await this.dao.updateLevel(customer_id, level);
-  }
+  // public async updateLevel(customer_id: string, level: number) {
+  //   await this.dao.updateLevel(customer_id, level);
+  // }
 
   public async update(id: string, dto: UserServiceDto) {
     return await this.dao.update({ ...dto, id, updated_at: mnDate() }, [
