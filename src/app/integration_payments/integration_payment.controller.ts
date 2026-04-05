@@ -37,20 +37,15 @@ export class IntegrationPaymentController {
   // zasna
   @PQ(['from', 'to', 'artist_id'])
   @Get()
-  findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
-    return this.service.findAll(pg, user.user.role);
+  async findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
+    const res = await this.service.findAll(pg, user.user.role);
+    console.log(res);
+    return res;
   }
   @Employee()
   @Get('get/:id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
-  }
-  @PQ(['from', 'to', 'artist_id'])
-  @Get('summary')
-  summary(@Pagination() pg: PaginationDto) {
-    return this.service.getSummary(
-      pg as PaginationDto & { from?: string; to?: string; artist_id?: string },
-    );
   }
   @Public()
   @Get('report')

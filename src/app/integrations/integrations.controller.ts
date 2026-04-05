@@ -35,7 +35,7 @@ export class IntegrationController {
     return this.integrationService.create(dto);
   }
   // zasna
-  @PQ()
+  @PQ(['from', 'to', 'artist_id', 'salary_status'])
   @Get()
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.integrationService.findAll(pg, user.user.role);

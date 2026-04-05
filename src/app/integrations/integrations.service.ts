@@ -35,7 +35,32 @@ export class IntegrationService {
   }
 
   public async findAll(pg: PaginationDto, role: number) {
-    return await this.dao.list(applyDefaultStatusFilter(pg, role));
+    const query = applyDefaultStatusFilter(
+      pg,
+      role,
+    ) as PaginationDto & {
+      from?: string;
+      to?: string;
+      artist_id?: string;
+      salary_status?: string;
+    };
+
+    const [data, summaryRow] = await Promise.all([
+      this.dao.list(query),
+      this.dao.getListSummary(query),
+    ]);
+
+    return {
+      items: data.items,
+      count: data.count,
+      from: query.from ?? '',
+      to: query.to ?? '',
+      summary: {
+        total_amount: Number(summaryRow?.total_amount ?? 0),
+        total_order_count: Number(summaryRow?.total_order_count ?? 0),
+        total_count: Number(summaryRow?.total_count ?? 0),
+      },
+    };
   }
 
   public async findOne(id: string) {
@@ -99,7 +124,6 @@ export class IntegrationService {
         balance_amount: income.income_amount - transferred_amount,
       };
     });
-
     const summary = items.reduce(
       (acc, item) => {
         acc.income_amount += item.income_amount;
@@ -128,11 +152,11 @@ export class IntegrationService {
   public async report(pg: PaginationDto, role: number, res: Response) {
     const selectCols = [
       'id',
-      'user_id',
+      'artist_id',
       'amount',
-      'order_status',
+      'salary_status',
       'order_count',
-      'created_at',
+      'date',
     ];
 
     // 1) үндсэн жагсаалт
@@ -143,7 +167,7 @@ export class IntegrationService {
 
     // 2) user/customer-уудыг багцлаад авах (боломжтой бол findManyByIds ашигла)
     const userIds = Array.from(
-      new Set(items.map((x) => x.user_id).filter(Boolean)),
+      new Set(items.map((x) => x.artist_id).filter(Boolean)),
     );
 
     const [usersArr] = await Promise.all([
@@ -164,14 +188,14 @@ export class IntegrationService {
     };
 
     const rows: Row[] = items.map((it: any) => {
-      const u = usersMap.get(it.user_id);
+      const u = usersMap.get(it.artist_id);
 
       return {
         artist: usernameFormatter(u) ?? '',
         amount: it.amount,
         count: it.order_count,
         status: SalaryLogValue[it.salary_status],
-        date: ubDateAt00(it.created_at),
+        date: ubDateAt00(it.date),
       };
     });
 

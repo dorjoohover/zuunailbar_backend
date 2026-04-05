@@ -42,16 +42,17 @@ export class IntegrationPaymentDao {
     return trx.query(
       `SELECT COALESCE(SUM(amount),0) as total
        FROM integration_payments
-       WHERE integration_id = $1`,
-      [integrationId],
+       WHERE integration_id = $1
+         AND COALESCE(status, $2) = $2`,
+      [integrationId, STATUS.Active],
     );
   }
 
   async insertPayment(trx, dto: any) {
     return trx.query(
       `INSERT INTO integration_payments
-       (id, integration_id, artist_id, type, amount, paid_by, paid_at)
-       VALUES ($1,$2,$3,$4,$5,$6,now())`,
+       (id, integration_id, artist_id, type, amount, paid_by, paid_at, status)
+       VALUES ($1,$2,$3,$4,$5,$6,now(),$7)`,
       [
         dto.id,
         dto.integration_id,
@@ -59,6 +60,7 @@ export class IntegrationPaymentDao {
         dto.type,
         dto.amount,
         dto.paid_by,
+        STATUS.Active,
       ],
     );
   }
@@ -117,7 +119,6 @@ export class IntegrationPaymentDao {
   }
 
   async list(query, cols?: string) {
-    //  nemne
     if (query.id) {
       query.id = `%${query.id}%`;
     }
@@ -130,13 +131,15 @@ export class IntegrationPaymentDao {
       .conditionIfNotEmpty('paid_by', '=', query.paid_by)
       .conditionIfNotEmpty('type', '=', query.type)
       .conditionIfDateBetweenValues(query.from, query.to, '"paid_at"::date')
-
       .criteria();
+    const statusCriteria = query.status
+      ? `${criteria ? `${criteria} AND` : 'WHERE'} COALESCE("status", ${STATUS.Active}) = ${query.status}`
+      : criteria;
     const sql =
-      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by paid_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${cols ?? '*'} FROM "${tableName}" ${statusCriteria} order by paid_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${statusCriteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
@@ -152,7 +155,7 @@ export class IntegrationPaymentDao {
         artist_id,
         COALESCE(SUM(amount), 0) AS transferred_amount
       FROM "${tableName}"
-      WHERE "status" = $1
+      WHERE COALESCE("status", $1) = $1
     `;
 
     if (filter.from || filter.to) {

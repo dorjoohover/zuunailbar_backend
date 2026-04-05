@@ -10,6 +10,23 @@ const tableName = 'integrations';
 export class IntegrationDao {
   constructor(private readonly _db: AppDB) {}
 
+  private buildListCriteria(query) {
+    if (query.id) {
+      query.id = `%${query.id}%`;
+    }
+
+    const builder = new SqlBuilder(query);
+    const criteria = builder
+      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('artist_id', '=', query.artist_id)
+      .conditionIfNotEmpty('salary_status', '=', query.salary_status)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfDateBetweenValues(query.from, query.to, 'date')
+      .criteria();
+
+    return { builder, criteria };
+  }
+
   async add(data: Integration) {
     return await this._db.insert(tableName, data, [
       'id',
@@ -76,20 +93,7 @@ export class IntegrationDao {
   }
 
   async list(query, cols?: string) {
-    //  nemne
-    if (query.id) {
-      query.id = `%${query.id}%`;
-    }
-
-    const builder = new SqlBuilder(query);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('artist_id', '=', query.artist_id)
-      .conditionIfNotEmpty('integration_status', '=', query.integration_status)
-      .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfDateBetweenValues(query.from, query.to, 'date')
-
-      .criteria();
+    const { builder, criteria } = this.buildListCriteria(query);
     const sql =
       `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
@@ -99,6 +103,21 @@ export class IntegrationDao {
     const items = await this._db.select(sql, builder.values);
     return { count, items };
   }
+
+  async getListSummary(query) {
+    const { builder, criteria } = this.buildListCriteria({ ...query });
+    const sql = `
+      SELECT
+        COALESCE(SUM("amount"), 0) AS total_amount,
+        COALESCE(SUM("order_count"), 0) AS total_order_count,
+        COUNT(*) AS total_count
+      FROM "${tableName}"
+      ${criteria}
+    `;
+
+    return await this._db.selectOne(sql, builder.values);
+  }
+
   async getArtistIncomeTotals(filter: {
     from?: string;
     to?: string;

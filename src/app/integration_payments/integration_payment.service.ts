@@ -75,12 +75,8 @@ export class IntegrationPaymentService {
       pg,
       role,
     ) as PaginationDto & { from?: string; to?: string; artist_id?: string };
-
-    const [data, reconciliation] = await Promise.all([
-      this.dao.list(query),
-      this.integration.getReconciliation(query),
-    ]);
-
+    const data = await this.dao.list(query);
+    const reconciliation = await this.integration.getReconciliation(query);
     return {
       items: data.items,
       count: data.count,
@@ -95,16 +91,6 @@ export class IntegrationPaymentService {
   }
   public async findDate(id: string, date: string) {
     return await this.dao.getByDate(id, date);
-  }
-  public async getSummary(
-    pg: PaginationDto & { from?: string; to?: string; artist_id?: string },
-  ) {
-    const reconciliation = await this.integration.getReconciliation(pg);
-    return {
-      summary: reconciliation.summary,
-      from: reconciliation.from,
-      to: reconciliation.to,
-    };
   }
 
   public async report(pg: PaginationDto, role: number, res: Response) {
