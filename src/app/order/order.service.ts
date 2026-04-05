@@ -157,16 +157,6 @@ export class OrderService {
       date: dates,
       artists: valid_artists,
     });
-    const availableTimesByArtistDate = result.reduce(
-      (acc, slot) => {
-        const key = `${slot.artist_id}_${toYMD(new Date(slot.date))}`;
-        const existing = acc.get(key) ?? new Set<number>();
-        existing.add(timeToDecimal(this.normalizeTimeValue(slot.start_time)));
-        acc.set(key, existing);
-        return acc;
-      },
-      new Map<string, Set<number>>(),
-    );
 
     // 🔥 group by artist_id
     const ordersByArtist: Record<string, any[]> = {};
@@ -179,18 +169,6 @@ export class OrderService {
     }
 
     for (const slot of result) {
-      const slotKey = `${slot.artist_id}_${toYMD(new Date(slot.date))}`;
-      const availableTimes = availableTimesByArtistDate.get(slotKey);
-      if (
-        !this.hasEnoughContinuousSlots(
-          timeToDecimal(this.normalizeTimeValue(slot.start_time)),
-          needDuration,
-          availableTimes,
-        )
-      ) {
-        continue;
-      }
-
       const start = this.combineDateTime(slot.date, slot.start_time.toString());
       const end = new Date(start.getTime() + needDuration * 60000);
       const artistOrders = ordersByArtist[slot.artist_id] || [];
