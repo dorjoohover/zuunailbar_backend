@@ -72,6 +72,9 @@ export class ProductWarehouseDao {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
+    if (query.name) {
+      query.name = `%${query.name}%`;
+    }
 
     const builder = new SqlBuilder(query);
     const criteria = builder
@@ -79,6 +82,10 @@ export class ProductWarehouseDao {
       .conditionIfNotEmpty('warehouse_id', '=', query.warehouse_id)
       .conditionIfNotEmpty('product_id', '=', query.product_id)
       .conditionIfNotEmpty('status', '=', query.status)
+      .orConditions([
+        new SqlCondition('product_name', 'LIKE', query.name),
+        new SqlCondition('warehouse_name', 'LIKE', query.name),
+      ])
       .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date')
       .criteria();
     const sql =

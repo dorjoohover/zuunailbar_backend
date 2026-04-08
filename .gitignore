@@ -1,4 +1,5 @@
 # compiled output
+/test
 /db
 docker-compose.yml
 package-lock.json

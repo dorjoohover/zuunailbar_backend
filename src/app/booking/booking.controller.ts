@@ -17,7 +17,7 @@ import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
-import { CLIENT, ScheduleStatus } from 'src/base/constants';
+import { ADMIN, ADMINUSERS, CLIENT, ScheduleStatus } from 'src/base/constants';
 import { SAP } from 'src/common/decorator/use-param.decorator';
 @ApiBearerAuth('access-token')
 @ApiHeader({
@@ -28,6 +28,9 @@ import { SAP } from 'src/common/decorator/use-param.decorator';
 @Controller('booking')
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
+  private canManageFinishTime(role?: number) {
+    return role === ADMIN || role === ADMINUSERS;
+  }
 
   private static clientFields = [
     'branch_id',
@@ -66,8 +69,13 @@ export class BookingController {
 
   @SAP()
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: BookingDto) {
-    return this.bookingService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: BookingDto, @Req() { user }) {
+    return this.bookingService.update(id, {
+      ...dto,
+      finish_time: this.canManageFinishTime(user.user.role)
+        ? dto.finish_time
+        : undefined,
+    });
   }
 
   @SAP()

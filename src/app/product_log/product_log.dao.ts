@@ -78,8 +78,11 @@ export class ProductLogDao {
       if (query.id) {
         query.id = `%${query.id}%`;
       }
+      if (query.name) {
+        query.name = `%${query.name}%`;
+      }
       const builder = new SqlBuilder(query);
-      const criteria = builder
+      builder
         .conditionIfNotEmpty('id', 'LIKE', query.id)
 
         .conditionIfNotEmpty('product_id', '=', query.product_id)
@@ -91,8 +94,14 @@ export class ProductLogDao {
           '=',
           query.product_log_status,
         )
-        .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date')
-        .criteria();
+        .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date');
+      if (query.name) {
+        builder.conditionRaw(
+          `EXISTS (SELECT 1 FROM "products" p WHERE p."id" = "${tableName}"."product_id" AND p."name" LIKE $${builder.values.length + 1})`,
+          [query.name],
+        );
+      }
+      const criteria = builder.criteria();
       const sql =
         `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
         `${query.limit ? `limit ${query.limit}` : ''}` +

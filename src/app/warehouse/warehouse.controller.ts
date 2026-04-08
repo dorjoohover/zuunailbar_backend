@@ -36,7 +36,7 @@ export class WarehouseController {
   }
   @Manager()
   @Get()
-  @PQ(['status'])
+  @PQ(['status', 'name'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.warehouseService.findAll(pg, user.user.role);
   }

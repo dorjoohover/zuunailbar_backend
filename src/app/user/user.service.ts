@@ -14,6 +14,7 @@ import {
   STATUS,
   UserLevel,
   UserStatus,
+  usernameFormatter,
 } from 'src/base/constants';
 import { BadRequest, NoPermissionException } from 'src/common/error';
 import { User } from './user.entity';
@@ -25,6 +26,8 @@ import { RegisterDto } from 'src/auth/auth.dto';
 import { BranchService } from '../branch/branch.service';
 import { UserServiceService } from '../user_service/user_service.service';
 import { UserSalariesService } from '../user_salaries/user_salaries.service';
+import { ExcelService } from 'src/excel.service';
+import { Response } from 'express';
 @Injectable()
 export class UserService {
   constructor(
@@ -32,6 +35,7 @@ export class UserService {
     private readonly userService: UserServiceService,
     private readonly userSalary: UserSalariesService,
     private readonly branchService: BranchService,
+    private readonly excel: ExcelService,
   ) {}
   public async create(
     dto: UserDto,
@@ -188,6 +192,69 @@ export class UserService {
       ...data,
       items,
     };
+  }
+  public async report(pg: PaginationDto, role: number, res: Response) {
+    const data = await this.findAll(pg, role);
+    const counts = await this.dao.getCustomerOrderCounts(
+      data.items.map((item) => item.id).filter(Boolean),
+    );
+    const countMap = new Map(
+      counts.map((item: any) => [item.customer_id, Number(item.order_count ?? 0)]),
+    );
+
+    const levelLabels = {
+      [UserLevel.BRONZE]: 'Bronze',
+      [UserLevel.SILVER]: 'Silver',
+      [UserLevel.GOLD]: 'Gold',
+    } as Record<number, string>;
+
+    const statusLabels = {
+      [UserStatus.Active]: 'Идэвхтэй',
+      [UserStatus.Deleted]: 'Устгасан',
+      [UserStatus.Banned]: 'Хориглосон',
+    } as Record<number, string>;
+
+    type Row = {
+      nickname: string;
+      mobile: string;
+      level: string;
+      status: string;
+      order_count: number;
+      created_at: Date | string;
+    };
+
+    const rows: Row[] = data.items.map((item) => ({
+      nickname: usernameFormatter(item as User) ?? '',
+      mobile: item.mobile ?? '',
+      level:
+        item.level != null && levelLabels[item.level]
+          ? levelLabels[item.level]
+          : '',
+      status:
+        item.user_status != null && statusLabels[item.user_status]
+          ? statusLabels[item.user_status]
+          : '',
+      order_count: countMap.get(item.id) ?? 0,
+      created_at: item.created_at ? new Date(item.created_at) : '',
+    }));
+
+    return this.excel.xlsxFromIterable(
+      res,
+      'users',
+      [
+        { header: 'Нэр', key: 'nickname', width: 24 },
+        { header: 'Утас', key: 'mobile', width: 16 },
+        { header: 'Эрэмбэ', key: 'level', width: 14 },
+        { header: 'Статус', key: 'status', width: 16 },
+        { header: 'Үйлчлүүлсэн', key: 'order_count', width: 14 },
+        { header: 'Үүсгэсэн', key: 'created_at', width: 16 },
+      ] as any,
+      rows as any,
+      {
+        sheetName: 'Users',
+        dateKeys: ['created_at'],
+      },
+    );
   }
   public async findMany(ids: string[]) {
     const data = await this.dao.listMany(ids);

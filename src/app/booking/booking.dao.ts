@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
@@ -10,6 +10,21 @@ const tableName = 'bookings';
 export class BookingDao {
   constructor(private readonly _db: AppDB) {}
 
+  private rethrowSchemaError(error: any): never {
+    const message = `${error?.message ?? ''}`;
+    if (
+      message.includes('invalid input syntax for type date') ||
+      message.includes('column "finish_time"') ||
+      message.includes('finish_time')
+    ) {
+      throw new HttpException(
+        'Booking finish_time schema aldaatai baina. backend/db/2026-04-09_add_finish_time.sql migration-g ajilluulna uu.',
+        500,
+      );
+    }
+    throw error;
+  }
+
   async add(data: Booking) {
     try {
       return await this._db.insert(tableName, data, [
@@ -18,6 +33,7 @@ export class BookingDao {
         'index',
         'start_time',
         'end_time',
+        'finish_time',
         'branch_id',
         'merchant_id',
         'times',
@@ -25,7 +41,7 @@ export class BookingDao {
       ]);
     } catch (error) {
       console.log(error);
-      throw Error();
+      this.rethrowSchemaError(error);
     }
   }
 
@@ -82,6 +98,7 @@ export class BookingDao {
       return { count, items };
     } catch (error) {
       console.log(error);
+      this.rethrowSchemaError(error);
     }
   }
 }

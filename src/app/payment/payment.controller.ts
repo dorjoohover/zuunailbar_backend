@@ -36,9 +36,21 @@ export class PaymentController {
     return this.service.findAll(p, user.user.role);
   }
   @Get('summary')
-  @PQ(['from', 'to'])
+  @PQ(['from', 'to', 'branch_id'])
   dailySummary(@Pagination() pg: PaginationDto, @Req() { user }) {
-    return this.service.getDailySummary(pg as PaginationDto & { from?: string; to?: string }, user?.merchant?.id);
+    return this.service.getDailySummary(
+      pg as PaginationDto & { from?: string; to?: string; branch_id?: string },
+      user?.merchant?.id,
+    );
+  }
+
+  @Get('breakdown')
+  @PQ(['from', 'to', 'branch_id'])
+  dailyBreakdown(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.service.getDailyBreakdown(
+      pg as PaginationDto & { from?: string; to?: string; branch_id?: string },
+      user?.merchant?.id,
+    );
   }
 
   @Get('get/:id')

@@ -7,6 +7,7 @@ import { BranchModule } from '../branch/branch.module';
 import { UserServiceModule } from '../user_service/user_service.module';
 import { UserSalariesModule } from '../user_salaries/user_salaries.module';
 import { UserService } from './user.service';
+import { ExcelService } from 'src/excel.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { UserService } from './user.service';
     forwardRef(() => BranchModule),
   ],
   controllers: [UserController],
-  providers: [UserService, UserDao],
+  providers: [UserService, UserDao, ExcelService],
   exports: [UserService],
 })
 export class UserModule {}

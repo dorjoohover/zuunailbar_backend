@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Req,
+  Res,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { ApiBearerAuth, ApiHeader, ApiHeaders } from '@nestjs/swagger';
@@ -20,6 +21,7 @@ import { ADMIN, CLIENT, MANAGER } from 'src/base/constants';
 import { SAP, SAQ } from 'src/common/decorator/use-param.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { RegisterDto } from 'src/auth/auth.dto';
+import { Response } from 'express';
 
 @ApiBearerAuth('access-token')
 @Controller('user')
@@ -54,9 +56,18 @@ export class UserController {
   }
 
   @Get()
-  @PQ(['role'])
+  @PQ(['role', 'user_status', 'level', 'mobile', 'branch_id'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.userService.findAll(pg, user.user.role);
+  }
+  @Get('report')
+  @PQ(['role', 'user_status', 'level', 'mobile', 'branch_id'])
+  report(
+    @Pagination() pg: PaginationDto,
+    @Req() { user },
+    @Res() res: Response,
+  ) {
+    return this.userService.report(pg, user.user.role, res);
   }
   @Public()
   @Get('client')

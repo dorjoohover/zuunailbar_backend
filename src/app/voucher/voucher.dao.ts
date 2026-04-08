@@ -73,10 +73,14 @@ export class VoucherDao {
       if (query.id) {
         query.id = `%${query.id}%`;
       }
+      if (query.name) {
+        query.name = `%${query.name}%`;
+      }
 
       const builder = new SqlBuilder(query);
       const criteria = builder
         .conditionIfNotEmpty('id', 'LIKE', query.id)
+        .conditionIfNotEmpty('name', 'LIKE', query.name)
         .conditionIfNotEmpty('user_id', '=', query.user_id)
         .conditionIfNotEmpty('service_id', '=', query.service_id)
         .conditionIfNotEmpty('status', '=', query.status)

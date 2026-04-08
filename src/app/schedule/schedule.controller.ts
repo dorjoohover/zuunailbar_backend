@@ -17,7 +17,7 @@ import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
-import { CLIENT, ScheduleStatus } from 'src/base/constants';
+import { ADMIN, ADMINUSERS, CLIENT, ScheduleStatus } from 'src/base/constants';
 import { SAP } from 'src/common/decorator/use-param.decorator';
 @ApiBearerAuth('access-token')
 @ApiHeader({
@@ -28,6 +28,9 @@ import { SAP } from 'src/common/decorator/use-param.decorator';
 @Controller('schedule')
 export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
+  private canManageFinishTime(role?: number) {
+    return role === ADMIN || role === ADMINUSERS;
+  }
   private static clientFields = ['user_id', 'branch_id', 'date', 'time'];
   private static fields = [
     'user_id',
@@ -40,7 +43,15 @@ export class ScheduleController {
   @Employee()
   @Post()
   create(@Body() dto: ScheduleDto, @Req() { user }) {
-    return this.scheduleService.create(dto, user.user.id);
+    return this.scheduleService.create(
+      {
+        ...dto,
+        finish_time: this.canManageFinishTime(user.user.role)
+          ? dto.finish_time
+          : undefined,
+      },
+      user.user.id,
+    );
   }
 
   @Get()
@@ -75,8 +86,13 @@ export class ScheduleController {
   }
   @SAP()
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: ScheduleDto) {
-    return this.scheduleService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: ScheduleDto, @Req() { user }) {
+    return this.scheduleService.update(id, {
+      ...dto,
+      finish_time: this.canManageFinishTime(user.user.role)
+        ? dto.finish_time
+        : undefined,
+    });
   }
 
   @SAP()

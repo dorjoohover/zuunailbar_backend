@@ -35,7 +35,7 @@ export class BrandController {
   }
   @Manager()
   @Get()
-  @PQ(['status'])
+  @PQ(['status', 'name'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.brandService.findAll(pg, user.user.role);
   }

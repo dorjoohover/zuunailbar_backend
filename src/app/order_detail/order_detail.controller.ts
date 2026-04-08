@@ -27,7 +27,7 @@ export class OrderDetailController {
   }
 
   @Get()
-  @PQ()
+  @PQ(['user_id', 'from', 'to'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.orderDetailService.find(pg, user.user.role);
   }

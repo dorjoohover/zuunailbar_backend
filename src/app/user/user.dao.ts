@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { UserLevel, UserStatus } from 'src/base/constants';
+import { OrderStatus, UserLevel, UserStatus } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { User } from './user.entity';
@@ -179,6 +179,29 @@ export class UserDao {
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
+  }
+
+  async getCustomerOrderCounts(ids: string[]) {
+    if (!ids?.length) return [];
+
+    return await this._db.select(
+      `
+        SELECT
+          "customer_id",
+          COUNT(*)::int AS "order_count"
+        FROM "orders"
+        WHERE "customer_id" = ANY($1)
+          AND "order_status" NOT IN ($2, $3, $4, $5)
+        GROUP BY "customer_id"
+      `,
+      [
+        ids,
+        OrderStatus.Cancelled,
+        OrderStatus.Friend,
+        OrderStatus.Absent,
+        OrderStatus.Pending,
+      ],
+    );
   }
 
   async search(filter: any): Promise<any[]> {

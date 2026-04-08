@@ -28,7 +28,7 @@ export class DiscountController {
   }
 
   @Get()
-  @PQ(['status'])
+  @PQ(['status', 'name'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.discountService.findAll(pg, user.user.role);
   }

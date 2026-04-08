@@ -34,7 +34,7 @@ export class ProductLogController {
   }
 
   @Get()
-  @PQ(['created_by', 'product_id', 'start_date', 'end_date'])
+  @PQ(['created_by', 'product_id', 'product_log_status', 'start_date', 'end_date', 'name'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.productLogService.findAll(

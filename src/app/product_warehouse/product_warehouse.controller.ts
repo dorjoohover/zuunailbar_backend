@@ -37,7 +37,7 @@ export class ProductWarehouseController {
 
   @Get()
   @Employee()
-  @PQ(['warehouse_id', 'product_id'])
+  @PQ(['warehouse_id', 'product_id', 'start_date', 'end_date', 'name'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.productWarehouseService.findAll({ ...pg }, user.user.role);
   }

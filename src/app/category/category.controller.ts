@@ -35,7 +35,7 @@ export class CategoryController {
   }
 
   @Get()
-  @PQ(['status'])
+  @PQ(['status', 'name'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.categoryService.findAll(pg, user.user.role);
   }

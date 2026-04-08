@@ -1,19 +1,72 @@
 // src/qpay/qpay.service.ts
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom, lastValueFrom } from 'rxjs';
-import { MobileFormat, MobileParser } from 'src/common/formatter';
+import { firstValueFrom } from 'rxjs';
+import { MobileParser } from 'src/common/formatter';
 @Injectable()
 export class QpayService {
   private readonly logger = new Logger(QpayService.name);
+  private readonly refreshWindowMs = 24 * 60 * 60 * 1000;
+  private readonly expirySkewMs = 30 * 1000;
 
   private baseUrl = 'https://merchant.qpay.mn/v2/';
-  private accessToken: string;
-  private refreshToken: string;
-  private expiresIn: Date;
+  private accessToken?: string;
+  private refreshToken?: string;
+  private expiresIn?: Date;
+  private tokenRecoveryPromise?: Promise<void>;
 
   constructor(private readonly httpService: HttpService) {}
+
+  private updateTokens(data: {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+  }) {
+    this.accessToken = data.access_token;
+    this.refreshToken = data.refresh_token;
+    this.expiresIn = new Date(Date.now() + data.expires_in * 1000);
+  }
+
+  private normalizeEndpoint(endpoint: string) {
+    return endpoint.replace(/^\/+/, '');
+  }
+
+  private formatError(error: any) {
+    const responseData = error?.response?.data;
+    if (typeof responseData === 'string') return responseData;
+    if (responseData?.message) return responseData.message;
+    if (responseData) return JSON.stringify(responseData);
+    return error?.message ?? 'Unknown error';
+  }
+
+  private canRefreshToken() {
+    if (!this.refreshToken) return false;
+    if (!this.expiresIn) return true;
+
+    return Date.now() - this.expiresIn.getTime() < this.refreshWindowMs;
+  }
+
+  private hasExpiredToken() {
+    if (!this.accessToken || !this.expiresIn) return true;
+
+    return Date.now() >= this.expiresIn.getTime() - this.expirySkewMs;
+  }
+
+  private async runTokenRecovery(task: () => Promise<void>) {
+    if (!this.tokenRecoveryPromise) {
+      this.tokenRecoveryPromise = task().finally(() => {
+        this.tokenRecoveryPromise = undefined;
+      });
+    }
+
+    await this.tokenRecoveryPromise;
+  }
+
   private async refreshAccessToken() {
+    if (!this.refreshToken) {
+      throw new Error('QPay refresh token is missing');
+    }
+
     const response = await firstValueFrom(
       this.httpService.post(
         `${this.baseUrl}auth/refresh`,
@@ -26,28 +79,34 @@ export class QpayService {
       ),
     );
 
-    const data = response.data;
-    this.accessToken = data.access_token;
-    this.refreshToken = data.refresh_token;
-    this.expiresIn = new Date(Date.now() + data.expires_in * 1000);
+    this.updateTokens(response.data);
     this.logger.log('QPay access token refreshed');
   }
 
-  private async ensureValidToken() {
-    const now = new Date();
-
-    if (!this.accessToken || now > this.expiresIn) {
-      const diff = this.expiresIn
-        ? now.getTime() - this.expiresIn.getTime()
-        : 0;
-
-      if (this.refreshToken && diff < 24 * 60 * 60 * 1000) {
-        this.logger.warn('QPay access token expired, refreshing');
-        await this.refreshAccessToken();
+  private async recoverAuthorization(reason: string) {
+    await this.runTokenRecovery(async () => {
+      if (this.canRefreshToken()) {
+        try {
+          this.logger.warn(`${reason}. Refreshing QPay access token`);
+          await this.refreshAccessToken();
+          return;
+        } catch (error) {
+          this.logger.warn(
+            `${reason}. QPay token refresh failed, re-authenticating`,
+          );
+          this.logger.debug(this.formatError(error));
+        }
       } else {
-        this.logger.warn('QPay refresh window passed, re-authenticating');
-        await this.authenticate();
+        this.logger.warn(`${reason}. Re-authenticating with QPay`);
       }
+
+      await this.authenticate();
+    });
+  }
+
+  private async ensureValidToken() {
+    if (this.hasExpiredToken()) {
+      await this.recoverAuthorization('QPay access token missing or expired');
     }
   }
 
@@ -56,13 +115,14 @@ export class QpayService {
     endpoint: string,
     data: any = {},
   ): Promise<T> {
-    await this.ensureValidToken(); // check expiry first
+    await this.ensureValidToken();
+    const url = `${this.baseUrl}${this.normalizeEndpoint(endpoint)}`;
 
     try {
       const response = await firstValueFrom(
         this.httpService.request({
           method,
-          url: `${this.baseUrl}${endpoint}`,
+          url,
           data,
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
@@ -71,16 +131,13 @@ export class QpayService {
       );
       return response.data;
     } catch (error) {
-      this.logger.error(
-        'QPay request failed',
-        error?.response?.data?.message || error?.message,
-      );
+      this.logger.error('QPay request failed', this.formatError(error));
       if (error.response?.status === 401) {
-        await this.refreshAccessToken();
+        await this.recoverAuthorization('QPay request returned 401');
         const retryResponse = await firstValueFrom(
           this.httpService.request({
             method,
-            url: `${this.baseUrl}${endpoint}`,
+            url,
             data,
             headers: {
               Authorization: `Bearer ${this.accessToken}`,
@@ -95,7 +152,7 @@ export class QpayService {
   }
   private async authenticate() {
     try {
-      const response = await lastValueFrom(
+      const response = await firstValueFrom(
         this.httpService.post(
           `${this.baseUrl}auth/token`,
           {},
@@ -109,39 +166,10 @@ export class QpayService {
         ),
       );
 
-      this.accessToken = response.data.access_token;
-      this.refreshToken = response.data.refresh_token;
-      this.expiresIn = new Date(Date.now() + response.data.expires_in * 1000);
+      this.updateTokens(response.data);
+      this.logger.log('QPay access token authenticated');
     } catch (e) {
-      console.error('QPAY AUTH ERROR:', e.response?.data || e.message);
-      throw e;
-    }
-  }
-
-  private async tokenRefresh() {
-    try {
-      const params = new URLSearchParams();
-      params.append('grant_type', 'client_credentials');
-
-      const response = await lastValueFrom(
-        this.httpService.post(
-          `${this.baseUrl}auth/refresh`,
-          params.toString(),
-          {
-            headers: {
-              Authorization: 'Bearer ' + this.refreshToken,
-            },
-
-            timeout: 10000,
-          },
-        ),
-      );
-
-      this.accessToken = response.data.access_token;
-      this.refreshToken = response.data.refresh_token;
-      this.expiresIn = new Date(Date.now() + response.data.expires_in * 1000);
-    } catch (e) {
-      console.error('QPAY AUTH ERROR:', e.response?.data || e.message);
+      this.logger.error('QPay authentication failed', this.formatError(e));
       throw e;
     }
   }
@@ -156,7 +184,7 @@ export class QpayService {
   ) {
     try {
       const phone = MobileParser(mobile);
-      const res = this.requestWithToken('POST', 'invoice', {
+      const res = await this.requestWithToken('POST', 'invoice', {
         // invoice_code: 'Zuunailbar',
         invoice_code: process.env.QPAY_INVOICE_CODE,
         sender_invoice_no: `${phone}`,
@@ -177,8 +205,9 @@ export class QpayService {
     } catch (error) {
       this.logger.error(
         'QPay createInvoice failed',
-        error?.response?.data || error?.message,
+        this.formatError(error),
       );
+      throw error;
     }
   }
 
@@ -195,12 +224,15 @@ export class QpayService {
         amount: payment.payment_amount,
         transaction_type: payment.payment_type,
       };
-    } catch (error) {}
+    } catch (error) {
+      this.logger.error('QPay getInvoice failed', this.formatError(error));
+      throw error;
+    }
   }
 
   // ✅ Төлбөр шалгах
   async checkPayment(invoiceId: string) {
-    const res = this.requestWithToken('POST', '/payment/check', {
+    const res = await this.requestWithToken('POST', 'payment/check', {
       object_type: 'INVOICE',
       object_id: invoiceId,
       offset: {

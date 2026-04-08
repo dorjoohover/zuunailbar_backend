@@ -104,15 +104,14 @@ export class OrderController {
   //   };
   // }
 
-  @Public()
   @Get('report')
-  @PQ()
+  @PQ(['date', 'end_date', 'order_status', 'user_id', 'branch_id', 'customer', 'friend'])
   async reports(
     @Pagination() pg: PaginationDto,
     @Req() { user },
     @Res() res: Response,
   ) {
-    return await this.orderService.report(pg, CLIENT, res);
+    return await this.orderService.report(pg, user.user.role, res);
   }
   @Get('limit/:limit')
   // @Admin()

@@ -38,13 +38,13 @@ export class ServiceController {
     BadRequest.merchantNotFound(user?.merchant, user.user.role);
     return this.serviceService.create(dto, user.merchant.id, user.user);
   }
-  @PQ(['branch_id'])
+  @PQ(['branch_id', 'category_id', 'name'])
   @Get()
   @Public()
   findAll(@Pagination() pg: PaginationDto) {
     return this.serviceService.findAll(pg, CLIENT);
   }
-  @PQ(['branch_id', 'status'])
+  @PQ(['branch_id', 'status', 'category_id', 'name'])
   @Get('admin')
   @System()
   find(@Pagination() pg: PaginationDto, @Req() { user }) {

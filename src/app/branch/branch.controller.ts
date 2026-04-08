@@ -36,7 +36,7 @@ export class BranchController {
   }
   @Public()
   @Get()
-  @PQ(['status'])
+  @PQ(['status', 'name'])
   findAll(@Pagination() pg: PaginationDto) {
     return this.branchService.find(pg, CLIENT);
   }

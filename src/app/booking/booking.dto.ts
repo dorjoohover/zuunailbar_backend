@@ -11,6 +11,9 @@ export class BookingDto {
 
   @ApiProperty()
   times?: string[];
+
+  @ApiProperty()
+  finish_time?: string | null;
 }
 
 export interface BookingListType {

@@ -239,7 +239,8 @@ SELECT
   branch_id,
   artist_id,
   date,
-  start_time
+  start_time,
+  finish_time
 FROM availability_service_slots
 WHERE end_time is null and branch_id = $${i++}
 `;
@@ -267,7 +268,7 @@ WHERE end_time is null and branch_id = $${i++}
     }
 
     sql += `
-GROUP BY date, start_time, artist_id, branch_id
+GROUP BY date, start_time, artist_id, branch_id, finish_time
 HAVING MIN(available) > 0
 AND COUNT(*) FILTER (WHERE end_time IS NOT NULL) = 0
 `;
@@ -278,6 +279,35 @@ AND COUNT(*) FILTER (WHERE end_time IS NOT NULL) = 0
     `;
 
     return this._db.select(sql, params);
+  }
+  async getShiftBoundaries(input: {
+    branch_id: string;
+    artists: string[];
+    date: string | Date;
+  }) {
+    const { branch_id, artists, date } = input;
+    if (!artists.length) return [];
+
+    const sql = `
+    WITH target AS (
+      SELECT (((EXTRACT(dow FROM $3::date) + 6)::numeric % 7)::integer) AS weekday_index
+    )
+    SELECT
+      s.user_id AS artist_id,
+      s.finish_time AS schedule_finish_time,
+      b.finish_time AS booking_finish_time
+    FROM target t
+    JOIN schedules s
+      ON s.index = t.weekday_index::numeric
+     AND s.schedule_status = 10
+     AND s.user_id = ANY($2::text[])
+    LEFT JOIN bookings b
+      ON b.branch_id = $1
+     AND b.booking_status = 10
+     AND b.index = t.weekday_index
+    `;
+
+    return this._db.select(sql, [branch_id, artists, date]);
   }
   async getOrders(userId: string, salary_day: number) {
     const today = ubDateAt00(); // moment эсвэл өөр date util

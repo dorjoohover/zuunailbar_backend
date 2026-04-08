@@ -15,4 +15,7 @@ export class ScheduleDto {
 
   @ApiProperty({ isArray: true })
   times: string[];
+
+  @ApiProperty({ required: false })
+  finish_time?: string | null;
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { ScheduleStatus, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
@@ -10,19 +10,39 @@ const tableName = 'schedules';
 export class ScheduleDao {
   constructor(private readonly _db: AppDB) {}
 
+  private rethrowSchemaError(error: any): never {
+    const message = `${error?.message ?? ''}`;
+    if (
+      message.includes('invalid input syntax for type date') ||
+      message.includes('column "finish_time"') ||
+      message.includes('finish_time')
+    ) {
+      throw new HttpException(
+        'Schedule finish_time schema aldaatai baina. backend/db/2026-04-09_add_finish_time.sql migration-g ajilluulna uu.',
+        500,
+      );
+    }
+    throw error;
+  }
+
   async add(data: Schedule) {
-    return await this._db.insert(tableName, data, [
-      'id',
-      'user_id',
-      'approved_by',
-      'index',
-      'start_time',
-      'end_time',
-      'branch_id',
-      'meta',
-      'times',
-      'schedule_status',
-    ]);
+    try {
+      return await this._db.insert(tableName, data, [
+        'id',
+        'user_id',
+        'approved_by',
+        'index',
+        'start_time',
+        'end_time',
+        'finish_time',
+        'branch_id',
+        'meta',
+        'times',
+        'schedule_status',
+      ]);
+    } catch (error) {
+      this.rethrowSchemaError(error);
+    }
   }
 
   async update(data: any, attr: string[]): Promise<number> {

@@ -1,4 +1,8 @@
-import { forwardRef, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AvailableTimeDto, OrderDto } from './order.dto';
 import { OrdersDao } from './order.dao';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
@@ -97,16 +101,14 @@ export class OrderService {
       this.orderError.dateOrTimeNotSelected;
 
     if (details.length <= 0) this.orderError.serviceNotSelected;
-    let prev_start_time = dto.start_time;
-    if (prev_start_time.length > 2)
-      prev_start_time = prev_start_time.slice(0, 2);
-    const start_time = +prev_start_time;
+    const start_time = timeToDecimal(dto.start_time.toString());
     if (start_time < STARTTIME || start_time > ENDTIME)
       this.orderError.invalidHour;
     const date = new Date();
+    const nowHour = date.getHours() + date.getMinutes() / 60;
     if (
       user.role == CLIENT &&
-      start_time < date.getHours() &&
+      start_time < nowHour &&
       isSameDay(date, dto.order_date)
     )
       this.orderError.cannotChooseHour;
@@ -171,6 +173,7 @@ export class OrderService {
     for (const slot of result) {
       const start = this.combineDateTime(slot.date, slot.start_time.toString());
       const end = new Date(start.getTime() + needDuration * 60000);
+      const finishBoundary = this.resolveEffectiveFinishTime(slot.finish_time);
       const artistOrders = ordersByArtist[slot.artist_id] || [];
 
       const hasConflict = artistOrders.some((order) => {
@@ -183,7 +186,11 @@ export class OrderService {
         return res;
       });
 
-      if (!hasConflict) {
+      const exceedsFinishBoundary =
+        finishBoundary != null &&
+        end > this.combineDateTime(slot.date, finishBoundary);
+
+      if (!hasConflict && !exceedsFinishBoundary) {
         validSlots.push(slot);
       }
     }
@@ -232,6 +239,73 @@ export class OrderService {
     d.setHours(h, m, s || 0, 0);
 
     return d;
+  }
+  private resolveEffectiveFinishTime(
+    ...candidates: Array<Date | string | null | undefined>
+  ) {
+    const normalized = candidates
+      .filter(Boolean)
+      .map((time) => this.normalizeTimeValue(time as Date | string));
+
+    if (!normalized.length) return null;
+
+    return normalized.reduce((earliest, current) =>
+      timeToDecimal(current) < timeToDecimal(earliest) ? current : earliest,
+    );
+  }
+  private async validateShiftFinishBoundaries(input: {
+    branch_id?: string;
+    order_date: Date | string;
+    details: Array<{
+      user_id: string;
+      start_time: string;
+      end_time: string;
+    }>;
+  }) {
+    const { branch_id, order_date, details } = input;
+    if (!branch_id || !details.length) return;
+
+    const artists = [
+      ...new Set(details.map((detail) => detail.user_id).filter(Boolean)),
+    ];
+    if (!artists.length) return;
+
+    const boundaries = await this.dao.getShiftBoundaries({
+      branch_id,
+      artists,
+      date:
+        typeof order_date === 'string'
+          ? order_date
+          : toYMD(new Date(order_date)),
+    });
+
+    const finishTimeByArtist = new Map<string, string>();
+
+    for (const row of boundaries) {
+      const finishTime = this.resolveEffectiveFinishTime(
+        row?.schedule_finish_time,
+        row?.booking_finish_time,
+      );
+
+      if (finishTime) {
+        finishTimeByArtist.set(row.artist_id, finishTime);
+      }
+    }
+
+    for (const detail of details) {
+      const finishTime = finishTimeByArtist.get(detail.user_id);
+      if (!finishTime) continue;
+
+      if (
+        timeToDecimal(this.normalizeTimeValue(detail.end_time)) >
+        timeToDecimal(finishTime)
+      ) {
+        throw new HttpException(
+          'Ажилтны тарах цагаас хэтэрсэн захиалга байна.',
+          400,
+        );
+      }
+    }
   }
   private async syncOrderPaidMeta(
     orderId: string,
@@ -376,6 +450,17 @@ export class OrderService {
 
         if (dto.parallel !== true) startDate = endDate;
       }
+
+      await this.validateShiftFinishBoundaries({
+        branch_id: dto.branch_id,
+        order_date: orderDate,
+        details: orderDetails.map((detail) => ({
+          user_id: detail.user_id,
+          start_time: detail.start_time,
+          end_time: detail.end_time,
+        })),
+      });
+
       const order = await this.dao.create(payload, orderDetails);
       if (dto.method == PaymentMethod.P2P && orderPreAmount > 0) {
         const invoice = await this.qpay.createInvoice(
@@ -587,9 +672,18 @@ export class OrderService {
   }
 
   public async report(pg: PaginationDto, role: number, res: Response) {
+    const q = { ...pg };
+    if (pg.customer && role < EMPLOYEE) {
+      const users = await this.user.search(
+        { id: pg.customer, skip: undefined, limit: undefined },
+        '3f86c0b23a5a4ef89a745269e7849640',
+      );
+
+      q.customers = users.map((u) => u.id);
+    }
+
     const selectCols = [
       'id',
-      'user_id',
       'customer_id',
       'order_date',
       'end_time',
@@ -597,20 +691,41 @@ export class OrderService {
       'discount_type',
       'start_time',
       'total_amount',
+      'branch_id',
     ];
 
-    // 1) үндсэн жагсаалт
     const { items } = await this.dao.list(
-      applyDefaultStatusFilter(pg, role),
+      applyDefaultStatusFilter(q, role),
       selectCols.join(','),
     );
+    const details = await this.orderDetail.findByOrderIds(items.map((item) => item.id));
+    const detailsMap = new Map<string, any[]>();
 
-    // 2) user/customer-уудыг багцлаад авах (боломжтой бол findManyByIds ашигла)
+    for (const detail of details) {
+      const current = detailsMap.get(detail.order_id) ?? [];
+      current.push(detail);
+      detailsMap.set(detail.order_id, current);
+    }
+
+    const filteredItems = pg.user_id
+      ? items.filter((item) =>
+          (detailsMap.get(item.id) ?? []).some(
+            (detail) => detail.user_id === pg.user_id,
+          ),
+        )
+      : items;
+
     const userIds = Array.from(
-      new Set(items.map((x) => x.user_id)?.filter(Boolean)),
-    );
+      new Set(
+        filteredItems.flatMap((item) =>
+          (detailsMap.get(item.id) ?? [])
+            .filter((detail) => !pg.user_id || detail.user_id === pg.user_id)
+            .map((detail) => detail.user_id),
+        ),
+      ),
+    ).filter(Boolean) as string[];
     const customerIds = Array.from(
-      new Set(items.map((x) => x.customer_id)?.filter(Boolean)),
+      new Set(filteredItems.map((x) => x.customer_id)?.filter(Boolean)),
     );
 
     const [usersArr, customersArr] = await Promise.all([
@@ -632,23 +747,40 @@ export class OrderService {
       customerName: string;
       order: Date | string;
       time: string;
-      timeEnd: number;
+      timeEnd: string;
+      services: string;
       discountType: number;
       discount: number;
       amount: number;
     };
 
-    const rows: Row[] = items.map((it: any) => {
-      const u = usersMap.get(it.user_id);
+    const rows: Row[] = filteredItems.map((it: any) => {
+      const detailItems = (detailsMap.get(it.id) ?? []).filter(
+        (detail) => !pg.user_id || detail.user_id === pg.user_id,
+      );
+      const artists = Array.from(
+        new Set(
+          detailItems
+            .map((detail) => {
+              const user = usersMap.get(detail.user_id);
+              return user ? usernameFormatter(user) : '';
+            })
+            .filter(Boolean),
+        ),
+      ).join(', ');
+      const services = Array.from(
+        new Set(detailItems.map((detail) => detail.service_name).filter(Boolean)),
+      ).join(', ');
       const c = customersMap.get(it.customer_id);
 
       return {
-        artist: usernameFormatter(u) ?? '',
+        artist: artists,
         customer: c?.mobile ? MobileParser(c.mobile) : '',
-        customerName: usernameFormatter(c),
+        customerName: c ? usernameFormatter(c) : '',
         order: it.order_date ? new Date(it.order_date) : '',
         time: it.start_time ?? '',
         timeEnd: it.end_time ?? '',
+        services,
         discountType: it.discount_type,
         discount: it.discount,
         amount: Number(it.total_amount ?? 0),
@@ -663,6 +795,7 @@ export class OrderService {
       { header: 'Order', key: 'order', width: 14 }, // date
       { header: 'Time', key: 'time', width: 10 },
       { header: 'Time end', key: 'timeEnd', width: 10 },
+      { header: 'Services', key: 'services', width: 28 },
       { header: 'Discount Type', key: 'discountType', width: 10 },
       { header: 'Discount', key: 'discount', width: 10 },
       { header: 'Amount', key: 'amount', width: 16 }, // money
@@ -803,6 +936,59 @@ export class OrderService {
       const existingDetails = await this.orderDetail.findByOrder(id);
       const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
       const incomingIds = details.filter((d) => d.id).map((d) => d.id);
+      const orderDetailDate = order_date ?? order.order_date;
+      let startDate = start_time;
+      const detailPayloads: Array<{
+        detail: OrderDetailDto;
+        prev: any;
+        payload: any;
+        nickname?: string | null;
+      }> = [];
+
+      for (const detail of details) {
+        const prev = detail.id ? existingMap.get(detail.id) : null;
+        const service = await this.service.findOne(detail.service_id);
+        const duration = Number(detail.duration ?? +service.duration) / 60;
+        const endDate = startDate + duration;
+
+        const detailPayload: any = {
+          ...detail,
+          start_time: toTimeString(Math.floor(startDate), startDate % 1 !== 0),
+          end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
+          status: status,
+          view_status: order.status,
+          order_date: orderDetailDate,
+        };
+
+        let nickname: string | null | undefined;
+        if (!prev) {
+          const artist = await this.userService.findOne(detail.user_id);
+          nickname = artist?.nickname ?? null;
+        }
+
+        detailPayloads.push({
+          detail,
+          prev,
+          payload: detailPayload,
+          nickname,
+        });
+
+        if (parallel) {
+          startDate = start_time;
+        } else {
+          startDate = endDate;
+        }
+      }
+
+      await this.validateShiftFinishBoundaries({
+        branch_id: payload.branch_id ?? order.branch_id,
+        order_date: orderDetailDate,
+        details: detailPayloads.map(({ payload }) => ({
+          user_id: payload.user_id,
+          start_time: payload.start_time,
+          end_time: payload.end_time,
+        })),
+      });
 
       await this.db.withTransaction(async (client) => {
         await this.register_status_logs({
@@ -820,40 +1006,16 @@ export class OrderService {
           }
         }
 
-        let startDate = start_time;
-
-        for (const d of details) {
-          const order_detail_date = order_date ?? order.order_date;
-          const prev = d.id ? existingMap.get(d.id) : null;
-          const service = await this.service.findOne(d.service_id);
-          const dura = Number(d.duration ?? +service.duration) / 60;
-          const endDate = startDate + dura;
-
-          const detailPayload: any = {
-            ...d,
-            start_time: toTimeString(Math.floor(startDate), startDate % 1 !== 0),
-            end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
-            status: status,
-            view_status: order.status,
-            order_date: order_detail_date,
-          };
-
+        for (const { detail, prev, payload: detailPayload, nickname } of detailPayloads) {
           const { category_id, ...updatePayload } = detailPayload;
           if (prev) {
-            await this.orderDetail.updateTx(client, d.id, updatePayload);
+            await this.orderDetail.updateTx(client, detail.id!, updatePayload);
           } else {
-            const artist = await this.userService.findOne(d.user_id);
-
             await this.orderDetail.createTx(client, {
               ...updatePayload,
               order_id: id,
-              nickname: artist?.nickname ?? null,
+              nickname: nickname ?? null,
             } as any);
-          }
-          if (parallel) {
-            startDate = start_time;
-          } else {
-            startDate = endDate;
           }
         }
       });
@@ -893,6 +1055,23 @@ export class OrderService {
     return await this.dao.updatePaidDate(id, date, type);
   }
   private isFullDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+  private async finalizeOrderForProcessing(
+    orderId: string,
+    approver?: string,
+  ) {
+    if (approver) {
+      await this.register_status_logs({
+        user: approver,
+        order_id: orderId,
+        order_status: OrderStatus.Finished,
+      });
+    }
+
+    await Promise.all([
+      this.dao.updateOrderStatus(orderId, OrderStatus.Finished),
+      this.orderDetail.updateStatusByOrder(orderId, OrderStatus.Finished),
+    ]);
+  }
   public async confirmSalaryProcessStatus(
     approver?: string,
     param?: string,
@@ -914,12 +1093,21 @@ export class OrderService {
 
     const items = await Promise.all(
       orders.items.map(async (order) => {
+        let status = order.order_status;
+
+        if (status == OrderStatus.Active) {
+          await this.finalizeOrderForProcessing(order.id, approver);
+          status = OrderStatus.Finished;
+        }
+
         if (order.salary_date) return;
 
-        const status = order.order_status;
         if (status == OrderStatus.Finished || status == OrderStatus.Friend) {
           await this.dao.updateSalaryProcessStatus(order.id, new Date());
-          return order;
+          return {
+            ...order,
+            order_status: status,
+          };
         }
       }),
     );

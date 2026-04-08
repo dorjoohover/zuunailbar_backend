@@ -70,7 +70,16 @@ export class PaymentDao {
     merchant_id: string;
     from: string;
     to: string;
+    branch_id?: string;
   }) {
+    const values: Array<string | number> = [
+      filter.merchant_id,
+      PAYMENT_STATUS.Cancelled,
+      PAYMENT_STATUS.Pending,
+      PaymentMethod.CASH,
+      filter.from,
+      filter.to,
+    ];
     const sql = `
       SELECT
         COALESCE(SUM(CASE WHEN is_pre_amount = true THEN amount ELSE 0 END), 0) AS pre_amount,
@@ -92,21 +101,61 @@ export class PaymentDao {
           ),
           0
         ) AS bank_amount
-      FROM "${tableName}"
-      WHERE "merchant_id" = $1
-        AND "status" != $2
-        AND ("paid_at" IS NOT NULL OR "status" != $3)
-        AND COALESCE("paid_at", "created_at")::date BETWEEN $5::date AND $6::date
+      FROM "${tableName}" p
+      LEFT JOIN "orders" o ON o."id" = p."order_id"
+      WHERE p."merchant_id" = $1
+        AND p."status" != $2
+        AND (p."paid_at" IS NOT NULL OR p."status" != $3)
+        AND COALESCE(p."paid_at", p."created_at")::date BETWEEN $5::date AND $6::date
     `;
 
-    return await this._db.selectOne(sql, [
+    const branchSql = filter.branch_id
+      ? ` AND o."branch_id" = $${values.push(filter.branch_id)}`
+      : '';
+
+    return await this._db.selectOne(`${sql}${branchSql}`, values);
+  }
+
+  async getDailyBreakdown(filter: {
+    merchant_id: string;
+    from: string;
+    to: string;
+    branch_id?: string;
+  }) {
+    const values: Array<string | number> = [
       filter.merchant_id,
       PAYMENT_STATUS.Cancelled,
       PAYMENT_STATUS.Pending,
-      PaymentMethod.CASH,
       filter.from,
       filter.to,
-    ]);
+    ];
+    let sql = `
+      SELECT
+        p."id",
+        p."order_id",
+        p."amount",
+        p."method",
+        p."is_pre_amount",
+        COALESCE(p."paid_at", p."created_at") AS paid_at,
+        o."branch_id",
+        b."name" AS branch_name
+      FROM "${tableName}" p
+      LEFT JOIN "orders" o ON o."id" = p."order_id"
+      LEFT JOIN "branches" b ON b."id" = o."branch_id"
+      WHERE p."merchant_id" = $1
+        AND p."status" != $2
+        AND (p."paid_at" IS NOT NULL OR p."status" != $3)
+        AND COALESCE(p."paid_at", p."created_at")::date BETWEEN $4::date AND $5::date
+    `;
+
+    if (filter.branch_id) {
+      values.push(filter.branch_id);
+      sql += ` AND o."branch_id" = $${values.length}`;
+    }
+
+    sql += ` ORDER BY COALESCE(p."paid_at", p."created_at") DESC, p."created_at" DESC`;
+
+    return await this._db.select(sql, values);
   }
 
   async list(query, cols?: string) {

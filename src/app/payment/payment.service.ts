@@ -256,7 +256,7 @@ export class PaymentService {
     };
   }
   public async getDailySummary(
-    pg: PaginationDto & { from?: string; to?: string },
+    pg: PaginationDto & { from?: string; to?: string; branch_id?: string },
     merchantId: string,
   ) {
     const from = pg.from ?? mnDate(new Date());
@@ -265,6 +265,7 @@ export class PaymentService {
       merchant_id: merchantId,
       from,
       to,
+      branch_id: pg.branch_id,
     });
 
     const pre_amount = Number(result?.pre_amount ?? 0);
@@ -278,6 +279,30 @@ export class PaymentService {
       cash_amount,
       bank_amount,
       total_amount: pre_amount + cash_amount + bank_amount,
+    };
+  }
+
+  public async getDailyBreakdown(
+    pg: PaginationDto & { from?: string; to?: string; branch_id?: string },
+    merchantId: string,
+  ) {
+    const from = pg.from ?? mnDate(new Date());
+    const to = pg.to ?? from;
+    const items = await this.dao.getDailyBreakdown({
+      merchant_id: merchantId,
+      from,
+      to,
+      branch_id: pg.branch_id,
+    });
+
+    return {
+      items: items.map((item) => ({
+        ...item,
+        amount: Number(item.amount ?? 0),
+      })),
+      count: items.length,
+      from,
+      to,
     };
   }
 

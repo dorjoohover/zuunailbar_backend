@@ -2,7 +2,7 @@ export class Integration {
   id: string;
   artist_id: string;
   approved_by: string;
-  date: Date;
+  date: Date | string;
   amount: number;
   status: number;
   salary_id?: string;

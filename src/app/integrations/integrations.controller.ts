@@ -62,6 +62,15 @@ export class IntegrationController {
   ) {
     return await this.integrationService.report(pg, CLIENT, res);
   }
+  @Get('report_summary')
+  @PQ(['from', 'to', 'artist_id'])
+  reportSummary(
+    @Pagination() pg: PaginationDto,
+    @Req() { user },
+    @Res() res: Response,
+  ) {
+    return this.integrationService.reportSummary(pg, user.user.role, res);
+  }
 
   @Admin()
   @Patch(':id')

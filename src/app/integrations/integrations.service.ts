@@ -26,9 +26,39 @@ export class IntegrationService {
     private user: UserService,
     private excel: ExcelService,
   ) {}
-  public async create(dto: IntegrationDto) {
-    return await this.dao.add({
+
+  private normalizeDate(date: Date | string) {
+    return mnDate(date);
+  }
+
+  private normalizeDto(dto: IntegrationDto) {
+    return {
       ...dto,
+      date: this.normalizeDate(dto.date),
+    };
+  }
+
+  private serializeDate<T extends { date?: Date | string | null }>(
+    item: T | null,
+  ) {
+    if (!item) {
+      return item;
+    }
+
+    if (!item.date) {
+      return item;
+    }
+
+    return {
+      ...item,
+      date: this.normalizeDate(item.date),
+    };
+  }
+
+  public async create(dto: IntegrationDto) {
+    const payload = this.normalizeDto(dto);
+    return await this.dao.add({
+      ...payload,
       id: AppUtils.uuid4(),
       status: STATUS.Active,
     });
@@ -51,7 +81,7 @@ export class IntegrationService {
     ]);
 
     return {
-      items: data.items,
+      items: data.items.map((item) => this.serializeDate(item)),
       count: data.count,
       from: query.from ?? '',
       to: query.to ?? '',
@@ -64,10 +94,11 @@ export class IntegrationService {
   }
 
   public async findOne(id: string) {
-    return await this.dao.getById(id);
+    return this.serializeDate(await this.dao.getById(id));
   }
   public async findDate(id: string, date: string) {
-    return await this.dao.getByDate(id, date);
+    const rows = await this.dao.getByDate(id, date);
+    return rows.map((item) => this.serializeDate(item));
   }
   public async getReconciliation(
     pg: PaginationDto & { from?: string; to?: string; artist_id?: string },
@@ -222,8 +253,117 @@ export class IntegrationService {
     );
   }
 
+  public async reportSummary(pg: PaginationDto, role: number, res: Response) {
+    const query = applyDefaultStatusFilter(
+      pg,
+      role,
+    ) as PaginationDto & {
+      from?: string;
+      to?: string;
+      artist_id?: string;
+    };
+
+    const [integrationList, reconciliation] = await Promise.all([
+      this.findAll(query, role),
+      this.getReconciliation(query),
+    ]);
+
+    const salaryMap = new Map<
+      string,
+      { salary_amount: number; order_count: number }
+    >();
+
+    for (const item of integrationList.items ?? []) {
+      const current = salaryMap.get(item.artist_id) ?? {
+        salary_amount: 0,
+        order_count: 0,
+      };
+
+      salaryMap.set(item.artist_id, {
+        salary_amount: current.salary_amount + Number(item.amount ?? 0),
+        order_count: current.order_count + Number(item.order_count ?? 0),
+      });
+    }
+
+    const reconciliationMap = new Map(
+      (reconciliation.items ?? []).map((item) => [item.artist_id, item]),
+    );
+    const artistIds = Array.from(
+      new Set([
+        ...salaryMap.keys(),
+        ...(reconciliation.items ?? []).map((item) => item.artist_id),
+      ]),
+    );
+
+    const users = await Promise.all(artistIds.map((artistId) => this.user.findOne(artistId)));
+    const userMap = new Map(users.filter(Boolean).map((user: any) => [user.id, user]));
+
+    type Row = {
+      artist: string;
+      from: string;
+      to: string;
+      income_amount: number;
+      salary_amount: number;
+      order_count: number;
+      transferred_amount: number;
+      balance_amount: number;
+    };
+
+    const rows: Row[] = artistIds
+      .map((artistId) => {
+        const salary = salaryMap.get(artistId);
+        const reconciliationItem = reconciliationMap.get(artistId);
+        const user = userMap.get(artistId);
+
+        return {
+          artist: user ? usernameFormatter(user) : '',
+          from: query.from ?? reconciliation.from ?? integrationList.from ?? '',
+          to:
+            query.to ??
+            reconciliation.to ??
+            integrationList.to ??
+            query.from ??
+            '',
+          income_amount: Number(reconciliationItem?.income_amount ?? 0),
+          salary_amount: Number(salary?.salary_amount ?? 0),
+          order_count: Number(
+            reconciliationItem?.order_count ?? salary?.order_count ?? 0,
+          ),
+          transferred_amount: Number(reconciliationItem?.transferred_amount ?? 0),
+          balance_amount: Number(reconciliationItem?.balance_amount ?? 0),
+        };
+      })
+      .sort((a, b) => a.artist.localeCompare(b.artist));
+
+    return this.excel.xlsxFromIterable(
+      res,
+      'salary_summary',
+      [
+        { header: 'Артист', key: 'artist', width: 24 },
+        { header: 'Эхлэх огноо', key: 'from', width: 14 },
+        { header: 'Дуусах огноо', key: 'to', width: 14 },
+        { header: 'Нийт орлого', key: 'income_amount', width: 16 },
+        { header: 'Цалин', key: 'salary_amount', width: 16 },
+        { header: 'Захиалгын тоо', key: 'order_count', width: 14 },
+        { header: 'Шилжүүлсэн', key: 'transferred_amount', width: 16 },
+        { header: 'Үлдэгдэл', key: 'balance_amount', width: 16 },
+      ] as any,
+      rows as any,
+      {
+        sheetName: 'Salary Summary',
+        moneyKeys: [
+          'income_amount',
+          'salary_amount',
+          'transferred_amount',
+          'balance_amount',
+        ],
+      },
+    );
+  }
+
   public async update(id: string, dto: IntegrationDto) {
-    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+    const payload = this.normalizeDto(dto);
+    return await this.dao.update({ ...payload, id }, getDefinedKeys(payload));
   }
 
   public async remove(id: string) {
@@ -232,31 +372,29 @@ export class IntegrationService {
 
   public async updateSalaryLog(dto: IntegrationLogDto) {
     const today = new Date();
-    const baseDate = new Date(dto.date);
+    const normalizedDate = this.normalizeDate(dto.date);
     const salaryDay = dto.day + 15;
+    const [todayYear, todayMonth, todayDate] = mnDate(today)
+      .split('-')
+      .map(Number);
+    const lastSalaryDate = new Date(Date.UTC(todayYear, todayMonth - 1, 1));
 
-    const lastSalaryDate = new Date(baseDate);
-    lastSalaryDate.setDate(salaryDay);
-
-    if (today.getDate() < salaryDay) {
-      lastSalaryDate.setMonth(today.getMonth() - 1);
-      lastSalaryDate.setFullYear(today.getFullYear());
-    } else {
-      lastSalaryDate.setMonth(today.getMonth());
-      lastSalaryDate.setFullYear(today.getFullYear());
+    if (todayDate < salaryDay) {
+      lastSalaryDate.setUTCMonth(lastSalaryDate.getUTCMonth() - 1);
     }
+
+    lastSalaryDate.setUTCDate(salaryDay);
 
     const salaries = await this.dao.getByDate(
       dto.artist_id,
       mnDate(lastSalaryDate),
     );
-    console.log(salaries);
     if (salaries.length > 0) {
       const { amount, id, order_count } = salaries[0];
       await this.update(id, {
         amount: +amount + +dto.amount,
         approved_by: dto.approved_by,
-        date: dto.date,
+        date: normalizedDate,
         order_count: +order_count + +dto.order_count,
         artist_id: dto.artist_id,
         salary_status: dto.salary_status,
@@ -266,12 +404,11 @@ export class IntegrationService {
         amount: +dto.amount,
         salary_status: dto.salary_status,
         approved_by: dto.approved_by,
-        date: dto.date,
+        date: normalizedDate,
         order_count: +dto.order_count,
         artist_id: dto.artist_id,
       });
     }
-    console.log(salaries);
   }
 
   // cron

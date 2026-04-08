@@ -11,6 +11,7 @@ export class Schedule {
   public index: number;
   public start_time: string;
   public end_time: string;
+  public finish_time?: string;
   public schedule_status: number;
   public times: string;
   public created_at?: Date;
@@ -26,4 +27,5 @@ export interface ScheduleListType {
   user_id?: string;
   index?: number;
   times?: boolean;
+  finish_time?: string;
 }

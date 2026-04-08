@@ -163,6 +163,7 @@ export class OrderDetailDao {
       .conditionIfNotEmpty('order_id', '=', query.order_id)
       .conditionIfNotEmpty('service_id', '=', query.service_id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
+      .conditionIfDateBetweenValues(query.from, query.to, 'order_date')
       .conditionIfNotEmpty('view_status', '=', STATUS.Active)
       .criteria();
     const sql =
