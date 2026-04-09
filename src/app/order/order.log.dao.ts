@@ -60,7 +60,18 @@ export class OrderLogDao {
     AND changed_at < '${query.changed_at} 23:59:59'
   `;
     }
-    const sql = `SELECT ${columns ?? `oh.*, u.mobile AS customer_mobile`}
+    const sql = `SELECT ${
+      columns ??
+      `oh.id,
+      oh.order_id,
+      oh.old_status,
+      oh.new_status,
+      oh.old_order_status,
+      oh.new_order_status,
+      oh.changed_by,
+      to_char(oh.changed_at, 'YYYY-MM-DD HH24:MI:SS') AS changed_at,
+      u.mobile AS customer_mobile`
+    }
    FROM "${tableName}" oh
    LEFT JOIN orders o ON o.id = oh.order_id
    LEFT JOIN users u ON u.id = o.customer_id
