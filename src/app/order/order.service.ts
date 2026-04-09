@@ -139,7 +139,13 @@ export class OrderService {
       branch_id,
     );
 
-    const categories = selected_services.map((d) => d?.category_id);
+    const categories = [
+      ...new Set(
+        selected_services
+          .map((d) => d?.category_id)
+          .filter((category): category is string => Boolean(category)),
+      ),
+    ];
     const durations = selected_services.map((d) => Number(d.duration) || 0);
     const needDuration = p
       ? Math.max(0, ...durations)
@@ -343,7 +349,9 @@ export class OrderService {
         (dto.details ?? []).map((detail) => detail.service_id),
         dto.branch_id,
       );
-      const serviceMap = new Map(serviceConfigs.map((service) => [service.id, service]));
+      const serviceMap = new Map(
+        serviceConfigs.map((service) => [service.id, service]),
+      );
 
       // artists.length == 0 || artists?.[0] == '0' && artists =
 
@@ -467,7 +475,7 @@ export class OrderService {
           orderPreAmount,
           order,
           user.id,
-          dto.branch_name,
+          dto.branch_id,
           user.mobile,
         );
         await this.payment.create(
@@ -561,7 +569,11 @@ export class OrderService {
         user,
       });
       if (row) {
-        await this.updatePaidDate(id, payment?.paid_at ?? new Date(), row.payment_type);
+        await this.updatePaidDate(
+          id,
+          payment?.paid_at ?? new Date(),
+          row.payment_type,
+        );
       }
       return {
         status: OrderStatus.Active,
@@ -698,7 +710,9 @@ export class OrderService {
       applyDefaultStatusFilter(q, role),
       selectCols.join(','),
     );
-    const details = await this.orderDetail.findByOrderIds(items.map((item) => item.id));
+    const details = await this.orderDetail.findByOrderIds(
+      items.map((item) => item.id),
+    );
     const detailsMap = new Map<string, any[]>();
 
     for (const detail of details) {
@@ -769,7 +783,9 @@ export class OrderService {
         ),
       ).join(', ');
       const services = Array.from(
-        new Set(detailItems.map((detail) => detail.service_name).filter(Boolean)),
+        new Set(
+          detailItems.map((detail) => detail.service_name).filter(Boolean),
+        ),
       ).join(', ');
       const c = customersMap.get(it.customer_id);
 
@@ -998,7 +1014,11 @@ export class OrderService {
           client,
         });
 
-        await this.dao.updateTx(client, { id, ...payload }, getDefinedKeys(payload));
+        await this.dao.updateTx(
+          client,
+          { id, ...payload },
+          getDefinedKeys(payload),
+        );
 
         for (const existing of existingDetails) {
           if (!incomingIds.includes(existing.id)) {
@@ -1006,7 +1026,12 @@ export class OrderService {
           }
         }
 
-        for (const { detail, prev, payload: detailPayload, nickname } of detailPayloads) {
+        for (const {
+          detail,
+          prev,
+          payload: detailPayload,
+          nickname,
+        } of detailPayloads) {
           const { category_id, ...updatePayload } = detailPayload;
           if (prev) {
             await this.orderDetail.updateTx(client, detail.id!, updatePayload);
@@ -1032,7 +1057,10 @@ export class OrderService {
         paymentSync.latestPaidAt,
         paymentSync.latestMethod,
       );
-      await this.updatePrePaid(id, preAmount == 0 ? true : !!paymentSync.hasPrePayment);
+      await this.updatePrePaid(
+        id,
+        preAmount == 0 ? true : !!paymentSync.hasPrePayment,
+      );
     } catch (error) {
       console.error('Order update failed:', error);
       throw error;
@@ -1055,10 +1083,62 @@ export class OrderService {
     return await this.dao.updatePaidDate(id, date, type);
   }
   private isFullDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
-  private async finalizeOrderForProcessing(
-    orderId: string,
-    approver?: string,
+
+  private normalizeSalaryDay(value?: number | null) {
+    const day = Number(value);
+    return Number.isFinite(day) && day > 0 ? day : 5;
+  }
+
+  private roundMoney(value: number) {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  private calculateSalaryAmount(price: number, percent?: number | null) {
+    const normalizedPercent = Number(percent ?? 0);
+    if (!Number.isFinite(price) || !Number.isFinite(normalizedPercent)) {
+      return 0;
+    }
+
+    return this.roundMoney((price * normalizedPercent) / 100);
+  }
+
+  private resolveSalaryPayDate(
+    orderDate: Date | string,
+    salaryDay?: number | null,
   ) {
+    const normalizedSalaryDay = this.normalizeSalaryDay(salaryDay);
+    const [year, month, day] = mnDate(orderDate).split('-').map(Number);
+    const orderUtc = Date.UTC(year, month - 1, day);
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const anchorMonths = [-1, 0, 1].map((offset) => {
+      const value = new Date(monthStart);
+      value.setUTCMonth(value.getUTCMonth() + offset);
+      return value;
+    });
+
+    const payDates = anchorMonths
+      .flatMap((anchor) => {
+        const first = new Date(
+          Date.UTC(
+            anchor.getUTCFullYear(),
+            anchor.getUTCMonth(),
+            normalizedSalaryDay,
+          ),
+        );
+        const second = new Date(first);
+        second.setUTCDate(second.getUTCDate() + 15);
+        return [first, second];
+      })
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    const target =
+      payDates.find((candidate) => candidate.getTime() >= orderUtc) ??
+      payDates[payDates.length - 1];
+
+    return mnDate(target);
+  }
+
+  private async finalizeOrderForProcessing(orderId: string, approver?: string) {
     if (approver) {
       await this.register_status_logs({
         user: approver,
@@ -1111,19 +1191,28 @@ export class OrderService {
         }
       }),
     );
-    const confirmedOrders = items?.filter((i) => i !== undefined);
+    const confirmedOrders = items?.filter((i) => i !== undefined) ?? [];
     type UserSalaryInfo = {
       amount: number; // нийт цалин
-      order_date: Date; // хамгийн эртний/сүүлийн захиалгын огноо
-      day: number; // цалин авах өдөр (5 | 15)
-      order_count: number; // нийт авсан захиалгын тоо
+      pay_date: string; // тухайн мөчлөгийн цалин олгох өдөр
+      day: number; // цалин авах өдөр (5 | 20)
+      order_ids: Set<string>; // давхардалгүй захиалгын тоо
       salary_status: number;
     };
 
-    const users: Record<string, UserSalaryInfo> = {};
-    const userCache = new Map<string, { id: string; day: number }>();
+    const users = new Map<string, UserSalaryInfo>();
+    const userCache = new Map<
+      string,
+      { id: string; day: number; percent: number }
+    >();
 
     for (const order of confirmedOrders) {
+      if (order.order_status !== OrderStatus.Finished) {
+        const customer = order.customer_id;
+        if (customer) this.checkLevel(customer);
+        continue;
+      }
+
       const details = await this.orderDetail.findByOrder(order.id);
       if (!details?.length) continue;
 
@@ -1135,40 +1224,42 @@ export class OrderService {
           const fetchedUser = await this.user.findOne(detail.user_id);
           if (!fetchedUser) continue;
 
-          currentUser = { id: fetchedUser.id, day: fetchedUser.day ?? 1 };
+          currentUser = {
+            id: fetchedUser.id,
+            day: this.normalizeSalaryDay(fetchedUser.salary_day),
+            percent: Number(fetchedUser.percent ?? 0),
+          };
           userCache.set(detail.user_id, currentUser);
         }
 
-        // 🔹 Users объект үүсгээгүй бол шинэ үүсгэнэ
-        if (!users[detail.user_id]) {
-          users[detail.user_id] = {
+        const payDate = this.resolveSalaryPayDate(
+          order.order_date,
+          currentUser.day,
+        );
+        const groupKey = `${detail.user_id}:${payDate}`;
+
+        if (!users.has(groupKey)) {
+          users.set(groupKey, {
             amount: 0,
-            order_date: new Date(order.order_date),
+            pay_date: payDate,
             day: currentUser.day,
-            order_count: 0,
+            order_ids: new Set<string>(),
             salary_status: order.salary_status,
-          };
+          });
         }
 
-        const userData = users[detail.user_id];
-        const amount = +detail.price || 0;
-        const orderDate = new Date(order.order_date);
+        const userData = users.get(groupKey)!;
+        const amount = this.calculateSalaryAmount(
+          Number(detail.price ?? 0),
+          currentUser.percent,
+        );
 
-        // 🔹 Цалин нэмэх
-        userData.amount += amount;
-
-        // 🔹 Захиалгын тоо нэмэх
-        userData.order_count += 1;
-
-        // 🔹 Хэрвээ хамгийн сүүлийн order_date хадгалах бол:
-        if (orderDate > userData.order_date) {
-          userData.order_date = orderDate;
+        if (amount > 0) {
+          userData.amount += amount;
         }
 
-        // 🔹 Хэрвээ хамгийн эртний өдөр хадгалах бол:
-        if (orderDate < userData.order_date) {
-          userData.order_date = orderDate;
-        }
+        userData.order_ids.add(order.id);
+        userData.salary_status = order.salary_status;
       }
 
       const customer = order.customer_id;
@@ -1176,17 +1267,20 @@ export class OrderService {
     }
     // 🧾 Salary Log-г бүгдийг нэг дор шинэчилнэ
     await Promise.all(
-      Object.entries(users).map(async ([userId, data]) => {
-        await this.integrationService.updateSalaryLog({
-          amount: data.amount,
-          approved_by: approver,
-          date: data.order_date,
-          day: data.day,
-          order_count: data.order_count,
-          salary_status: data.salary_status,
-          artist_id: userId,
-        });
-      }),
+      [...users.entries()]
+        .filter(([, data]) => data.amount > 0)
+        .map(async ([groupKey, data]) => {
+          const [userId] = groupKey.split(':');
+          await this.integrationService.updateSalaryLog({
+            amount: data.amount,
+            approved_by: approver,
+            date: data.pay_date,
+            day: data.day,
+            order_count: data.order_ids.size,
+            salary_status: data.salary_status,
+            artist_id: userId,
+          });
+        }),
     );
     return {
       count: confirmedOrders.length,

@@ -92,6 +92,21 @@ export class IntegrationDao {
     return this._db.select(sql, [userId, date]);
   }
 
+  async getByArtistAndDate(userId: string, date: string) {
+    return this._db.selectOne(
+      `
+        SELECT *
+        FROM "${tableName}"
+        WHERE "artist_id" = $1
+          AND "date"::date = $2::date
+          AND "status" = $3
+        ORDER BY "created_at" DESC
+        LIMIT 1
+      `,
+      [userId, date, STATUS.Active],
+    );
+  }
+
   async list(query, cols?: string) {
     const { builder, criteria } = this.buildListCriteria(query);
     const sql =
@@ -127,18 +142,24 @@ export class IntegrationDao {
       STATUS.Active,
       STATUS.Active,
       OrderStatus.Finished,
-      OrderStatus.Friend,
     ];
     let sql = `
       SELECT
         od."user_id" AS artist_id,
+        COALESCE(u."percent", 0) AS percent,
+        COALESCE(u."salary_day", 5) AS salary_day,
         COALESCE(SUM(od."price"), 0) AS income_amount,
-        COUNT(od."id") AS order_count
+        COALESCE(
+          ROUND(SUM((od."price" * COALESCE(u."percent", 0)) / 100.0), 2),
+          0
+        ) AS salary_amount,
+        COUNT(DISTINCT od."order_id") AS order_count
       FROM "order_details" od
       INNER JOIN "orders" o ON o."id" = od."order_id"
+      LEFT JOIN "users" u ON u."id" = od."user_id"
       WHERE od."view_status" = $1
         AND o."status" = $2
-        AND od."status" IN ($3, $4)
+        AND o."order_status" = $3
     `;
 
     if (filter.from || filter.to) {
@@ -159,7 +180,12 @@ export class IntegrationDao {
       sql += ` AND od."user_id" = $${values.length}`;
     }
 
-    sql += ` GROUP BY od."user_id"`;
+    sql += `
+      GROUP BY
+        od."user_id",
+        u."percent",
+        u."salary_day"
+    `;
 
     return await this._db.select(sql, values);
   }

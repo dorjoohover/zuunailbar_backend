@@ -38,9 +38,7 @@ export class IntegrationPaymentController {
   @PQ(['from', 'to', 'artist_id'])
   @Get()
   async findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
-    const res = await this.service.findAll(pg, user.user.role);
-    console.log(res);
-    return res;
+    return await this.service.findAll(pg, user.user.role);
   }
   @Employee()
   @Get('get/:id')

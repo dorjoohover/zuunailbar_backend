@@ -76,9 +76,14 @@ describe('IntegrationService', () => {
     add: jest.Mock;
     getById: jest.Mock;
     getByDate: jest.Mock;
+    getByArtistAndDate: jest.Mock;
+    getArtistIncomeTotals: jest.Mock;
     update: jest.Mock;
     list: jest.Mock;
     getListSummary: jest.Mock;
+  };
+  let integrationPaymentDao: {
+    getArtistTransferTotals: jest.Mock;
   };
 
   beforeEach(() => {
@@ -86,14 +91,19 @@ describe('IntegrationService', () => {
       add: jest.fn(),
       getById: jest.fn(),
       getByDate: jest.fn(),
+      getByArtistAndDate: jest.fn(),
+      getArtistIncomeTotals: jest.fn(),
       update: jest.fn(),
       list: jest.fn(),
       getListSummary: jest.fn(),
     };
+    integrationPaymentDao = {
+      getArtistTransferTotals: jest.fn(),
+    };
 
     service = new IntegrationService(
       dao as any,
-      {} as any,
+      integrationPaymentDao as any,
       {} as any,
       {} as any,
     );
@@ -140,13 +150,11 @@ describe('IntegrationService', () => {
   });
 
   it('keeps salary log updates date-only when aggregating confirmed orders', async () => {
-    dao.getByDate.mockResolvedValue([
-      {
-        id: 'integration-1',
-        amount: 150000,
-        order_count: 2,
-      },
-    ]);
+    dao.getByArtistAndDate.mockResolvedValue({
+      id: 'integration-1',
+      amount: 150000,
+      order_count: 2,
+    });
     dao.update.mockResolvedValue(1);
 
     await service.updateSalaryLog({
@@ -165,6 +173,51 @@ describe('IntegrationService', () => {
         date: '2026-04-06',
       }),
       expect.arrayContaining(['date']),
+    );
+  });
+
+  it('calculates reconciliation salary and balance from artist percent', async () => {
+    dao.getArtistIncomeTotals.mockResolvedValue([
+      {
+        artist_id: 'artist-1',
+        income_amount: '100000',
+        salary_amount: '30000',
+        order_count: '1',
+        percent: '30',
+        salary_day: '5',
+      },
+    ]);
+    integrationPaymentDao.getArtistTransferTotals.mockResolvedValue([
+      {
+        artist_id: 'artist-1',
+        transferred_amount: '5000',
+      },
+    ]);
+
+    const result = await service.getReconciliation({
+      from: '2026-04-01',
+      to: '2026-04-15',
+    } as any);
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        artist_id: 'artist-1',
+        income_amount: 100000,
+        salary_amount: 30000,
+        transferred_amount: 5000,
+        balance_amount: 25000,
+        percent: 30,
+        salary_day: 5,
+      }),
+    ]);
+    expect(result.summary).toEqual(
+      expect.objectContaining({
+        income_amount: 100000,
+        salary_amount: 30000,
+        transferred_amount: 5000,
+        balance_amount: 25000,
+        order_count: 1,
+      }),
     );
   });
 });

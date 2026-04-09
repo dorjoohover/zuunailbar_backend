@@ -88,9 +88,7 @@ jest.mock(
     },
     timeToDecimal: (value: string) => {
       const [hours, minutes = '0', seconds = '0'] = String(value).split(':');
-      return (
-        Number(hours) + Number(minutes) / 60 + Number(seconds) / 3600
-      );
+      return Number(hours) + Number(minutes) / 60 + Number(seconds) / 3600;
     },
     toTimeString: (value: number | string, half?: boolean) =>
       `${String(Math.floor(Number(value))).padStart(2, '0')}:${
@@ -274,7 +272,8 @@ describe('OrderService', () => {
     ]);
     user.findOne.mockResolvedValue({
       id: 'artist-1',
-      day: 1,
+      salary_day: 5,
+      percent: 30,
     });
 
     const result = await service.confirmSalaryProcessStatus(
@@ -305,10 +304,12 @@ describe('OrderService', () => {
     expect(integrationService.updateSalaryLog).toHaveBeenCalledWith(
       expect.objectContaining({
         approved_by: 'admin-1',
-        amount: 100000,
+        amount: 30000,
         artist_id: 'artist-1',
         order_count: 1,
         salary_status: 10,
+        date: '2026-04-20',
+        day: 5,
       }),
     );
     expect(result).toEqual(
@@ -371,6 +372,44 @@ describe('OrderService', () => {
         start_time: '18:00:00',
       }),
     ]);
+  });
+
+  it('deduplicates repeated service categories before querying unified slots', async () => {
+    serviceConfig.getBookingConfigs.mockResolvedValue([
+      {
+        id: 'service-1',
+        category_id: 'category-1',
+        duration: '60',
+      },
+      {
+        id: 'service-2',
+        category_id: 'category-1',
+        duration: '30',
+      },
+    ]);
+    userService.getByServices.mockResolvedValue([{ user_id: 'artist-1' }]);
+    dao.getSlotsUnified.mockResolvedValue([
+      {
+        artist_id: 'artist-1',
+        branch_id: 'branch-1',
+        date: new Date('2026-04-10'),
+        start_time: '10:00:00',
+        finish_time: null,
+      },
+    ]);
+    dao.get_order_details.mockResolvedValue([]);
+
+    await service.getSlots({
+      branch_id: 'branch-1',
+      services: 'service-1,service-2',
+      parallel: 'false',
+    } as any);
+
+    expect(dao.getSlotsUnified).toHaveBeenCalledWith(
+      expect.objectContaining({
+        categories: ['category-1'],
+      }),
+    );
   });
 
   it('rejects order details that exceed shift finish boundary', async () => {

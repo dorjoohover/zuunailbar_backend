@@ -32,7 +32,11 @@ export class IntegrationPaymentDao {
   async getIntegrationForUpdate(trx, artist_id: string) {
     return trx.query(
       `SELECT * FROM integrations
-       WHERE artist_id = $1 and salary_status = ${SALARY_LOG_STATUS.Pending}
+       WHERE artist_id = $1
+         AND salary_status = ${SALARY_LOG_STATUS.Pending}
+         AND COALESCE(status, ${STATUS.Active}) = ${STATUS.Active}
+       ORDER BY date ASC NULLS FIRST, created_at ASC
+       LIMIT 1
        FOR UPDATE`,
       [artist_id],
     );

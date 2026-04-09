@@ -136,7 +136,6 @@ export class UserServiceService {
 
     const mapping: Record<string, string[]> = {};
     for (const service of services) {
-      console.log(service, branch_id);
       const { items } = await this.dao.list({
         branch_id,
         service_id: service,

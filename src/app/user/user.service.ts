@@ -282,10 +282,10 @@ export class UserService {
   ) {
     let user = await this.dao.getByMobile(mobile);
     if (!user) user = await this.dao.getByMail(mobile);
-    if (!user) return;
+    if (!user) return 0;
     const pass = await this.hash(password);
     const body = { id: user.id, password: pass, lastname, firstname };
-    await this.dao.update(body, getDefinedKeys(body));
+    return await this.dao.update(body, getDefinedKeys(body));
   }
   public async update(id: string, dto: UserDto) {
     try {

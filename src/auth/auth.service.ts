@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AdminUserService } from 'src/app/admin.user/admin.user.service';
@@ -8,10 +8,8 @@ import {
   ResetCurrentPasswordDto,
   ResetPasswordDto,
 } from './auth.dto';
-import { MobileFormat } from 'src/common/formatter';
 import { UserService } from 'src/app/user/user.service';
 import { ADMIN, CLIENT } from 'src/base/constants';
-import { FirebaseService } from 'src/base/firebase.service';
 import { AuthError, BadRequest } from 'src/common/error';
 import axios from 'axios';
 import { ResendService } from './resend.service';
@@ -46,6 +44,25 @@ export class AuthService {
     }
   }
 
+  async validateClientUser(identifier: string, pass: string): Promise<any> {
+    let user;
+    try {
+      user = await this.userService.findMobile(identifier);
+    } catch (error) {
+      user = null;
+    }
+
+    if (user == null) this.authError.unregister;
+
+    const isMatch = await bcrypt.compare(pass, user.password);
+    if (isMatch != true) this.authError.wrongPassword;
+
+    if (user && isMatch == true) {
+      const { password, ...result } = user;
+      return result;
+    }
+  }
+
   async adminLogin(user: any, role = ADMIN) {
     const result = await this.validateAdminUser(user.mobile, user.password);
     if (result.role > role) {
@@ -65,7 +82,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const result = await this.validateAdminUser(dto.mobile, dto.password);
+    const result = await this.validateClientUser(dto.mobile, dto.password);
 
     return {
       accessToken: this.jwtService.sign({
@@ -160,7 +177,6 @@ export class AuthService {
       });
       return true;
     } catch (error) {
-      console.log(error);
       return false;
     }
   }
@@ -179,7 +195,6 @@ export class AuthService {
       const { result, message, data } = res.data;
       return true;
     } catch (error) {
-      console.log(error);
       return false;
     }
   }
@@ -189,13 +204,22 @@ export class AuthService {
   }
 
   async reset(dto: ResetPasswordDto) {
-    if (!(await this.checkOtp(dto.otp, dto.mobile))) return;
-    return await this.userService.resetPassword(
+    if (!(await this.checkOtp(dto.otp, dto.mobile))) {
+      throw new BadRequest().OTP_INVALID;
+    }
+
+    const updated = await this.userService.resetPassword(
       dto.mobile,
       dto.password,
       dto.lastname,
       dto.firstname,
     );
+
+    if (!updated) {
+      throw new BadRequest().unregistered;
+    }
+
+    return updated;
   }
   async resetPassword(dto: ResetCurrentPasswordDto, mobile: string) {
     await this.validateAdminUser(mobile, dto.password);

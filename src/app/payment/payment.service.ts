@@ -27,6 +27,18 @@ export class PaymentService {
     private qpay: QpayService,
     private order_detail: OrderDetailService,
   ) {}
+
+  private resolveDateRange(input: { from?: string; to?: string }) {
+    const from = input.from ?? mnDate(new Date());
+    const to = input.to ?? from;
+
+    if (from <= to) {
+      return { from, to };
+    }
+
+    return { from: to, to: from };
+  }
+
   public async create(dto: PaymentDto, merchant: string) {
     await this.dao.add({
       ...dto,
@@ -218,7 +230,8 @@ export class PaymentService {
     const activePayments = [prePayment, paidPayment].filter(Boolean);
     const latestPayment = activePayments.sort(
       (a, b) =>
-        new Date(b?.paid_at ?? 0).getTime() - new Date(a?.paid_at ?? 0).getTime(),
+        new Date(b?.paid_at ?? 0).getTime() -
+        new Date(a?.paid_at ?? 0).getTime(),
     )[0];
 
     return {
@@ -259,8 +272,7 @@ export class PaymentService {
     pg: PaginationDto & { from?: string; to?: string; branch_id?: string },
     merchantId: string,
   ) {
-    const from = pg.from ?? mnDate(new Date());
-    const to = pg.to ?? from;
+    const { from, to } = this.resolveDateRange(pg);
     const result = await this.dao.getDailySummary({
       merchant_id: merchantId,
       from,
@@ -286,8 +298,7 @@ export class PaymentService {
     pg: PaginationDto & { from?: string; to?: string; branch_id?: string },
     merchantId: string,
   ) {
-    const from = pg.from ?? mnDate(new Date());
-    const to = pg.to ?? from;
+    const { from, to } = this.resolveDateRange(pg);
     const items = await this.dao.getDailyBreakdown({
       merchant_id: merchantId,
       from,
@@ -299,6 +310,9 @@ export class PaymentService {
       items: items.map((item) => ({
         ...item,
         amount: Number(item.amount ?? 0),
+        pre_amount: Number(item.pre_amount ?? 0),
+        paid_amount: Number(item.paid_amount ?? 0),
+        order_total_amount: Number(item.order_total_amount ?? 0),
       })),
       count: items.length,
       from,

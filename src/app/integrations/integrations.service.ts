@@ -65,10 +65,7 @@ export class IntegrationService {
   }
 
   public async findAll(pg: PaginationDto, role: number) {
-    const query = applyDefaultStatusFilter(
-      pg,
-      role,
-    ) as PaginationDto & {
+    const query = applyDefaultStatusFilter(pg, role) as PaginationDto & {
       from?: string;
       to?: string;
       artist_id?: string;
@@ -130,7 +127,10 @@ export class IntegrationService {
         row.artist_id,
         {
           income_amount: Number(row.income_amount ?? 0),
+          salary_amount: Number(row.salary_amount ?? 0),
           order_count: Number(row.order_count ?? 0),
+          percent: Number(row.percent ?? 0),
+          salary_day: Number(row.salary_day ?? 0),
         },
       ]),
     );
@@ -143,21 +143,28 @@ export class IntegrationService {
     const items = [...artistIds].map((artist_id) => {
       const income = incomeMap.get(artist_id) ?? {
         income_amount: 0,
+        salary_amount: 0,
         order_count: 0,
+        percent: 0,
+        salary_day: 0,
       };
       const transferred_amount = transferMap.get(artist_id) ?? 0;
 
       return {
         artist_id,
         income_amount: income.income_amount,
+        salary_amount: income.salary_amount,
         order_count: income.order_count,
+        percent: income.percent,
+        salary_day: income.salary_day,
         transferred_amount,
-        balance_amount: income.income_amount - transferred_amount,
+        balance_amount: income.salary_amount - transferred_amount,
       };
     });
     const summary = items.reduce(
       (acc, item) => {
         acc.income_amount += item.income_amount;
+        acc.salary_amount += item.salary_amount;
         acc.transferred_amount += item.transferred_amount;
         acc.balance_amount += item.balance_amount;
         acc.order_count += item.order_count;
@@ -165,6 +172,7 @@ export class IntegrationService {
       },
       {
         income_amount: 0,
+        salary_amount: 0,
         transferred_amount: 0,
         balance_amount: 0,
         order_count: 0,
@@ -254,10 +262,7 @@ export class IntegrationService {
   }
 
   public async reportSummary(pg: PaginationDto, role: number, res: Response) {
-    const query = applyDefaultStatusFilter(
-      pg,
-      role,
-    ) as PaginationDto & {
+    const query = applyDefaultStatusFilter(pg, role) as PaginationDto & {
       from?: string;
       to?: string;
       artist_id?: string;
@@ -295,8 +300,12 @@ export class IntegrationService {
       ]),
     );
 
-    const users = await Promise.all(artistIds.map((artistId) => this.user.findOne(artistId)));
-    const userMap = new Map(users.filter(Boolean).map((user: any) => [user.id, user]));
+    const users = await Promise.all(
+      artistIds.map((artistId) => this.user.findOne(artistId)),
+    );
+    const userMap = new Map(
+      users.filter(Boolean).map((user: any) => [user.id, user]),
+    );
 
     type Row = {
       artist: string;
@@ -325,11 +334,15 @@ export class IntegrationService {
             query.from ??
             '',
           income_amount: Number(reconciliationItem?.income_amount ?? 0),
-          salary_amount: Number(salary?.salary_amount ?? 0),
+          salary_amount: Number(
+            reconciliationItem?.salary_amount ?? salary?.salary_amount ?? 0,
+          ),
           order_count: Number(
             reconciliationItem?.order_count ?? salary?.order_count ?? 0,
           ),
-          transferred_amount: Number(reconciliationItem?.transferred_amount ?? 0),
+          transferred_amount: Number(
+            reconciliationItem?.transferred_amount ?? 0,
+          ),
           balance_amount: Number(reconciliationItem?.balance_amount ?? 0),
         };
       })
@@ -371,26 +384,14 @@ export class IntegrationService {
   }
 
   public async updateSalaryLog(dto: IntegrationLogDto) {
-    const today = new Date();
     const normalizedDate = this.normalizeDate(dto.date);
-    const salaryDay = dto.day + 15;
-    const [todayYear, todayMonth, todayDate] = mnDate(today)
-      .split('-')
-      .map(Number);
-    const lastSalaryDate = new Date(Date.UTC(todayYear, todayMonth - 1, 1));
-
-    if (todayDate < salaryDay) {
-      lastSalaryDate.setUTCMonth(lastSalaryDate.getUTCMonth() - 1);
-    }
-
-    lastSalaryDate.setUTCDate(salaryDay);
-
-    const salaries = await this.dao.getByDate(
+    const salary = await this.dao.getByArtistAndDate(
       dto.artist_id,
-      mnDate(lastSalaryDate),
+      normalizedDate,
     );
-    if (salaries.length > 0) {
-      const { amount, id, order_count } = salaries[0];
+
+    if (salary) {
+      const { amount, id, order_count } = salary;
       await this.update(id, {
         amount: +amount + +dto.amount,
         approved_by: dto.approved_by,
