@@ -152,7 +152,9 @@ import { OrderService } from './order.service';
 describe('OrderService', () => {
   let service: OrderService;
   let dao: {
+    updateTx: jest.Mock;
     updateOrderStatus: jest.Mock;
+    updatePrePaid: jest.Mock;
     updateSalaryProcessStatus: jest.Mock;
     customerCheck: jest.Mock;
     getSlotsUnified: jest.Mock;
@@ -160,7 +162,11 @@ describe('OrderService', () => {
     getShiftBoundaries: jest.Mock;
   };
   let orderDetail: {
+    createTx: jest.Mock;
+    deleteTx: jest.Mock;
     updateStatusByOrder: jest.Mock;
+    updateTx: jest.Mock;
+    updateViewStatusTx: jest.Mock;
     findByOrder: jest.Mock;
   };
   let user: {
@@ -182,19 +188,32 @@ describe('OrderService', () => {
     add: jest.Mock;
     addTx: jest.Mock;
   };
+  let payment: {
+    syncManualPayments: jest.Mock;
+  };
+  let db: {
+    withTransaction: jest.Mock;
+  };
 
   beforeEach(() => {
     dao = {
+      updateTx: jest.fn(),
       updateOrderStatus: jest.fn(),
+      updatePrePaid: jest.fn(),
       updateSalaryProcessStatus: jest.fn(),
       customerCheck: jest.fn(),
       getSlotsUnified: jest.fn(),
       get_order_details: jest.fn(),
       getShiftBoundaries: jest.fn(),
     };
+    dao.getShiftBoundaries.mockResolvedValue([]);
 
     orderDetail = {
+      createTx: jest.fn(),
+      deleteTx: jest.fn(),
       updateStatusByOrder: jest.fn(),
+      updateTx: jest.fn(),
+      updateViewStatusTx: jest.fn(),
       findByOrder: jest.fn(),
     };
 
@@ -222,6 +241,20 @@ describe('OrderService', () => {
       addTx: jest.fn(),
     };
 
+    payment = {
+      syncManualPayments: jest.fn().mockResolvedValue({
+        latestPaidAt: undefined,
+        latestMethod: undefined,
+        hasPrePayment: false,
+      }),
+    };
+
+    db = {
+      withTransaction: jest.fn().mockImplementation(async (fn) =>
+        fn({ query: jest.fn() }),
+      ),
+    };
+
     service = new OrderService(
       dao as any,
       orderDetail as any,
@@ -232,8 +265,8 @@ describe('OrderService', () => {
       userService as any,
       integrationService as any,
       orderLog as any,
-      {} as any,
-      {} as any,
+      payment as any,
+      db as any,
     );
 
     jest.spyOn(service, 'find').mockResolvedValue({
@@ -434,5 +467,64 @@ describe('OrderService', () => {
         ],
       }),
     ).rejects.toThrow('Ажилтны тарах цагаас хэтэрсэн захиалга байна.');
+  });
+
+  it('temporarily hides existing order details before resequencing sequential edits', async () => {
+    orderDetail.findByOrder.mockResolvedValue([
+      {
+        id: 'detail-1',
+        user_id: 'artist-1',
+        start_time: '17:00:00',
+        end_time: '19:00:00',
+      },
+      {
+        id: 'detail-2',
+        user_id: 'artist-1',
+        start_time: '19:00:00',
+        end_time: '19:30:00',
+      },
+    ]);
+    serviceConfig.findOne
+      .mockResolvedValueOnce({ duration: '90' })
+      .mockResolvedValueOnce({ duration: '30' });
+
+    await service.update(
+      'order-1',
+      {
+        branch_id: 'branch-1',
+        order_date: '2026-04-08',
+        order_status: OrderStatus.Active,
+        paid_amount: 0,
+        pre_amount: 0,
+        parallel: false,
+        start_time: '17:00:00',
+        details: [
+          {
+            id: 'detail-1',
+            service_id: 'service-1',
+            user_id: 'artist-1',
+            duration: 90,
+          },
+          {
+            id: 'detail-2',
+            service_id: 'service-2',
+            user_id: 'artist-1',
+            duration: 30,
+          },
+        ],
+      } as any,
+      'admin-1',
+      20,
+    );
+
+    expect(orderDetail.updateViewStatusTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'order-1',
+      30,
+    );
+    expect(orderDetail.updateTx).toHaveBeenCalledTimes(2);
+    expect(orderDetail.updateViewStatusTx.mock.invocationCallOrder[0]).toBeLessThan(
+      orderDetail.updateTx.mock.invocationCallOrder[0],
+    );
   });
 });

@@ -1020,6 +1020,10 @@ export class OrderService {
           getDefinedKeys(payload),
         );
 
+        // Temporarily hide the order's existing details so resequencing them
+        // does not trip the exclusion constraint against their previous slots.
+        await this.orderDetail.updateViewStatusTx(client, id, STATUS.Hidden);
+
         for (const existing of existingDetails) {
           if (!incomingIds.includes(existing.id)) {
             await this.orderDetail.deleteTx(client, existing.id);

@@ -68,6 +68,9 @@ export class OrderDetailService {
     const { ...body } = dto;
     return await this.dao.updateTx(client, { ...body, id }, getDefinedKeys(body));
   }
+  public async updateViewStatusTx(client: any, id: string, status: number) {
+    return await this.dao.updateViewStatusTx(client, id, status);
+  }
   public async updateStatusByOrder(id: string, status: OrderStatus) {
     return await this.dao.updateStatus(id, status);
   }

@@ -96,6 +96,17 @@ export class OrderDetailDao {
       [status, id],
     );
   }
+  async updateViewStatusTx(
+    client: any,
+    id: string,
+    status: number,
+  ): Promise<number> {
+    const result = await client.query(
+      `UPDATE "${tableName}" SET "view_status"=$1 WHERE "order_id"=$2`,
+      [status, id],
+    );
+    return result.rowCount;
+  }
   async delete(id: string): Promise<number> {
     return await this._db._update(
       `delete from "${tableName}" where id = $1`,
