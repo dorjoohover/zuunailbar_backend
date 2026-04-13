@@ -46,7 +46,7 @@ export class PaymentService {
       merchant_id: merchant,
       order_id: dto.order_id,
       status: dto.status ?? PAYMENT_STATUS.Pending,
-      method: dto.method ?? PaymentMethod.P2P,
+      method: dto.method ?? PaymentMethod.QPAY,
       amount: dto.amount ?? 0,
       is_pre_amount: dto.is_pre_amount ?? false,
       paid_at: dto.paid_at,
@@ -202,6 +202,7 @@ export class PaymentService {
     order_id: string;
     created_by?: string;
     method?: PaymentMethod;
+    pre_method?: PaymentMethod;
     pre_amount?: number;
     paid_amount?: number;
   }) {
@@ -216,27 +217,22 @@ export class PaymentService {
 
     const prePayment = await this.syncManualPayment({
       ...input,
+      method: input.pre_method ?? input.method,
       amount: Number(input.pre_amount ?? 0),
       is_pre_amount: true,
       existing: existingPre,
     });
     const paidPayment = await this.syncManualPayment({
       ...input,
+      method: input.method,
       amount: Number(input.paid_amount ?? 0),
       is_pre_amount: false,
       existing: existingPaid,
     });
 
-    const activePayments = [prePayment, paidPayment].filter(Boolean);
-    const latestPayment = activePayments.sort(
-      (a, b) =>
-        new Date(b?.paid_at ?? 0).getTime() -
-        new Date(a?.paid_at ?? 0).getTime(),
-    )[0];
-
     return {
-      latestPaidAt: latestPayment?.paid_at,
-      latestMethod: latestPayment?.method,
+      latestPaidAt: paidPayment?.paid_at,
+      latestMethod: paidPayment?.method,
       hasPrePayment: Number(input.pre_amount ?? 0) > 0,
     };
   }

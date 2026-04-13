@@ -181,4 +181,97 @@ describe('QpayService', () => {
       service.createInvoice(5000, 'order-1', 'user-1', 'branch-1', '94001234'),
     ).rejects.toBe(authError);
   });
+
+  it('clears stale tokens after refresh and auth both fail, then authenticates directly on the next request', async () => {
+    (service as any).accessToken = 'stale-access';
+    (service as any).refreshToken = 'stale-refresh';
+    (service as any).expiresIn = new Date(Date.now() + 5 * 60 * 1000);
+
+    httpService.request.mockReturnValueOnce(
+      throwError(() => ({
+        response: {
+          status: 401,
+          data: { message: 'Unauthorized' },
+        },
+        message: 'Unauthorized',
+      })),
+    );
+
+    httpService.post.mockImplementation((url: string) => {
+      if (url.endsWith('auth/refresh')) {
+        return throwError(() => ({
+          response: {
+            status: 401,
+            data: { message: 'Refresh expired' },
+          },
+          message: 'Refresh expired',
+        }));
+      }
+
+      if (url.endsWith('auth/token')) {
+        return throwError(() => ({
+          response: {
+            status: 401,
+            data: { message: 'Нэвтрэх нэр, нууц үг буруу' },
+          },
+          message: 'Bad credentials',
+        }));
+      }
+
+      throw new Error(`Unexpected POST ${url}`);
+    });
+
+    await expect(service.checkPayment('invoice-1')).rejects.toMatchObject({
+      response: {
+        status: 401,
+      },
+    });
+
+    expect((service as any).accessToken).toBeUndefined();
+    expect((service as any).refreshToken).toBeUndefined();
+    expect((service as any).expiresIn).toBeUndefined();
+
+    httpService.post.mockClear();
+    httpService.request.mockClear();
+
+    httpService.post.mockImplementation((url: string) => {
+      if (url.endsWith('auth/token')) {
+        return of({
+          data: {
+            access_token: 'new-access',
+            refresh_token: 'new-refresh',
+            expires_in: 3600,
+          },
+        });
+      }
+
+      throw new Error(`Unexpected POST ${url}`);
+    });
+
+    httpService.request.mockReturnValueOnce(
+      of({
+        data: {
+          paid_amount: 200,
+          rows: [],
+        },
+      }),
+    );
+
+    await expect(service.checkPayment('invoice-1')).resolves.toEqual({
+      paid_amount: 200,
+      rows: [],
+    });
+
+    expect(httpService.post).toHaveBeenCalledTimes(1);
+    expect(httpService.post).toHaveBeenCalledWith(
+      'https://merchant.qpay.mn/v2/auth/token',
+      {},
+      expect.objectContaining({
+        auth: {
+          username: 'client-id',
+          password: 'client-secret',
+        },
+      }),
+    );
+  });
 });

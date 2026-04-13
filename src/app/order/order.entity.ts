@@ -1,3 +1,5 @@
+import { PaymentMethod } from 'src/base/constants';
+
 export class Order {
   id: string;
   customer_id: string;
@@ -21,6 +23,9 @@ export class Order {
   branch_id?: string;
   parallel?: boolean;
   paid_at?: Date;
+  transaction_type?: string;
+  method?: PaymentMethod;
+  pre_method?: PaymentMethod;
 }
 
 export class Slot {

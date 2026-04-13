@@ -1,5 +1,6 @@
 import {
   HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -118,7 +119,7 @@ export class OrderService {
   }
 
   public async getSlots(pg: PaginationDto) {
-    const { parallel, branch_id, services } = pg;
+    const { parallel, branch_id, services, date, time } = pg;
     let artists = [];
     let result: Slot[] = [];
 
@@ -155,6 +156,8 @@ export class OrderService {
       branch_id,
       artists,
       categories,
+      date: date ? `${date}`.slice(0, 10) : undefined,
+      time: time ? `${time}` : undefined,
       parallel: p,
     });
     const validSlots = [];
@@ -322,6 +325,9 @@ export class OrderService {
 
     await this.updatePaidDate(orderId, paidAt, PaymentMethod[method]);
   }
+  private async clearOrderPaidMeta(orderId: string) {
+    await this.dao.clearPaidMeta(orderId);
+  }
   public async updateOrderLimit(limit: number) {
     await this.dao.orderLimit(limit);
     // this.slot.updateOrderLimit(limit);
@@ -342,7 +348,9 @@ export class OrderService {
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
       const admin = user.role <= ADMIN;
+      const requiresOnlinePrePayment = !admin;
       const canManagePreAmount = user.role < MANAGER;
+      const preMethod = dto.pre_method ?? dto.method;
       if ((dto.details?.length ?? 0) <= 0) this.orderError.serviceNotSelected;
       const parallel = dto.parallel;
       const serviceConfigs = await this.service.getBookingConfigs(
@@ -414,6 +422,18 @@ export class OrderService {
         created_by: user.id,
         branch_id: dto.branch_id,
       } as const;
+      if (requiresOnlinePrePayment && orderPreAmount <= 0) {
+        throw new HttpException(
+          'Урьдчилгаа төлбөр үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      if (requiresOnlinePrePayment && preMethod !== PaymentMethod.QPAY) {
+        throw new HttpException(
+          'Урьдчилгаа төлбөр үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
       if (!admin) {
         await this.canPlaceOrder(
           {
@@ -469,15 +489,32 @@ export class OrderService {
         })),
       });
 
+      let invoice:
+        | {
+            invoice_id: string;
+            qr_image?: string;
+            qr_text?: string;
+          }
+        | null = null;
+      if (preMethod == PaymentMethod.QPAY && orderPreAmount > 0) {
+        try {
+          invoice = await this.qpay.createInvoice(
+            orderPreAmount,
+            payload.id,
+            user.id,
+            dto.branch_id,
+            user.mobile,
+          );
+        } catch (error) {
+          throw new HttpException(
+            'Урьдчилгаа төлбөр үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
       const order = await this.dao.create(payload, orderDetails);
-      if (dto.method == PaymentMethod.P2P && orderPreAmount > 0) {
-        const invoice = await this.qpay.createInvoice(
-          orderPreAmount,
-          order,
-          user.id,
-          dto.branch_id,
-          user.mobile,
-        );
+      if (invoice) {
         await this.payment.create(
           {
             amount: orderPreAmount,
@@ -487,7 +524,7 @@ export class OrderService {
             qr_image: invoice.qr_image,
             qr_text: invoice.qr_text,
             status: PAYMENT_STATUS.Pending,
-            method: PaymentMethod.P2P,
+            method: PaymentMethod.QPAY,
             order_id: order,
           },
           merchant,
@@ -507,14 +544,17 @@ export class OrderService {
           order_id: order,
           created_by: user.id,
           method: dto.method,
+          pre_method: preMethod,
           paid_amount: Number(dto.paid_amount ?? 0),
           pre_amount: orderPreAmount,
         });
-        await this.syncOrderPaidMeta(
-          order,
-          paymentSync.latestPaidAt,
-          paymentSync.latestMethod,
-        );
+        if (paymentSync.latestPaidAt && paymentSync.latestMethod != null) {
+          await this.syncOrderPaidMeta(
+            order,
+            paymentSync.latestPaidAt,
+            paymentSync.latestMethod,
+          );
+        }
         await this.updatePrePaid(order, true);
         await this.dao.updateOrderStatus(order, OrderStatus.Active);
         return { id: order };
@@ -569,11 +609,7 @@ export class OrderService {
         user,
       });
       if (row) {
-        await this.updatePaidDate(
-          id,
-          payment?.paid_at ?? new Date(),
-          row.payment_type,
-        );
+        await this.updatePrePaid(id, true);
       }
       return {
         status: OrderStatus.Active,
@@ -895,6 +931,7 @@ export class OrderService {
     const { details = [], parallel, order_date, ...body } = dto;
     const payload = { order_date, ...body };
     try {
+      const preMethod = dto.pre_method ?? dto.method;
       const order = await this.findOne(id);
       if (!order) return;
       if (details.length <= 0) this.orderError.serviceNotSelected;
@@ -1053,14 +1090,19 @@ export class OrderService {
         order_id: id,
         created_by: user,
         method: dto.method,
+        pre_method: preMethod,
         paid_amount: paidAmount,
         pre_amount: preAmount,
       });
-      await this.syncOrderPaidMeta(
-        id,
-        paymentSync.latestPaidAt,
-        paymentSync.latestMethod,
-      );
+      if (paymentSync.latestPaidAt && paymentSync.latestMethod != null) {
+        await this.syncOrderPaidMeta(
+          id,
+          paymentSync.latestPaidAt,
+          paymentSync.latestMethod,
+        );
+      } else {
+        await this.clearOrderPaidMeta(id);
+      }
       await this.updatePrePaid(
         id,
         preAmount == 0 ? true : !!paymentSync.hasPrePayment,
@@ -1083,7 +1125,11 @@ export class OrderService {
     });
     return await this.dao.updateOrderStatus(id, order_status);
   }
-  public async updatePaidDate(id: string, date: Date, type: string) {
+  public async updatePaidDate(
+    id: string,
+    date: Date | null,
+    type: string | null,
+  ) {
     return await this.dao.updatePaidDate(id, date, type);
   }
   private isFullDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -1357,11 +1403,7 @@ export class OrderService {
           order_status: OrderStatus.Active,
           user,
         });
-        await this.updatePaidDate(
-          order_id,
-          payment?.paid_at ?? new Date(),
-          res.transaction_type,
-        );
+        await this.updatePrePaid(order_id, true);
       } catch (error) {
         throw error;
       }

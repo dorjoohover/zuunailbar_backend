@@ -152,8 +152,11 @@ import { OrderService } from './order.service';
 describe('OrderService', () => {
   let service: OrderService;
   let dao: {
+    create: jest.Mock;
+    clearPaidMeta: jest.Mock;
     updateTx: jest.Mock;
     updateOrderStatus: jest.Mock;
+    updatePaidDate: jest.Mock;
     updatePrePaid: jest.Mock;
     updateSalaryProcessStatus: jest.Mock;
     customerCheck: jest.Mock;
@@ -188,6 +191,10 @@ describe('OrderService', () => {
     add: jest.Mock;
     addTx: jest.Mock;
   };
+  let qpay: {
+    createInvoice: jest.Mock;
+    checkPayment: jest.Mock;
+  };
   let payment: {
     syncManualPayments: jest.Mock;
   };
@@ -197,8 +204,11 @@ describe('OrderService', () => {
 
   beforeEach(() => {
     dao = {
+      create: jest.fn(),
+      clearPaidMeta: jest.fn(),
       updateTx: jest.fn(),
       updateOrderStatus: jest.fn(),
+      updatePaidDate: jest.fn(),
       updatePrePaid: jest.fn(),
       updateSalaryProcessStatus: jest.fn(),
       customerCheck: jest.fn(),
@@ -241,6 +251,11 @@ describe('OrderService', () => {
       addTx: jest.fn(),
     };
 
+    qpay = {
+      createInvoice: jest.fn(),
+      checkPayment: jest.fn(),
+    };
+
     payment = {
       syncManualPayments: jest.fn().mockResolvedValue({
         latestPaidAt: undefined,
@@ -261,7 +276,7 @@ describe('OrderService', () => {
       serviceConfig as any,
       user as any,
       {} as any,
-      {} as any,
+      qpay as any,
       userService as any,
       integrationService as any,
       orderLog as any,
@@ -469,6 +484,145 @@ describe('OrderService', () => {
     ).rejects.toThrow('Ажилтны тарах цагаас хэтэрсэн захиалга байна.');
   });
 
+  it('syncs pre and remaining payment methods for admin orders', async () => {
+    serviceConfig.getBookingConfigs.mockResolvedValue([
+      {
+        id: 'service-1',
+        duration: '60',
+        pre: '10000',
+        name: 'Service 1',
+      },
+    ]);
+    user.findOne.mockResolvedValue({
+      id: 'artist-1',
+      nickname: 'Artist 1',
+    });
+    dao.create.mockResolvedValue('order-created');
+
+    await service.create(
+      {
+        branch_id: 'branch-1',
+        customer_id: 'customer-1',
+        order_date: '2026-04-12',
+        start_time: '10:00:00',
+        order_status: OrderStatus.Active,
+        total_amount: 30000,
+        pre_amount: 10000,
+        paid_amount: 20000,
+        pre_method: 3,
+        method: 4,
+        details: [
+          {
+            service_id: 'service-1',
+            user_id: 'artist-1',
+            price: 30000,
+          },
+        ],
+      } as any,
+      {
+        id: 'admin-1',
+        role: 20,
+        mobile: '99999999',
+      } as any,
+      'merchant-1',
+    );
+
+    expect(payment.syncManualPayments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        order_id: 'order-created',
+        pre_method: 3,
+        method: 4,
+        pre_amount: 10000,
+        paid_amount: 20000,
+      }),
+    );
+  });
+
+  it('does not create client orders when prepayment amount is missing', async () => {
+    serviceConfig.getBookingConfigs.mockResolvedValue([
+      {
+        id: 'service-1',
+        duration: '60',
+        pre: '0',
+        name: 'Service 1',
+      },
+    ]);
+    user.findOne.mockResolvedValue({
+      id: 'artist-1',
+      nickname: 'Artist 1',
+    });
+    jest.spyOn(service, 'canPlaceOrder').mockResolvedValue(undefined);
+
+    await expect(
+      service.create(
+        {
+          branch_id: 'branch-1',
+          order_date: '2026-04-12',
+          start_time: '10:00:00',
+          details: [
+            {
+              service_id: 'service-1',
+              user_id: 'artist-1',
+              price: 30000,
+            },
+          ],
+        } as any,
+        {
+          id: 'client-1',
+          role: 50,
+          mobile: '99999999',
+        } as any,
+        'merchant-1',
+      ),
+    ).rejects.toThrow('Урьдчилгаа төлбөр үүсгэхэд алдаа гарлаа');
+
+    expect(qpay.createInvoice).not.toHaveBeenCalled();
+    expect(dao.create).not.toHaveBeenCalled();
+  });
+
+  it('does not persist client orders when qpay invoice creation fails', async () => {
+    serviceConfig.getBookingConfigs.mockResolvedValue([
+      {
+        id: 'service-1',
+        duration: '60',
+        pre: '10000',
+        name: 'Service 1',
+      },
+    ]);
+    user.findOne.mockResolvedValue({
+      id: 'artist-1',
+      nickname: 'Artist 1',
+    });
+    qpay.createInvoice.mockRejectedValue(new Error('401'));
+    jest.spyOn(service, 'canPlaceOrder').mockResolvedValue(undefined);
+
+    await expect(
+      service.create(
+        {
+          branch_id: 'branch-1',
+          order_date: '2026-04-12',
+          start_time: '10:00:00',
+          details: [
+            {
+              service_id: 'service-1',
+              user_id: 'artist-1',
+              price: 30000,
+            },
+          ],
+        } as any,
+        {
+          id: 'client-1',
+          role: 50,
+          mobile: '99999999',
+        } as any,
+        'merchant-1',
+      ),
+    ).rejects.toThrow('Урьдчилгаа төлбөр үүсгэхэд алдаа гарлаа');
+
+    expect(qpay.createInvoice).toHaveBeenCalled();
+    expect(dao.create).not.toHaveBeenCalled();
+  });
+
   it('temporarily hides existing order details before resequencing sequential edits', async () => {
     orderDetail.findByOrder.mockResolvedValue([
       {
@@ -526,5 +680,48 @@ describe('OrderService', () => {
     expect(orderDetail.updateViewStatusTx.mock.invocationCallOrder[0]).toBeLessThan(
       orderDetail.updateTx.mock.invocationCallOrder[0],
     );
+  });
+
+  it('clears order paid meta when remaining payment is removed', async () => {
+    orderDetail.findByOrder.mockResolvedValue([
+      {
+        id: 'detail-1',
+        user_id: 'artist-1',
+        start_time: '17:00:00',
+        end_time: '18:00:00',
+      },
+    ]);
+    serviceConfig.findOne.mockResolvedValue({ duration: '60' });
+    payment.syncManualPayments.mockResolvedValue({
+      latestPaidAt: undefined,
+      latestMethod: undefined,
+      hasPrePayment: true,
+    });
+
+    await service.update(
+      'order-1',
+      {
+        branch_id: 'branch-1',
+        order_date: '2026-04-08',
+        order_status: OrderStatus.Active,
+        paid_amount: 0,
+        pre_amount: 10000,
+        parallel: false,
+        start_time: '17:00:00',
+        details: [
+          {
+            id: 'detail-1',
+            service_id: 'service-1',
+            user_id: 'artist-1',
+            duration: 60,
+          },
+        ],
+      } as any,
+      'admin-1',
+      20,
+    );
+
+    expect(dao.clearPaidMeta).toHaveBeenCalledWith('order-1');
+    expect(dao.updatePaidDate).not.toHaveBeenCalled();
   });
 });

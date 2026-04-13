@@ -17,6 +17,12 @@ export class QpayService {
 
   constructor(private readonly httpService: HttpService) {}
 
+  private clearTokens() {
+    this.accessToken = undefined;
+    this.refreshToken = undefined;
+    this.expiresIn = undefined;
+  }
+
   private updateTokens(data: {
     access_token: string;
     refresh_token: string;
@@ -95,6 +101,7 @@ export class QpayService {
             `${reason}. QPay token refresh failed, re-authenticating`,
           );
           this.logger.debug(this.formatError(error));
+          this.clearTokens();
         }
       } else {
         this.logger.warn(`${reason}. Re-authenticating with QPay`);
@@ -131,8 +138,8 @@ export class QpayService {
       );
       return response.data;
     } catch (error) {
-      this.logger.error('QPay request failed', this.formatError(error));
       if (error.response?.status === 401) {
+        this.logger.warn(`QPay request returned 401 for ${endpoint}`);
         await this.recoverAuthorization('QPay request returned 401');
         const retryResponse = await firstValueFrom(
           this.httpService.request({
@@ -147,6 +154,7 @@ export class QpayService {
         return retryResponse.data;
       }
 
+      this.logger.error('QPay request failed', this.formatError(error));
       throw error;
     }
   }
@@ -169,6 +177,7 @@ export class QpayService {
       this.updateTokens(response.data);
       this.logger.log('QPay access token authenticated');
     } catch (e) {
+      this.clearTokens();
       this.logger.error('QPay authentication failed', this.formatError(e));
       throw e;
     }

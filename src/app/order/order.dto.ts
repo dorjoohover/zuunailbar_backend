@@ -34,7 +34,12 @@ export class OrderDto {
   @ApiProperty()
   branch_id?: string;
   services?: string[];
-  method: PaymentMethod;
+  @ApiPropertyOptional({ enum: PaymentMethod })
+  @IsOptional()
+  method?: PaymentMethod;
+  @ApiPropertyOptional({ enum: PaymentMethod })
+  @IsOptional()
+  pre_method?: PaymentMethod;
   @ApiProperty({ isArray: true })
   details: OrderDetailDto[];
   updated_at?: Date;

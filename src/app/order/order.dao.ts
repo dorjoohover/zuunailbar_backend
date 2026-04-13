@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { OrderStatus, STATUS, ubDateAt00 } from 'src/base/constants';
+import { OrderStatus, PAYMENT_STATUS, STATUS, ubDateAt00 } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Order } from './order.entity';
@@ -91,11 +91,18 @@ export class OrdersDao {
     );
   }
 
-  async updatePaidDate(id: string, date: Date, type: string) {
+  async updatePaidDate(
+    id: string,
+    date: Date | null,
+    type: string | null,
+  ) {
     return await this._db._update(
       `UPDATE ${tableName} set "paid_at"=$1 , "transaction_type"=$2 where "id"=$3`,
       [date, type, id],
     );
+  }
+  async clearPaidMeta(id: string) {
+    return await this.updatePaidDate(id, null, null);
   }
   async updateSalaryProcessStatus(id: string, date?: Date): Promise<number> {
     const query = `
@@ -139,7 +146,28 @@ export class OrdersDao {
   }
   async getById(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "id"=$1`,
+      `SELECT
+        o.*,
+        (
+          SELECT p.method
+          FROM "payments" p
+          WHERE p."order_id" = o."id"
+            AND p."is_pre_amount" = true
+            AND p."status" != ${PAYMENT_STATUS.Cancelled}
+          ORDER BY p."created_at" DESC
+          LIMIT 1
+        ) AS pre_method,
+        (
+          SELECT p.method
+          FROM "payments" p
+          WHERE p."order_id" = o."id"
+            AND COALESCE(p."is_pre_amount", false) = false
+            AND p."status" != ${PAYMENT_STATUS.Cancelled}
+          ORDER BY p."created_at" DESC
+          LIMIT 1
+        ) AS method
+      FROM "${tableName}" o
+      WHERE o."id"=$1`,
       [id],
     );
   }
@@ -225,9 +253,9 @@ export class OrdersDao {
     branch_id: string;
     artists?: string[];
     categories?: string[];
-    date?: Date;
+    date?: Date | string;
     parallel?: boolean;
-    time?: Date;
+    time?: Date | string;
   }) {
     const { branch_id, parallel, artists, categories, date, time } = input;
 
@@ -500,11 +528,30 @@ WHERE key = 'availability_days';`;
       additional = ` AND customer_id = ANY($${index})`;
     }
     const criteria = builder.criteria();
+    const defaultColumns = `o.*,
+      (
+        SELECT p.method
+        FROM "payments" p
+        WHERE p."order_id" = o."id"
+          AND p."is_pre_amount" = true
+          AND p."status" != ${PAYMENT_STATUS.Cancelled}
+        ORDER BY p."created_at" DESC
+        LIMIT 1
+      ) AS pre_method,
+      (
+        SELECT p.method
+        FROM "payments" p
+        WHERE p."order_id" = o."id"
+          AND COALESCE(p."is_pre_amount", false) = false
+          AND p."status" != ${PAYMENT_STATUS.Cancelled}
+        ORDER BY p."created_at" DESC
+        LIMIT 1
+      ) AS method`;
     const sql =
-      `SELECT ${columns ?? '*'} FROM "${tableName}"   ${criteria} ${additional} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${columns ?? defaultColumns} FROM "${tableName}" o ${criteria} ${additional} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria} ${additional}`;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" o ${criteria} ${additional}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

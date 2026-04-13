@@ -223,7 +223,7 @@ export enum PAYMENT_STATUS {
 }
 
 export enum PaymentMethod {
-  P2P = 1,
+  QPAY = 1,
   CASH = 2,
   BANK = 3,
   CARD = 4,

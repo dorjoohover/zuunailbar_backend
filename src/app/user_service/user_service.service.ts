@@ -132,32 +132,25 @@ export class UserServiceService {
   }
 
   private async getServiceArtists(input: any) {
-    const { services, branch_id, order_date, start_time } = input;
+    const { services, branch_id } = input;
 
     const mapping: Record<string, string[]> = {};
-    for (const service of services) {
+    const uniqueServices: string[] = Array.from(
+      new Set((services ?? []).filter((service): service is string => !!service)),
+    );
+
+    for (const serviceId of uniqueServices) {
       const { items } = await this.dao.list({
         branch_id,
-        service_id: service,
+        service_id: serviceId,
+        status: STATUS.Active,
+        limit: -1,
+        page: 0,
+        skip: 0,
+        sort: false,
       });
 
-      const availableArtists: string[] = [];
-
-      for (const item of items) {
-        const orders = await this.dao.checkUsersOrder(
-          item.user_id,
-          order_date,
-          start_time,
-        );
-
-        const isBusy = orders.length > 0;
-
-        if (!isBusy) {
-          availableArtists.push(item.user_id);
-        }
-      }
-
-      mapping[service] = availableArtists;
+      mapping[serviceId] = [...new Set(items.map((item) => item.user_id))];
     }
 
     return mapping;
