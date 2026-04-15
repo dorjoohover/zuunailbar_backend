@@ -310,9 +310,10 @@ export class UserService {
             userSalary.percent == body.percent
           )
             return;
-          await this.userSalary.update(userSalary.id, {
-            salary_status: SalaryStatus.INACTIVE,
-          });
+          await this.userSalary.updateSalaryStatus(
+            userSalary.id,
+            SalaryStatus.INACTIVE,
+          );
         }
         await this.userSalary.create({
           duration: body.salary_day,
@@ -360,5 +361,25 @@ export class UserService {
   }
   public async updatePercent(id: string, percent: number) {
     return await this.dao.updatePercent(id, percent);
+  }
+  public async updateSalaryInfo(
+    id: string,
+    salaryDay?: number,
+    percent?: number,
+  ) {
+    const body: { id: string; salary_day?: number; percent?: number } = { id };
+    const attrs: string[] = [];
+
+    if (salaryDay !== undefined && salaryDay !== null) {
+      body.salary_day = salaryDay;
+      attrs.push('salary_day');
+    }
+    if (percent !== undefined && percent !== null) {
+      body.percent = percent;
+      attrs.push('percent');
+    }
+
+    if (!attrs.length) return 0;
+    return await this.dao.update(body, attrs);
   }
 }

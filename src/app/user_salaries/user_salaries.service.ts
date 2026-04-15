@@ -14,22 +14,32 @@ export class UserSalariesService {
     @Inject(forwardRef(() => UserService))
     private user: UserService,
   ) {}
-  public async create(dto: UserSalaryDto) {
-    const us = await this.dao.getByUser(dto.user_id, dto.status);
-    if (!us && us.length > 0) {
-      const user = us[0];
-      return await this.update(user.id, {
-        salary_status: SalaryStatus.ACTIVE,
-      });
-    }
-    const res = await this.dao.add({
-      duration: dto.duration,
+
+  private buildActiveLog(dto: Partial<UserSalaryDto>, fallback?: any) {
+    return {
+      duration: dto.duration ?? fallback?.duration,
       id: AppUtils.uuid4(),
-      percent: dto.percent,
-      status: dto.status ?? STATUS.Active,
-      user_id: dto.user_id,
-      salary_status: dto.salary_status,
-    });
+      percent: dto.percent ?? fallback?.percent,
+      status: dto.status ?? fallback?.status ?? STATUS.Active,
+      user_id: dto.user_id ?? fallback?.user_id,
+      salary_status: SalaryStatus.ACTIVE,
+      updated_at: new Date(),
+    };
+  }
+
+  private async syncUserSalarySnapshot(data: {
+    user_id?: string;
+    duration?: number;
+    percent?: number;
+  }) {
+    if (!data.user_id) return;
+    await this.user.updateSalaryInfo(data.user_id, data.duration, data.percent);
+  }
+
+  public async create(dto: UserSalaryDto) {
+    const data = this.buildActiveLog(dto);
+    const res = await this.dao.addActiveLog(data);
+    await this.syncUserSalarySnapshot(data);
     return res;
   }
 
@@ -69,11 +79,25 @@ export class UserSalariesService {
   }
 
   public async update(id: string, dto: any) {
-    return await this.dao.update({ ...dto, id }, [...getDefinedKeys(dto)]);
+    const keys = getDefinedKeys(dto);
+    if (keys.length === 1 && keys[0] === 'salary_status') {
+      return await this.dao.updateSalaryStatus(id, dto.salary_status);
+    }
+
+    const current = await this.dao.getById(id);
+    if (!current) return 0;
+
+    const data = this.buildActiveLog(dto, current);
+    const res = await this.dao.addActiveLog(data, id);
+    await this.syncUserSalarySnapshot(data);
+    return res;
   }
 
   public async updateUserSalaryStatus(id: string, status: number) {
     return await this.dao.updateStatus(id, status);
+  }
+  public async updateSalaryStatus(id: string, status: SalaryStatus) {
+    return await this.dao.updateSalaryStatus(id, status);
   }
   public async updateStatus(id: string) {
     return await this.dao.updateStatus(id, STATUS.Hidden);

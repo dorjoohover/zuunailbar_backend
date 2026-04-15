@@ -19,6 +19,7 @@ import {
   OrderStatus,
   PAYMENT_STATUS,
   PaymentMethod,
+  SALARY_LOG_STATUS,
   STARTTIME,
   STATUS,
   timeToDecimal,
@@ -46,6 +47,7 @@ import { IntegrationService } from '../integrations/integrations.service';
 import { PaymentService } from '../payment/payment.service';
 import { OrderLogDao } from './order.log.dao';
 import { AppDB } from 'src/core/db/pg/app.db';
+import { AuthService } from 'src/auth/auth.service';
 
 @Injectable()
 export class OrderService {
@@ -54,6 +56,8 @@ export class OrderService {
   private bronze = 10;
   private silver = 20;
   private gold = 30;
+  private pendingCleanupPromise?: Promise<void>;
+  private lastPendingCleanupAt = 0;
   constructor(
     private readonly dao: OrdersDao,
     private readonly orderDetail: OrderDetailService,
@@ -64,6 +68,7 @@ export class OrderService {
     private userService: UserServiceService,
     private integrationService: IntegrationService,
     private orderLog: OrderLogDao,
+    private authService: AuthService,
     // @Inject(forwardRef(() => PaymentService))
     private payment: PaymentService,
     private readonly db: AppDB,
@@ -119,6 +124,8 @@ export class OrderService {
   }
 
   public async getSlots(pg: PaginationDto) {
+    await this.reconcilePendingOrdersForSlots();
+
     const { parallel, branch_id, services, date, time } = pg;
     let artists = [];
     let result: Slot[] = [];
@@ -204,6 +211,32 @@ export class OrderService {
       }
     }
     return validSlots;
+  }
+  private async reconcilePendingOrdersForSlots() {
+    const now = Date.now();
+
+    if (this.pendingCleanupPromise) {
+      await this.pendingCleanupPromise;
+      return;
+    }
+
+    if (now - this.lastPendingCleanupAt < 30 * 1000) {
+      return;
+    }
+
+    this.pendingCleanupPromise = this.checkOrders()
+      .catch((error) => {
+        console.error(
+          'Pending order reconciliation before slot lookup failed:',
+          error,
+        );
+      })
+      .finally(() => {
+        this.lastPendingCleanupAt = Date.now();
+        this.pendingCleanupPromise = undefined;
+      });
+
+    await this.pendingCleanupPromise;
   }
   private isOverlapping(startA: Date, endA: Date, startB: Date, endB: Date) {
     return startA < endB && endA > startB;
@@ -489,13 +522,11 @@ export class OrderService {
         })),
       });
 
-      let invoice:
-        | {
-            invoice_id: string;
-            qr_image?: string;
-            qr_text?: string;
-          }
-        | null = null;
+      let invoice: {
+        invoice_id: string;
+        qr_image?: string;
+        qr_text?: string;
+      } | null = null;
       if (preMethod == PaymentMethod.QPAY && orderPreAmount > 0) {
         try {
           invoice = await this.qpay.createInvoice(
@@ -917,6 +948,13 @@ export class OrderService {
           order_status,
         });
         await this.orderDetail.updateStatusByOrder(r.id, order_status);
+        const mobile = MobileParser(r.mobile);
+        const date = mnDate(r.order_date);
+        const time = r.start_time ? r.start_time?.slice(0, 5) : '';
+        await this.authService.sendCancelWarning(mobile, {
+          order_date: date,
+          time: time,
+        });
       }),
     );
   }
@@ -1207,134 +1245,126 @@ export class OrderService {
     param?: string,
     endDateParam?: string,
   ) {
-    const date = this.isFullDate(param) ? param : undefined;
-    const end_date = this.isFullDate(endDateParam) ? endDateParam : undefined;
+    try {
+      const date = this.isFullDate(param) ? param : undefined;
+      const end_date = this.isFullDate(endDateParam) ? endDateParam : undefined;
 
-    const orders = await this.find(
-      {
-        limit: 1000,
-        skip: 0,
-        sort: false,
-        date: date,
-        end_date,
-      },
-      ADMIN,
-    );
+      const orders = await this.find(
+        {
+          limit: -1,
+          skip: 0,
+          sort: false,
+          date: date,
+          end_date,
+          order_status: OrderStatus.Finished,
+        },
+        ADMIN,
+      );
 
-    const items = await Promise.all(
-      orders.items.map(async (order) => {
-        let status = order.order_status;
-
-        if (status == OrderStatus.Active) {
-          await this.finalizeOrderForProcessing(order.id, approver);
-          status = OrderStatus.Finished;
-        }
-
-        if (order.salary_date) return;
-
-        if (status == OrderStatus.Finished || status == OrderStatus.Friend) {
+      const items = await Promise.all(
+        orders.items.map(async (order) => {
           await this.dao.updateSalaryProcessStatus(order.id, new Date());
-          return {
-            ...order,
-            order_status: status,
-          };
+          return order;
+        }),
+      );
+      const confirmedOrders = items?.filter((i) => i !== undefined) ?? [];
+      type UserSalaryInfo = {
+        amount: number; // нийт цалин
+        pay_date: string; // тухайн мөчлөгийн цалин олгох өдөр
+        day: number; // цалин авах өдөр (5 | 20)
+        order_ids: Set<string>; // давхардалгүй захиалгын тоо
+        salary_status: number;
+      };
+
+      const users = new Map<string, UserSalaryInfo>();
+      const userCache = new Map<
+        string,
+        { id: string; day: number; percent: number }
+      >();
+
+      for (const order of confirmedOrders) {
+        // if (order.order_status !== OrderStatus.Finished) {
+        //   const customer = order.customer_id;
+        //   if (customer) this.checkLevel(customer);
+        //   continue;
+        // }
+
+        const details = await this.orderDetail.findByOrder(order.id);
+        if (!details?.length) continue;
+
+        for (const detail of details) {
+          if (!detail.user_id) continue;
+          // 🔹 Хэрэглэгчийн мэдээлэл cache-ээс шалгах
+          let currentUser = userCache.get(detail.user_id);
+          if (!currentUser) {
+            const fetchedUser = await this.user.findOne(detail.user_id);
+            if (!fetchedUser) continue;
+
+            currentUser = {
+              id: fetchedUser.id,
+              day: this.normalizeSalaryDay(fetchedUser.salary_day),
+              percent: Number(fetchedUser.percent ?? 0),
+            };
+            userCache.set(detail.user_id, currentUser);
+          }
+
+          const payDate = this.resolveSalaryPayDate(
+            order.order_date,
+            currentUser.day,
+          );
+          const groupKey = `${detail.user_id}:${payDate}`;
+
+          if (!users.has(groupKey)) {
+            users.set(groupKey, {
+              amount: 0,
+              pay_date: payDate,
+              day: currentUser.day,
+              order_ids: new Set<string>(),
+              salary_status: order.salary_status ?? SALARY_LOG_STATUS.Pending,
+            });
+          }
+
+          const userData = users.get(groupKey)!;
+          const amount = this.calculateSalaryAmount(
+            Number(detail.price ?? 0),
+            currentUser.percent,
+          );
+
+          if (amount > 0) {
+            userData.amount += amount;
+          }
+
+          userData.order_ids.add(order.id);
+          userData.salary_status =
+            order.salary_status ?? userData.salary_status;
         }
-      }),
-    );
-    const confirmedOrders = items?.filter((i) => i !== undefined) ?? [];
-    type UserSalaryInfo = {
-      amount: number; // нийт цалин
-      pay_date: string; // тухайн мөчлөгийн цалин олгох өдөр
-      day: number; // цалин авах өдөр (5 | 20)
-      order_ids: Set<string>; // давхардалгүй захиалгын тоо
-      salary_status: number;
-    };
 
-    const users = new Map<string, UserSalaryInfo>();
-    const userCache = new Map<
-      string,
-      { id: string; day: number; percent: number }
-    >();
-
-    for (const order of confirmedOrders) {
-      if (order.order_status !== OrderStatus.Finished) {
         const customer = order.customer_id;
         if (customer) this.checkLevel(customer);
-        continue;
       }
-
-      const details = await this.orderDetail.findByOrder(order.id);
-      if (!details?.length) continue;
-
-      for (const detail of details) {
-        if (!detail.user_id) continue;
-        // 🔹 Хэрэглэгчийн мэдээлэл cache-ээс шалгах
-        let currentUser = userCache.get(detail.user_id);
-        if (!currentUser) {
-          const fetchedUser = await this.user.findOne(detail.user_id);
-          if (!fetchedUser) continue;
-
-          currentUser = {
-            id: fetchedUser.id,
-            day: this.normalizeSalaryDay(fetchedUser.salary_day),
-            percent: Number(fetchedUser.percent ?? 0),
-          };
-          userCache.set(detail.user_id, currentUser);
-        }
-
-        const payDate = this.resolveSalaryPayDate(
-          order.order_date,
-          currentUser.day,
-        );
-        const groupKey = `${detail.user_id}:${payDate}`;
-
-        if (!users.has(groupKey)) {
-          users.set(groupKey, {
-            amount: 0,
-            pay_date: payDate,
-            day: currentUser.day,
-            order_ids: new Set<string>(),
-            salary_status: order.salary_status,
-          });
-        }
-
-        const userData = users.get(groupKey)!;
-        const amount = this.calculateSalaryAmount(
-          Number(detail.price ?? 0),
-          currentUser.percent,
-        );
-
-        if (amount > 0) {
-          userData.amount += amount;
-        }
-
-        userData.order_ids.add(order.id);
-        userData.salary_status = order.salary_status;
-      }
-
-      const customer = order.customer_id;
-      if (customer) this.checkLevel(customer);
+      // 🧾 Salary Log-г бүгдийг нэг дор шинэчилнэ
+      await Promise.all(
+        [...users.entries()]
+          .filter(([, data]) => data.amount > 0)
+          .map(async ([groupKey, data]) => {
+            const [userId] = groupKey.split(':');
+            await this.integrationService.updateSalaryLog({
+              amount: data.amount,
+              approved_by: approver,
+              date: data.pay_date,
+              day: data.day,
+              order_count: data.order_ids.size,
+              salary_status: data.salary_status ?? SALARY_LOG_STATUS.Pending,
+              artist_id: userId,
+            });
+          }),
+      );
+      return {
+        count: confirmedOrders.length,
+      };
+    } catch (error) {
+      console.log(error);
     }
-    // 🧾 Salary Log-г бүгдийг нэг дор шинэчилнэ
-    await Promise.all(
-      [...users.entries()]
-        .filter(([, data]) => data.amount > 0)
-        .map(async ([groupKey, data]) => {
-          const [userId] = groupKey.split(':');
-          await this.integrationService.updateSalaryLog({
-            amount: data.amount,
-            approved_by: approver,
-            date: data.pay_date,
-            day: data.day,
-            order_count: data.order_ids.size,
-            salary_status: data.salary_status,
-            artist_id: userId,
-          });
-        }),
-    );
-    return {
-      count: confirmedOrders.length,
-    };
   }
   public async level() {
     return {

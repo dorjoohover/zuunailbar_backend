@@ -31,10 +31,23 @@ export class IntegrationService {
     return mnDate(date);
   }
 
+  private normalizeSalaryStatus(
+    status?: number | string | null,
+    fallback = SALARY_LOG_STATUS.Pending,
+  ) {
+    if (status === undefined || status === null || status === '') {
+      return fallback;
+    }
+
+    const value = Number(status);
+    return Number.isFinite(value) ? value : fallback;
+  }
+
   private normalizeDto(dto: IntegrationDto) {
     return {
       ...dto,
       date: this.normalizeDate(dto.date),
+      salary_status: this.normalizeSalaryStatus(dto.salary_status),
     };
   }
 
@@ -389,6 +402,10 @@ export class IntegrationService {
       dto.artist_id,
       normalizedDate,
     );
+    const salaryStatus = this.normalizeSalaryStatus(
+      dto.salary_status,
+      salary?.salary_status ?? SALARY_LOG_STATUS.Pending,
+    );
 
     if (salary) {
       const { amount, id, order_count } = salary;
@@ -398,12 +415,12 @@ export class IntegrationService {
         date: normalizedDate,
         order_count: +order_count + +dto.order_count,
         artist_id: dto.artist_id,
-        salary_status: dto.salary_status,
+        salary_status: salaryStatus,
       });
     } else {
       await this.create({
         amount: +dto.amount,
-        salary_status: dto.salary_status,
+        salary_status: salaryStatus,
         approved_by: dto.approved_by,
         date: normalizedDate,
         order_count: +dto.order_count,

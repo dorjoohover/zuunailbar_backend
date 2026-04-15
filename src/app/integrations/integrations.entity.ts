@@ -7,6 +7,7 @@ export class Integration {
   status: number;
   salary_id?: string;
   order_count: number;
+  salary_status: number;
   created_at?: Date;
   approved_at?: Date;
 }

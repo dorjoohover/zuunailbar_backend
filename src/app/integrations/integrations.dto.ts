@@ -3,7 +3,7 @@ export class IntegrationDto {
   approved_by: string;
   date: Date | string;
   amount: number;
-  salary_status: number;
+  salary_status?: number;
   order_count: number;
 }
 
@@ -12,7 +12,7 @@ export class IntegrationLogDto {
   approved_by: string;
   date: Date | string;
   amount: number;
-  salary_status: number;
+  salary_status?: number;
   order_count: number;
   day: number;
 }

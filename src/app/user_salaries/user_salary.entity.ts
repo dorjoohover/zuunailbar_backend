@@ -6,4 +6,5 @@ export class UserSalary {
   public status: number;
   public salary_status?: number;
   public created_at?: Date;
+  public updated_at?: Date
 }

@@ -147,17 +147,17 @@ export class OrderController {
   async customerCount(@Param('id') id: string) {
     return this.orderService.getCustomerOrderCount(id);
   }
-  @Get('confirm')
+  @Post('confirm')
   @Admin()
   @PQ(['from', 'to'])
-  async confirmOrders(@Pagination() pg: PaginationDto, @Req() { user }) {
+  async confirmOrders(@Body() body: { from?: string; to?: string }, @Req() { user }) {
     return this.orderService.confirmSalaryProcessStatus(
       user.user.id,
-      pg.from,
-      pg.to,
+      body?.from,
+      body?.to,
     );
   }
-  @Get('confirm/:date')
+  @Post('confirm/:date')
   @Admin()
   @ApiParam({ name: 'date' })
   async confirmOrder(@Param('date') date: string, @Req() { user }) {

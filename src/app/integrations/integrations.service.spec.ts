@@ -36,7 +36,9 @@ jest.mock(
       getDefinedKeys: (obj: Record<string, unknown>) =>
         Object.keys(obj).filter((key) => obj[key] !== undefined),
       mnDate: toYmd,
-      SALARY_LOG_STATUS: {},
+      SALARY_LOG_STATUS: {
+        Pending: 10,
+      },
       SalaryLogValue: {
         10: 'Pending',
       },
@@ -173,6 +175,26 @@ describe('IntegrationService', () => {
         date: '2026-04-06',
       }),
       expect.arrayContaining(['date']),
+    );
+  });
+
+  it('defaults missing salary_status to pending when creating salary logs', async () => {
+    dao.getByArtistAndDate.mockResolvedValue(null);
+    dao.add.mockResolvedValue('integration-1');
+
+    await service.updateSalaryLog({
+      artist_id: 'artist-1',
+      approved_by: 'admin-1',
+      date: '2026-04-27',
+      amount: 50000,
+      order_count: 1,
+      day: 5,
+    });
+
+    expect(dao.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        salary_status: 10,
+      }),
     );
   });
 

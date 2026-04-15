@@ -5,11 +5,11 @@ export class UserSalaryDto {
   user_id: string;
 
   @ApiProperty()
-  status: number;
+  status?: number;
   @ApiProperty()
-  salary_status: number;
+  salary_status?: number;
   @ApiProperty()
-  duration: number;
+  duration?: number;
   @ApiProperty()
-  percent: number;
+  percent?: number;
 }

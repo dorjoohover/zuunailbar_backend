@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { OrderStatus, PAYMENT_STATUS, STATUS, ubDateAt00 } from 'src/base/constants';
+import {
+  OrderStatus,
+  PAYMENT_STATUS,
+  STATUS,
+  ubDateAt00,
+} from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Order } from './order.entity';
@@ -91,11 +96,7 @@ export class OrdersDao {
     );
   }
 
-  async updatePaidDate(
-    id: string,
-    date: Date | null,
-    type: string | null,
-  ) {
+  async updatePaidDate(id: string, date: Date | null, type: string | null) {
     return await this._db._update(
       `UPDATE ${tableName} set "paid_at"=$1 , "transaction_type"=$2 where "id"=$3`,
       [date, type, id],
@@ -136,10 +137,14 @@ export class OrdersDao {
   async getCancelOrders() {
     return this._db.select(
       `
-    SELECT *
-    FROM "${tableName}"
-    WHERE order_status = $1
-      AND created_at < now() - interval '10 minutes' and status = ${STATUS.Active}
+    SELECT 
+      o.*,
+            u.mobile as mobile
+    FROM "${tableName}" o
+    INNER JOIN users u ON u.id = o.customer_id
+    WHERE o.order_status = $1
+      AND o.created_at < now() - interval '2 minutes'
+      AND o.status = ${STATUS.Active}
     `,
       [OrderStatus.Pending],
     );

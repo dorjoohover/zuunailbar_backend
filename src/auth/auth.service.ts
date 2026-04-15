@@ -13,7 +13,10 @@ import { ADMIN, CLIENT } from 'src/base/constants';
 import { AuthError, BadRequest } from 'src/common/error';
 import axios from 'axios';
 import { ResendService } from './resend.service';
-
+type CancelWarningPayload = {
+  order_date?: string;
+  time?: string
+};
 @Injectable()
 export class AuthService {
   constructor(
@@ -180,25 +183,58 @@ export class AuthService {
       return false;
     }
   }
-  async sendOtp(mobile: string) {
-    try {
-      const otp = this.generateOtp();
-      this.otps[mobile] = otp;
-      const text = `Your OTP code is: ${otp}\n
-                    Thank you.`;
-      const url = `${process.env.TELCOCOM_URL}?tenantId=${process.env.TELCOCOM}&fromNumber=${process.env.FROM_NUMBER}&toNumber=${mobile}&sms=${text}`;
-      const res = await axios.get(url, {
-        headers: {
-          'telco-auth-token': process.env.TELCOCOM_TOKEN,
-        },
-      });
-      const { result, message, data } = res.data;
-      return true;
-    } catch (error) {
+
+
+private async sendSms(mobile: string, text: string): Promise<boolean> {
+  try {
+    const res = await axios.get(process.env.TELCOCOM_URL!, {
+      params: {
+        tenantId: process.env.TELCOCOM,
+        fromNumber: process.env.FROM_NUMBER,
+        toNumber: mobile,
+        sms: text,
+      },
+      headers: {
+        'telco-auth-token': process.env.TELCOCOM_TOKEN,
+      },
+    });
+
+    const { result, message } = res.data ?? {};
+
+    if (result !== true) {
+      console.error('SMS илгээхэд API алдаа өглөө:', message);
       return false;
     }
-  }
 
+    return true;
+  } catch (error) {
+    console.error('SMS илгээхэд exception гарлаа:', error);
+    return false;
+  }
+}
+
+async sendOtp(mobile: string): Promise<boolean> {
+  const otp = this.generateOtp();
+  this.otps[mobile] = otp;
+
+  const text = [
+    `Your OTP code is: ${otp}`,
+    'Thanks.',
+  ].join('\n');
+
+  return this.sendSms(mobile, text);
+}
+
+async sendCancelWarning(
+  mobile: string,
+  payload: CancelWarningPayload,
+): Promise<boolean> {
+  const datePart = payload.order_date ? ` ${payload.order_date}` : '';
+  const timePart = payload.time ? ` ${payload.time}` : '';
+
+ const text = `Tanii ${datePart} ${timePart} zahialga uridchilgaa tulbur tulj batalgaajuulaagui tul tsutslagdlaa. Bayarlalaa`;
+  return this.sendSms(mobile, text);
+}
   async checkOtp(otp: string, mobile: string) {
     return this.otps[mobile] && this.otps[mobile] == otp;
   }

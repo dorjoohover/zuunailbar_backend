@@ -22,6 +22,13 @@ jest.mock('../integrations/integrations.service', () => ({
 jest.mock('../payment/payment.service', () => ({
   PaymentService: class {},
 }));
+jest.mock(
+  'src/auth/auth.service',
+  () => ({
+    AuthService: class {},
+  }),
+  { virtual: true },
+);
 jest.mock('./order.log.dao', () => ({
   OrderLogDao: class {},
 }));
@@ -76,6 +83,9 @@ jest.mock(
       Pending: 10,
       Active: 20,
       Cancelled: 50,
+    },
+    SALARY_LOG_STATUS: {
+      Pending: 10,
     },
     PaymentMethod: {
       P2P: 1,
@@ -198,6 +208,9 @@ describe('OrderService', () => {
   let payment: {
     syncManualPayments: jest.Mock;
   };
+  let authService: {
+    findOne?: jest.Mock;
+  };
   let db: {
     withTransaction: jest.Mock;
   };
@@ -264,6 +277,8 @@ describe('OrderService', () => {
       }),
     };
 
+    authService = {};
+
     db = {
       withTransaction: jest.fn().mockImplementation(async (fn) =>
         fn({ query: jest.fn() }),
@@ -280,6 +295,7 @@ describe('OrderService', () => {
       userService as any,
       integrationService as any,
       orderLog as any,
+      authService as any,
       payment as any,
       db as any,
     );
@@ -289,9 +305,8 @@ describe('OrderService', () => {
         {
           id: 'order-1',
           order_date: '2026-04-09',
-          order_status: OrderStatus.Active,
+          order_status: OrderStatus.Finished,
           salary_date: null,
-          salary_status: 10,
           customer_id: 'customer-1',
         },
       ],
@@ -311,7 +326,7 @@ describe('OrderService', () => {
     jest.clearAllMocks();
   });
 
-  it('finishes active orders before salary confirmation and aggregates their salary', async () => {
+  it('aggregates finished orders without changing their order status', async () => {
     orderDetail.findByOrder.mockResolvedValue([
       {
         user_id: 'artist-1',
@@ -329,22 +344,9 @@ describe('OrderService', () => {
       '2026-04-09',
     );
 
-    expect(orderLog.add).toHaveBeenCalledWith(
-      expect.objectContaining({
-        changed_by: 'admin-1',
-        order_id: 'order-1',
-        old_order_status: OrderStatus.Active,
-        new_order_status: OrderStatus.Finished,
-      }),
-    );
-    expect(dao.updateOrderStatus).toHaveBeenCalledWith(
-      'order-1',
-      OrderStatus.Finished,
-    );
-    expect(orderDetail.updateStatusByOrder).toHaveBeenCalledWith(
-      'order-1',
-      OrderStatus.Finished,
-    );
+    expect(orderLog.add).not.toHaveBeenCalled();
+    expect(dao.updateOrderStatus).not.toHaveBeenCalled();
+    expect(orderDetail.updateStatusByOrder).not.toHaveBeenCalled();
     expect(dao.updateSalaryProcessStatus).toHaveBeenCalledWith(
       'order-1',
       expect.any(Date),
@@ -363,6 +365,37 @@ describe('OrderService', () => {
     expect(result).toEqual(
       expect.objectContaining({
         count: 1,
+      }),
+    );
+  });
+
+  it('does not salary-process active orders when closing orders', async () => {
+    jest.spyOn(service, 'find').mockResolvedValueOnce({
+      items: [
+        {
+          id: 'order-active',
+          order_date: '2026-04-09',
+          order_status: OrderStatus.Active,
+          salary_date: null,
+          customer_id: 'customer-1',
+        },
+      ],
+      count: 1,
+    } as any);
+
+    const result = await service.confirmSalaryProcessStatus(
+      'admin-1',
+      '2026-04-09',
+    );
+
+    expect(orderLog.add).not.toHaveBeenCalled();
+    expect(dao.updateOrderStatus).not.toHaveBeenCalled();
+    expect(orderDetail.updateStatusByOrder).not.toHaveBeenCalled();
+    expect(dao.updateSalaryProcessStatus).not.toHaveBeenCalled();
+    expect(integrationService.updateSalaryLog).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        count: 0,
       }),
     );
   });
