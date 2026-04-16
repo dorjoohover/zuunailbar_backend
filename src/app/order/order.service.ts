@@ -273,6 +273,22 @@ export class OrderService {
 
     return true;
   }
+  private normalizeDurationMinutes(value?: number | string | null) {
+    const minutes = Number(value ?? 0);
+    if (!Number.isFinite(minutes) || minutes <= 0) return 0;
+
+    return Math.ceil(minutes / 30) * 30;
+  }
+  private addDurationToTimeString(
+    startTime: Date | string,
+    durationMinutes: number,
+  ) {
+    const normalizedStartTime = this.normalizeTimeValue(startTime);
+    const normalizedDuration = this.normalizeDurationMinutes(durationMinutes);
+    const end = timeToDecimal(normalizedStartTime) + normalizedDuration / 60;
+
+    return toTimeString(Math.floor(end), end % 1 !== 0);
+  }
   private combineDateTime(date: Date, time: string) {
     const d = new Date(date);
 
@@ -398,38 +414,35 @@ export class OrderService {
 
       const orderDate = toYMD(new Date(dto.order_date));
       let pre = 0;
-      let duration = admin && dto.duration ? +dto.duration : 0;
+      const detailConfigs: Array<{
+        detail: OrderDetailDto;
+        service: any;
+        duration: number;
+      }> = [];
       for (const detail of dto.details ?? []) {
         const service = serviceMap.get(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
         if (+(service.pre ?? '0') > pre) pre = +service.pre;
-        const d = +(detail.duration ?? service.duration ?? '0');
-        if (parallel) {
-          duration = duration < d ? d : duration;
-        } else {
-          duration += d;
-        }
+        detailConfigs.push({
+          detail,
+          service,
+          duration: this.normalizeDurationMinutes(
+            detail.duration ?? service.duration ?? '0',
+          ),
+        });
       }
+      const duration = parallel
+        ? Math.max(0, ...detailConfigs.map((detail) => detail.duration))
+        : detailConfigs.reduce((sum, detail) => sum + detail.duration, 0);
       if (admin && dto.pre_amount) {
         pre = +dto.pre_amount;
       }
       const orderPreAmount = canManagePreAmount
         ? +(dto.pre_amount ?? pre ?? 0)
         : +(pre ?? 0);
-      const durationHours = duration / 60; // 👈 хамгийн зөв
-
-      const startHour = timeToDecimal(dto.start_time.toString()); // ж: 12.5
-      const endHourRaw = startHour + durationHours;
-      const endHour = endHourRaw;
-
-      const start_time = toTimeString(
-        Math.floor(startHour),
-        startHour % 1 != 0,
-      );
-
-      const end_time = dto.end_time
-        ? dto.end_time
-        : toTimeString(Math.floor(endHour), endHour % 1 != 0);
+      const start_time = this.normalizeTimeValue(dto.start_time.toString());
+      const startHour = timeToDecimal(start_time);
+      const end_time = this.addDurationToTimeString(start_time, duration);
       // 4) DB-д TIME талбар руу "HH:00:00" гэх мэтээр бичнэ
       const order_status =
         user.role == ADMIN
@@ -480,19 +493,10 @@ export class OrderService {
       }
       let startDate = startHour;
       const orderDetails = [];
-      for (const d of dto.details ?? []) {
-        const service = serviceMap.get(d.service_id);
-        if (!service) throw new BadRequest().notFound('Үйлчилгээ');
-        const artist = await this.user.findOne(d.user_id);
-
-        const duration =
-          admin && dto.duration
-            ? Math.ceil(
-                (+dto.duration / (parallel ? 1 : dto.details.length) / 60) * 2,
-              ) / 2
-            : Math.ceil((+service.duration / 60) * 2) / 2;
-
-        const endDate = startDate + duration;
+      for (const { detail, service, duration } of detailConfigs) {
+        const artist = await this.user.findOne(detail.user_id);
+        const durationHours = duration / 60;
+        const endDate = startDate + durationHours;
         orderDetails.push({
           id: AppUtils.uuid4(),
           start_time: toTimeString(Math.floor(startDate), startDate % 1 != 0),
@@ -500,13 +504,13 @@ export class OrderService {
           service_id: service.id,
           order_date: orderDate,
           service_name: service.name,
-          price: d.price,
-          duration: service.duration,
+          price: detail.price,
+          duration: duration,
           nickname: artist.nickname,
-          description: d.description,
+          description: detail.description,
           status: order_status,
           view_status: STATUS.Active,
-          user_id: artist.id ?? d.user_id,
+          user_id: artist.id ?? detail.user_id,
         });
 
         if (dto.parallel !== true) startDate = endDate;
@@ -974,21 +978,6 @@ export class OrderService {
       if (!order) return;
       if (details.length <= 0) this.orderError.serviceNotSelected;
 
-      const start_time = timeToDecimal(dto.start_time.toString());
-      const orderDuration = parallel
-        ? Math.max(...details.map((d) => d.duration))
-        : details.reduce((sum, d) => sum + (d.duration ?? 0), 0);
-      // ⏱ end_time auto calculate
-      if (!payload.end_time) {
-        const hasHalfHour = start_time % 1 !== 0;
-        const duration = +orderDuration + (hasHalfHour ? 30 : 0);
-
-        payload.end_time = toTimeString(
-          Math.floor(start_time + Math.ceil(duration / 60)),
-          hasHalfHour,
-        );
-      }
-
       // 💰 PAYMENT LOGIC
       const canManagePreAmount = role < MANAGER;
       const preservedPreAmount = +(order.pre_amount ?? 0);
@@ -1028,7 +1017,12 @@ export class OrderService {
       const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
       const incomingIds = details.filter((d) => d.id).map((d) => d.id);
       const orderDetailDate = order_date ?? order.order_date;
-      let startDate = start_time;
+      const resolvedStartTime = this.normalizeTimeValue(
+        `${dto.start_time ?? order.start_time}`,
+      );
+      const startTimeDecimal = timeToDecimal(resolvedStartTime);
+      let startDate = startTimeDecimal;
+      const normalizedDurations: number[] = [];
       const detailPayloads: Array<{
         detail: OrderDetailDto;
         prev: any;
@@ -1039,11 +1033,16 @@ export class OrderService {
       for (const detail of details) {
         const prev = detail.id ? existingMap.get(detail.id) : null;
         const service = await this.service.findOne(detail.service_id);
-        const duration = Number(detail.duration ?? +service.duration) / 60;
+        const durationMinutes = this.normalizeDurationMinutes(
+          detail.duration ?? +service.duration,
+        );
+        const duration = durationMinutes / 60;
         const endDate = startDate + duration;
+        normalizedDurations.push(durationMinutes);
 
         const detailPayload: any = {
           ...detail,
+          duration: durationMinutes,
           start_time: toTimeString(Math.floor(startDate), startDate % 1 !== 0),
           end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
           status: status,
@@ -1065,11 +1064,21 @@ export class OrderService {
         });
 
         if (parallel) {
-          startDate = start_time;
+          startDate = startTimeDecimal;
         } else {
           startDate = endDate;
         }
       }
+
+      const orderDuration = parallel
+        ? Math.max(0, ...normalizedDurations)
+        : normalizedDurations.reduce((sum, duration) => sum + duration, 0);
+      payload.start_time = resolvedStartTime;
+      payload.duration = orderDuration;
+      payload.end_time = this.addDurationToTimeString(
+        resolvedStartTime,
+        orderDuration,
+      );
 
       await this.validateShiftFinishBoundaries({
         branch_id: payload.branch_id ?? order.branch_id,
@@ -1263,6 +1272,9 @@ export class OrderService {
 
       const items = await Promise.all(
         orders.items.map(async (order) => {
+          if (order.order_status !== OrderStatus.Finished) {
+            return undefined;
+          }
           await this.dao.updateSalaryProcessStatus(order.id, new Date());
           return order;
         }),

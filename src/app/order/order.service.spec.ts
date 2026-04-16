@@ -164,6 +164,7 @@ describe('OrderService', () => {
   let dao: {
     create: jest.Mock;
     clearPaidMeta: jest.Mock;
+    getCancelOrders: jest.Mock;
     updateTx: jest.Mock;
     updateOrderStatus: jest.Mock;
     updatePaidDate: jest.Mock;
@@ -219,6 +220,7 @@ describe('OrderService', () => {
     dao = {
       create: jest.fn(),
       clearPaidMeta: jest.fn(),
+      getCancelOrders: jest.fn().mockResolvedValue([]),
       updateTx: jest.fn(),
       updateOrderStatus: jest.fn(),
       updatePaidDate: jest.fn(),
@@ -571,6 +573,81 @@ describe('OrderService', () => {
     );
   });
 
+  it('keeps created order time aligned with normalized detail durations', async () => {
+    serviceConfig.getBookingConfigs.mockResolvedValue([
+      {
+        id: 'service-1',
+        duration: '90',
+        pre: '0',
+        name: 'Service 1',
+      },
+      {
+        id: 'service-2',
+        duration: '90',
+        pre: '0',
+        name: 'Service 2',
+      },
+    ]);
+    user.findOne.mockResolvedValue({
+      id: 'artist-1',
+      nickname: 'Artist 1',
+    });
+    dao.create.mockResolvedValue('order-created');
+
+    await service.create(
+      {
+        branch_id: 'branch-1',
+        customer_id: 'customer-1',
+        order_date: '2026-04-12',
+        start_time: '09:00:00',
+        order_status: OrderStatus.Active,
+        total_amount: 30000,
+        paid_amount: 30000,
+        pre_amount: 0,
+        details: [
+          {
+            service_id: 'service-1',
+            user_id: 'artist-1',
+            price: 15000,
+            duration: 105,
+          },
+          {
+            service_id: 'service-2',
+            user_id: 'artist-1',
+            price: 15000,
+            duration: 105,
+          },
+        ],
+      } as any,
+      {
+        id: 'admin-1',
+        role: 20,
+        mobile: '99999999',
+      } as any,
+      'merchant-1',
+    );
+
+    expect(dao.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        start_time: '09:00:00',
+        end_time: '13:00:00',
+        duration: 240,
+      }),
+      [
+        expect.objectContaining({
+          start_time: '09:00:00',
+          end_time: '11:00:00',
+          duration: 120,
+        }),
+        expect.objectContaining({
+          start_time: '11:00:00',
+          end_time: '13:00:00',
+          duration: 120,
+        }),
+      ],
+    );
+  });
+
   it('does not create client orders when prepayment amount is missing', async () => {
     serviceConfig.getBookingConfigs.mockResolvedValue([
       {
@@ -712,6 +789,78 @@ describe('OrderService', () => {
     expect(orderDetail.updateTx).toHaveBeenCalledTimes(2);
     expect(orderDetail.updateViewStatusTx.mock.invocationCallOrder[0]).toBeLessThan(
       orderDetail.updateTx.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('recalculates updated order time from normalized detail durations', async () => {
+    orderDetail.findByOrder.mockResolvedValue([
+      {
+        id: 'detail-1',
+        user_id: 'artist-1',
+        start_time: '09:00:00',
+        end_time: '11:00:00',
+      },
+      {
+        id: 'detail-2',
+        user_id: 'artist-1',
+        start_time: '11:00:00',
+        end_time: '13:00:00',
+      },
+    ]);
+    serviceConfig.findOne
+      .mockResolvedValueOnce({ duration: '90' })
+      .mockResolvedValueOnce({ duration: '90' });
+
+    await service.update(
+      'order-1',
+      {
+        branch_id: 'branch-1',
+        order_date: '2026-04-08',
+        order_status: OrderStatus.Active,
+        paid_amount: 0,
+        pre_amount: 0,
+        parallel: false,
+        start_time: '09:00:00',
+        details: [
+          {
+            id: 'detail-1',
+            service_id: 'service-1',
+            user_id: 'artist-1',
+            duration: 105,
+          },
+          {
+            id: 'detail-2',
+            service_id: 'service-2',
+            user_id: 'artist-1',
+            duration: 105,
+          },
+        ],
+      } as any,
+      'admin-1',
+      20,
+    );
+
+    expect(dao.updateTx.mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        id: 'order-1',
+        start_time: '09:00:00',
+        end_time: '13:00:00',
+        duration: 240,
+      }),
+    );
+    expect(orderDetail.updateTx.mock.calls[0][2]).toEqual(
+      expect.objectContaining({
+        duration: 120,
+        start_time: '09:00:00',
+        end_time: '11:00:00',
+      }),
+    );
+    expect(orderDetail.updateTx.mock.calls[1][2]).toEqual(
+      expect.objectContaining({
+        duration: 120,
+        start_time: '11:00:00',
+        end_time: '13:00:00',
+      }),
     );
   });
 
