@@ -143,7 +143,7 @@ export class OrdersDao {
     FROM "${tableName}" o
     INNER JOIN users u ON u.id = o.customer_id
     WHERE o.order_status = $1
-      AND o.created_at < now() - interval '2 minutes'
+      AND o.created_at < now() - interval '10 minutes'
       AND o.status = ${STATUS.Active}
     `,
       [OrderStatus.Pending],
