@@ -28,6 +28,9 @@ export class OrderDto {
   discount_type: number;
   @ApiProperty()
   discount: number;
+  voucher_id?: string;
+  voucher_name?: string;
+  voucher_value?: number;
   duration: number;
   @ApiProperty()
   parallel?: boolean;

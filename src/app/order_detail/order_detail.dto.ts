@@ -15,6 +15,9 @@ export class OrderDetailDto {
   nickname: string;
   @ApiProperty()
   price: number;
+  min_price?: number;
+  max_price?: number;
+  original_price?: number;
   @ApiProperty()
   duration: number;
   status: number;

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { UserDto } from './user.dto';
 import { UserDao } from './user.dao';
 import { AppUtils } from 'src/core/utils/app.utils';
@@ -37,6 +37,30 @@ export class UserService {
     private readonly branchService: BranchService,
     private readonly excel: ExcelService,
   ) {}
+  private getAllowedLevelsByRole(role?: number) {
+    if (role === CLIENT) {
+      return [UserLevel.BRONZE, UserLevel.SILVER, UserLevel.GOLD];
+    }
+
+    if (role != null && role >= MANAGER && role <= EMPLOYEE) {
+      return [UserLevel.JUNIOR, UserLevel.SENIOR];
+    }
+
+    return [];
+  }
+  private validateLevelForRole(role?: number, level?: number | null) {
+    if (level === undefined || level === null) return;
+
+    const allowed = this.getAllowedLevelsByRole(role);
+    if (!allowed.length) return;
+
+    if (!allowed.includes(level as UserLevel)) {
+      throw new HttpException(
+        'Сонгосон эрэмбэ тухайн хэрэглэгчийн төрөлд тохирохгүй байна.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
   public async create(
     dto: UserDto,
     merchant: string,
@@ -46,6 +70,8 @@ export class UserService {
     if (dto.role < EMPLOYEE && user.role === MANAGER)
       throw new NoPermissionException();
     if (!dto.password) BadRequest.required('Password');
+    const nextRole = dto.role ?? CLIENT;
+    this.validateLevelForRole(nextRole, dto.level ?? null);
     const mobile = MobileFormat(dto.mobile);
     let res;
     try {
@@ -70,7 +96,7 @@ export class UserService {
       merchant_id: merchant,
       password: password,
       added_by: user.id,
-      branch_id: dto.role === ADMIN ? null : branch_id,
+      branch_id: nextRole === ADMIN ? null : branch_id,
       branch_name: branch_id ? branch.name : null,
       birthday: new Date(dto.birthday),
       color: dto.color,
@@ -85,7 +111,7 @@ export class UserService {
       lastname: dto.lastname ?? '',
       nickname: dto.nickname ?? '',
       profile_img: dto.profile_img ?? '',
-      role: dto.role ?? CLIENT,
+      role: nextRole,
     });
     if (dto.salary_day || dto.percent || dto.date) {
       await this.userSalary.create({
@@ -206,6 +232,8 @@ export class UserService {
       [UserLevel.BRONZE]: 'Bronze',
       [UserLevel.SILVER]: 'Silver',
       [UserLevel.GOLD]: 'Gold',
+      [UserLevel.JUNIOR]: 'Junior',
+      [UserLevel.SENIOR]: 'Senior',
     } as Record<number, string>;
 
     const statusLabels = {
@@ -290,6 +318,9 @@ export class UserService {
   public async update(id: string, dto: UserDto) {
     try {
       const { ...body } = dto;
+      const currentUser = await this.findOne(id);
+      const nextRole = body.role ?? currentUser?.role;
+      this.validateLevelForRole(nextRole, body.level);
       body.id = id;
       if (body.password) {
         body.password = await bcrypt.hash(dto.password, saltOrRounds);
@@ -357,6 +388,8 @@ export class UserService {
     return res;
   }
   public async updateLevel(id: string, level: UserLevel) {
+    const user = await this.findOne(id);
+    this.validateLevelForRole(user?.role, level);
     return await this.dao.updateLevel(id, level);
   }
   public async updatePercent(id: string, percent: number) {

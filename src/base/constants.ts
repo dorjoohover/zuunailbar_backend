@@ -139,6 +139,11 @@ export enum VOUCHER {
   Price = 20,
   Service = 30,
 }
+export enum VoucherStatus {
+  Available = 10,
+  Used = 20,
+  Cancelled = 30,
+}
 export enum SCHEDULE_TYPE {
   Employee = 10,
   Branch = 20,
@@ -151,6 +156,10 @@ export const round = (value: number, round = 1000) => {
 export const DiscountValue = {
   [DISCOUNT.Percent]: 'Percent',
   [DISCOUNT.Price]: 'Price',
+};
+export const VoucherValue = {
+  [VOUCHER.Percent]: 'Percent',
+  [VOUCHER.Price]: 'Price',
 };
 export enum ScheduleStatus {
   Active = 10,
@@ -181,6 +190,8 @@ export enum UserLevel {
   BRONZE = 0,
   SILVER = 10,
   GOLD = 20,
+  JUNIOR = 100,
+  SENIOR = 110,
 }
 
 export enum OrderStatus {

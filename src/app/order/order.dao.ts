@@ -36,6 +36,11 @@ export class OrdersDao {
         'total_amount',
         'paid_amount',
         'description',
+        'discount',
+        'discount_type',
+        'voucher_id',
+        'voucher_name',
+        'voucher_value',
         'order_status',
       ]);
     } catch (error) {
@@ -43,34 +48,42 @@ export class OrdersDao {
     }
   }
 
+  async createTx(client: any, order: any, details: any) {
+    const orderId = await this._db.insertTx(client, tableName, order, [
+      'id',
+      'customer_id',
+      'duration',
+      'order_date',
+      'start_time',
+      'end_time',
+      'status',
+      'pre_amount',
+      'branch_id',
+      'is_pre_amount_paid',
+      'salary_date',
+      'created_by',
+      'total_amount',
+      'paid_amount',
+      'description',
+      'parallel',
+      'discount',
+      'discount_type',
+      'voucher_id',
+      'voucher_name',
+      'voucher_value',
+      'order_status',
+    ]);
+    for (const detail of details) {
+      await this.details.create(client, { ...detail, order_id: orderId });
+    }
+
+    return orderId;
+  }
+
   async create(order: any, details: any) {
     try {
       return this._db.withTransaction(async (client) => {
-        const orderId = await this._db.insertTx(client, tableName, order, [
-          'id',
-          'customer_id',
-          'duration',
-          'order_date',
-          'start_time',
-          'end_time',
-          'status',
-          'pre_amount',
-          'branch_id',
-          'is_pre_amount_paid',
-          'salary_date',
-          'created_by',
-          'total_amount',
-          'paid_amount',
-          'description',
-          'parallel',
-
-          'order_status',
-        ]);
-        for (const detail of details) {
-          await this.details.create(client, { ...detail, order_id: orderId });
-        }
-
-        return orderId;
+        return await this.createTx(client, order, details);
       });
     } catch (error) {
       console.error('Order transaction failed:', error);
@@ -465,9 +478,36 @@ WHERE key = 'availability_days';`;
 
   async getLimit() {
     const sql = `SELECT value
-FROM app_config
-WHERE key = 'availability_days';`;
+	FROM app_config
+	WHERE key = 'availability_days';`;
     return await this._db.select(sql, []);
+  }
+
+  async getAppConfigValues(keys: string[]) {
+    if (!keys.length) return [];
+
+    return await this._db.select(
+      `SELECT "key", "value" FROM app_config WHERE "key" = ANY($1::text[])`,
+      [keys],
+    );
+  }
+
+  async upsertAppConfigValues(entries: Array<{ key: string; value: number }>) {
+    if (!entries.length) return 0;
+
+    const values: Array<string | number> = [];
+    const placeholders = entries.map((entry, index) => {
+      const offset = index * 2;
+      values.push(entry.key, entry.value);
+      return `($${offset + 1}, $${offset + 2})`;
+    });
+
+    return await this._db._update(
+      `INSERT INTO app_config ("key", "value")
+       VALUES ${placeholders.join(', ')}
+       ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`,
+      values,
+    );
   }
 
   async customerCheck(customer_id: string): Promise<number> {

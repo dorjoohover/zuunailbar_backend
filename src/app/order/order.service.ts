@@ -48,14 +48,44 @@ import { PaymentService } from '../payment/payment.service';
 import { OrderLogDao } from './order.log.dao';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { AuthService } from 'src/auth/auth.service';
+import { VoucherService } from '../voucher/voucher.service';
+
+const CUSTOMER_USER_LEVELS = [
+  UserLevel.BRONZE,
+  UserLevel.SILVER,
+  UserLevel.GOLD,
+] as const;
+const EMPLOYEE_USER_LEVELS = [
+  UserLevel.JUNIOR,
+  UserLevel.SENIOR,
+] as const;
+const LEVEL_CONFIG_KEYS_BY_LEVEL: Record<number, string> = {
+  [UserLevel.BRONZE]: 'user_level_bronze',
+  [UserLevel.SILVER]: 'user_level_silver',
+  [UserLevel.GOLD]: 'user_level_gold',
+  [UserLevel.JUNIOR]: 'user_level_junior',
+  [UserLevel.SENIOR]: 'user_level_senior',
+};
+const LEVEL_CONFIG_DEFAULTS: Record<number, number> = {
+  [UserLevel.BRONZE]: 10,
+  [UserLevel.SILVER]: 20,
+  [UserLevel.GOLD]: 30,
+  [UserLevel.JUNIOR]: UserLevel.JUNIOR,
+  [UserLevel.SENIOR]: UserLevel.SENIOR,
+};
+
+type DetailConfig = {
+  detail: OrderDetailDto;
+  service: any;
+  duration: number;
+  basePrice: number;
+  finalPrice: number;
+};
 
 @Injectable()
 export class OrderService {
   private orderError = new OrderError();
   public orderLimit = 7;
-  private bronze = 10;
-  private silver = 20;
-  private gold = 30;
   private pendingCleanupPromise?: Promise<void>;
   private lastPendingCleanupAt = 0;
   constructor(
@@ -72,6 +102,7 @@ export class OrderService {
     // @Inject(forwardRef(() => PaymentService))
     private payment: PaymentService,
     private readonly db: AppDB,
+    private readonly voucher: VoucherService,
   ) {}
   public async canPlaceOrder(
     dto: Order,
@@ -279,6 +310,62 @@ export class OrderService {
 
     return Math.ceil(minutes / 30) * 30;
   }
+  private resolveDetailBasePrice(detail: OrderDetailDto, service: any) {
+    const candidates = [
+      detail.original_price,
+      detail.price,
+      (detail as any).min_price,
+      service?.min_price,
+      service?.price,
+    ];
+
+    for (const candidate of candidates) {
+      const value = Number(candidate ?? 0);
+      if (Number.isFinite(value) && value > 0) {
+        return value;
+      }
+    }
+
+    return 0;
+  }
+  private distributeDiscountAcrossDetails(
+    detailConfigs: DetailConfig[],
+    totalDiscount: number,
+  ) {
+    const subtotal = detailConfigs.reduce(
+      (sum, detail) => sum + Number(detail.basePrice ?? 0),
+      0,
+    );
+    const targetDiscount = Math.min(
+      Math.max(0, Number(totalDiscount ?? 0)),
+      subtotal,
+    );
+
+    if (targetDiscount <= 0 || subtotal <= 0) {
+      return detailConfigs.map((detail) => ({
+        ...detail,
+        finalPrice: Number(detail.basePrice ?? 0),
+      }));
+    }
+
+    let applied = 0;
+    return detailConfigs.map((detail, index) => {
+      const basePrice = Number(detail.basePrice ?? 0);
+      const isLast = index === detailConfigs.length - 1;
+      const share = isLast
+        ? targetDiscount - applied
+        : Math.min(
+            basePrice,
+            Math.round((basePrice / subtotal) * targetDiscount),
+          );
+      applied += share;
+
+      return {
+        ...detail,
+        finalPrice: Math.max(0, basePrice - share),
+      };
+    });
+  }
   private addDurationToTimeString(
     startTime: Date | string,
     durationMinutes: number,
@@ -377,6 +464,64 @@ export class OrderService {
   private async clearOrderPaidMeta(orderId: string) {
     await this.dao.clearPaidMeta(orderId);
   }
+  private async getLevelConfigMap() {
+    const rows = await this.dao.getAppConfigValues(
+      Object.values(LEVEL_CONFIG_KEYS_BY_LEVEL),
+    );
+    const valueByKey = new Map(
+      rows.map((row) => [row.key, Number(row.value ?? 0)]),
+    );
+    const missingEntries: Array<{ key: string; value: number }> = [];
+    const config = Object.entries(LEVEL_CONFIG_KEYS_BY_LEVEL).reduce(
+      (acc, [level, key]) => {
+        const numericLevel = Number(level);
+        const value = valueByKey.get(key);
+        const normalizedValue =
+          value != null && Number.isFinite(value)
+            ? value
+            : LEVEL_CONFIG_DEFAULTS[numericLevel];
+
+        if (!valueByKey.has(key)) {
+          missingEntries.push({
+            key,
+            value: normalizedValue,
+          });
+        }
+
+        acc[numericLevel] = normalizedValue;
+        return acc;
+      },
+      {} as Record<number, number>,
+    );
+
+    if (missingEntries.length) {
+      await this.dao.upsertAppConfigValues(missingEntries);
+    }
+
+    return config;
+  }
+  private normalizeLevelConfigPayload(dto: Record<string, any>) {
+    return Object.entries(LEVEL_CONFIG_KEYS_BY_LEVEL).reduce(
+      (acc, [level, key]) => {
+        const rawValue =
+          dto?.customer?.[level] ??
+          dto?.employee?.[level] ??
+          dto?.[level] ??
+          dto?.[Number(level)];
+
+        if (rawValue === undefined || rawValue === null || rawValue === '') {
+          return acc;
+        }
+
+        const value = Number(rawValue);
+        if (!Number.isFinite(value)) return acc;
+
+        acc.push({ key, value });
+        return acc;
+      },
+      [] as Array<{ key: string; value: number }>,
+    );
+  }
   public async updateOrderLimit(limit: number) {
     await this.dao.orderLimit(limit);
     // this.slot.updateOrderLimit(limit);
@@ -414,11 +559,8 @@ export class OrderService {
 
       const orderDate = toYMD(new Date(dto.order_date));
       let pre = 0;
-      const detailConfigs: Array<{
-        detail: OrderDetailDto;
-        service: any;
-        duration: number;
-      }> = [];
+      const customerId = dto.customer_id ?? user.id;
+      const detailConfigs: DetailConfig[] = [];
       for (const detail of dto.details ?? []) {
         const service = serviceMap.get(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
@@ -429,17 +571,42 @@ export class OrderService {
           duration: this.normalizeDurationMinutes(
             detail.duration ?? service.duration ?? '0',
           ),
+          basePrice: this.resolveDetailBasePrice(detail, service),
+          finalPrice: 0,
         });
       }
+      const subtotal = detailConfigs.reduce(
+        (sum, detail) => sum + Number(detail.basePrice ?? 0),
+        0,
+      );
+      const resolvedVoucher = await this.voucher.resolveForOrder({
+        voucher_id: dto.voucher_id,
+        customer_id: customerId,
+        subtotal,
+      });
+      const pricedDetails = this.distributeDiscountAcrossDetails(
+        detailConfigs,
+        resolvedVoucher?.discount ?? 0,
+      );
+      const totalAmount = pricedDetails.reduce(
+        (sum, detail) => sum + Number(detail.finalPrice ?? 0),
+        0,
+      );
       const duration = parallel
-        ? Math.max(0, ...detailConfigs.map((detail) => detail.duration))
-        : detailConfigs.reduce((sum, detail) => sum + detail.duration, 0);
+        ? Math.max(0, ...pricedDetails.map((detail) => detail.duration))
+        : pricedDetails.reduce((sum, detail) => sum + detail.duration, 0);
       if (admin && dto.pre_amount) {
         pre = +dto.pre_amount;
       }
-      const orderPreAmount = canManagePreAmount
+      const requestedPreAmount = canManagePreAmount
         ? +(dto.pre_amount ?? pre ?? 0)
         : +(pre ?? 0);
+      const orderPreAmount = Math.min(requestedPreAmount, totalAmount);
+      const requestedPaidAmount = Number(dto.paid_amount ?? 0);
+      const orderPaidAmount = Math.min(
+        Math.max(requestedPaidAmount, 0),
+        Math.max(totalAmount - orderPreAmount, 0),
+      );
       const start_time = this.normalizeTimeValue(dto.start_time.toString());
       const startHour = timeToDecimal(start_time);
       const end_time = this.addDurationToTimeString(start_time, duration);
@@ -450,31 +617,38 @@ export class OrderService {
           : (dto.order_status ?? OrderStatus.Pending);
       const payload: Order = {
         id: AppUtils.uuid4(),
-        customer_id: dto.customer_id ?? user.id,
+        customer_id: customerId,
         order_date: orderDate, // Date (өдөр давсан бол +1, +2 ...)
         start_time: start_time,
         end_time: end_time,
         duration: duration,
         description: dto.description ?? null,
-        discount_type: dto.discount_type ?? null,
-        discount: dto.discount ?? null,
-        total_amount: dto.total_amount ?? null,
-        paid_amount: dto.paid_amount ?? null,
+        discount_type: resolvedVoucher?.type ?? null,
+        discount: resolvedVoucher?.discount ?? 0,
+        voucher_id: resolvedVoucher?.id ?? null,
+        voucher_name: resolvedVoucher?.name ?? null,
+        voucher_value: resolvedVoucher?.value ?? null,
+        total_amount: totalAmount,
+        paid_amount: orderPaidAmount,
         pre_amount: orderPreAmount,
-        is_pre_amount_paid: orderPreAmount == 0,
+        is_pre_amount_paid: orderPreAmount === 0,
         order_status,
         status: STATUS.Active,
         parallel,
         created_by: user.id,
         branch_id: dto.branch_id,
       } as const;
-      if (requiresOnlinePrePayment && orderPreAmount <= 0) {
+      if (requiresOnlinePrePayment && totalAmount > 0 && orderPreAmount <= 0) {
         throw new HttpException(
           'Урьдчилгаа төлбөр үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.',
           HttpStatus.BAD_REQUEST,
         );
       }
-      if (requiresOnlinePrePayment && preMethod !== PaymentMethod.QPAY) {
+      if (
+        requiresOnlinePrePayment &&
+        totalAmount > 0 &&
+        preMethod !== PaymentMethod.QPAY
+      ) {
         throw new HttpException(
           'Урьдчилгаа төлбөр үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.',
           HttpStatus.BAD_REQUEST,
@@ -493,7 +667,7 @@ export class OrderService {
       }
       let startDate = startHour;
       const orderDetails = [];
-      for (const { detail, service, duration } of detailConfigs) {
+      for (const { detail, service, duration, finalPrice } of pricedDetails) {
         const artist = await this.user.findOne(detail.user_id);
         const durationHours = duration / 60;
         const endDate = startDate + durationHours;
@@ -504,7 +678,7 @@ export class OrderService {
           service_id: service.id,
           order_date: orderDate,
           service_name: service.name,
-          price: detail.price,
+          price: finalPrice,
           duration: duration,
           nickname: artist.nickname,
           description: detail.description,
@@ -548,7 +722,15 @@ export class OrderService {
         }
       }
 
-      const order = await this.dao.create(payload, orderDetails);
+      const order = await this.db.withTransaction(async (client) => {
+        const orderId = await this.dao.createTx(client, payload, orderDetails);
+        await this.voucher.syncOrderVoucherTx({
+          client,
+          order_id: orderId,
+          next_voucher_id: resolvedVoucher?.id ?? null,
+        });
+        return orderId;
+      });
       if (invoice) {
         await this.payment.create(
           {
@@ -580,7 +762,7 @@ export class OrderService {
           created_by: user.id,
           method: dto.method,
           pre_method: preMethod,
-          paid_amount: Number(dto.paid_amount ?? 0),
+          paid_amount: orderPaidAmount,
           pre_amount: orderPreAmount,
         });
         if (paymentSync.latestPaidAt && paymentSync.latestMethod != null) {
@@ -659,7 +841,11 @@ export class OrderService {
   public async cancelOrder(id: string, user: string, role: number) {
     try {
       await this.ensureOrderAccess(id, user, role);
-      await this.dao.updateOrderStatus(id, OrderStatus.Absent);
+      await this.updateStatus({
+        id,
+        user,
+        order_status: OrderStatus.Absent,
+      });
       await this.orderDetail.updateStatusByOrder(id, OrderStatus.Absent);
       return true;
     } catch (error) {
@@ -984,35 +1170,7 @@ export class OrderService {
       if (!canManagePreAmount) {
         payload.pre_amount = preservedPreAmount;
       }
-      const paidAmount = +(payload.paid_amount ?? 0);
-      const preAmount = canManagePreAmount
-        ? +(payload.pre_amount ?? preservedPreAmount)
-        : preservedPreAmount;
       const status = payload.order_status || order.order_status;
-
-      if (status === OrderStatus.Finished) {
-        const total = preAmount + paidAmount;
-
-        const artistAmounts =
-          details.length > 1
-            ? details.reduce((sum, d) => sum + +(d.price ?? 0), 0)
-            : total;
-
-        if (total !== artistAmounts) {
-          this.orderError.PAID_AMOUNT_REQUIRED;
-        }
-
-        payload.total_amount = total;
-
-        if (details.length === 1 && +details[0].price === 0) {
-          details[0].price = total;
-        }
-      }
-
-      if (order.order_status !== payload.order_status) {
-        payload.updated_at = new Date();
-      }
-
       const existingDetails = await this.orderDetail.findByOrder(id);
       const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
       const incomingIds = details.filter((d) => d.id).map((d) => d.id);
@@ -1022,32 +1180,101 @@ export class OrderService {
       );
       const startTimeDecimal = timeToDecimal(resolvedStartTime);
       let startDate = startTimeDecimal;
-      const normalizedDurations: number[] = [];
       const detailPayloads: Array<{
         detail: OrderDetailDto;
         prev: any;
         payload: any;
         nickname?: string | null;
       }> = [];
+      const detailConfigs: DetailConfig[] = [];
+      const normalizedDurations: number[] = [];
 
       for (const detail of details) {
-        const prev = detail.id ? existingMap.get(detail.id) : null;
         const service = await this.service.findOne(detail.service_id);
         const durationMinutes = this.normalizeDurationMinutes(
           detail.duration ?? +service.duration,
         );
-        const duration = durationMinutes / 60;
-        const endDate = startDate + duration;
         normalizedDurations.push(durationMinutes);
+        detailConfigs.push({
+          detail,
+          service,
+          duration: durationMinutes,
+          basePrice: this.resolveDetailBasePrice(detail, service),
+          finalPrice: 0,
+        });
+      }
+
+      const subtotal = detailConfigs.reduce(
+        (sum, detail) => sum + Number(detail.basePrice ?? 0),
+        0,
+      );
+      const nextVoucherId =
+        dto.voucher_id !== undefined ? dto.voucher_id : order.voucher_id;
+      const resolvedVoucher = await this.voucher.resolveForOrder({
+        voucher_id: nextVoucherId,
+        customer_id: dto.customer_id ?? order.customer_id,
+        order_id: id,
+        subtotal,
+      });
+      const pricedDetails = this.distributeDiscountAcrossDetails(
+        detailConfigs,
+        resolvedVoucher?.discount ?? 0,
+      );
+      const totalAmount = pricedDetails.reduce(
+        (sum, detail) => sum + Number(detail.finalPrice ?? 0),
+        0,
+      );
+      const requestedPreAmount = canManagePreAmount
+        ? +(payload.pre_amount ?? preservedPreAmount)
+        : preservedPreAmount;
+      const preAmount = Math.min(requestedPreAmount, totalAmount);
+      const requestedPaidAmount = +(payload.paid_amount ?? 0);
+      const paidAmount = Math.min(
+        Math.max(requestedPaidAmount, 0),
+        Math.max(totalAmount - preAmount, 0),
+      );
+
+      payload.pre_amount = preAmount;
+      payload.paid_amount = paidAmount;
+      payload.total_amount = totalAmount;
+      payload.discount = resolvedVoucher?.discount ?? 0;
+      payload.discount_type = resolvedVoucher?.type ?? null;
+      payload.voucher_id = resolvedVoucher?.id ?? null;
+      payload.voucher_name = resolvedVoucher?.name ?? null;
+      payload.voucher_value = resolvedVoucher?.value ?? null;
+
+      if (status === OrderStatus.Finished) {
+        const total = preAmount + paidAmount;
+        const artistAmounts = pricedDetails.reduce(
+          (sum, detail) => sum + Number(detail.finalPrice ?? 0),
+          0,
+        );
+
+        if (total !== artistAmounts) {
+          this.orderError.PAID_AMOUNT_REQUIRED;
+        }
+      }
+
+      if (order.order_status !== payload.order_status) {
+        payload.updated_at = new Date();
+      }
+
+      for (const pricedDetail of pricedDetails) {
+        const { detail, service, duration, finalPrice } = pricedDetail;
+        const prev = detail.id ? existingMap.get(detail.id) : null;
+        const durationHours = duration / 60;
+        const endDate = startDate + durationHours;
 
         const detailPayload: any = {
           ...detail,
-          duration: durationMinutes,
+          price: finalPrice,
+          duration: duration,
           start_time: toTimeString(Math.floor(startDate), startDate % 1 !== 0),
           end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
           status: status,
           view_status: order.status,
           order_date: orderDetailDate,
+          service_name: service.name ?? detail.service_name,
         };
 
         let nickname: string | null | undefined;
@@ -1098,10 +1325,23 @@ export class OrderService {
           client,
         });
 
+        const updateAttrs = [
+          ...new Set([
+            ...getDefinedKeys(payload),
+            'discount',
+            'discount_type',
+            'voucher_id',
+            'voucher_name',
+            'voucher_value',
+            'total_amount',
+            'paid_amount',
+            'pre_amount',
+          ]),
+        ];
         await this.dao.updateTx(
           client,
           { id, ...payload },
-          getDefinedKeys(payload),
+          updateAttrs,
         );
 
         // Temporarily hide the order's existing details so resequencing them
@@ -1131,6 +1371,13 @@ export class OrderService {
             } as any);
           }
         }
+
+        await this.voucher.syncOrderVoucherTx({
+          client,
+          order_id: id,
+          previous_voucher_id: order.voucher_id ?? null,
+          next_voucher_id: resolvedVoucher?.id ?? null,
+        });
       });
       const paymentSync = await this.payment.syncManualPayments({
         merchant,
@@ -1154,6 +1401,12 @@ export class OrderService {
         id,
         preAmount == 0 ? true : !!paymentSync.hasPrePayment,
       );
+      if (
+        payload.order_status === OrderStatus.Cancelled ||
+        payload.order_status === OrderStatus.Absent
+      ) {
+        await this.voucher.releaseOrderVoucher(id);
+      }
     } catch (error) {
       console.error('Order update failed:', error);
       throw error;
@@ -1170,7 +1423,23 @@ export class OrderService {
       user,
       order_status,
     });
-    return await this.dao.updateOrderStatus(id, order_status);
+    const result = await this.dao.updateOrderStatus(id, order_status);
+
+    if (
+      order_status === OrderStatus.Cancelled ||
+      order_status === OrderStatus.Absent
+    ) {
+      await this.voucher.releaseOrderVoucher(id);
+    }
+
+    if (order_status === OrderStatus.Finished) {
+      const order = await this.findOne(id);
+      if (order?.customer_id) {
+        await this.checkLevel(order.customer_id);
+      }
+    }
+
+    return result;
   }
   public async updatePaidDate(
     id: string,
@@ -1379,35 +1648,47 @@ export class OrderService {
     }
   }
   public async level() {
+    const config = await this.getLevelConfigMap();
+
     return {
-      [UserLevel.BRONZE]: this.bronze,
-      [UserLevel.SILVER]: this.silver,
-      [UserLevel.GOLD]: this.gold,
+      customer: CUSTOMER_USER_LEVELS.reduce(
+        (acc, level) => {
+          acc[level] = config[level];
+          return acc;
+        },
+        {} as Partial<Record<UserLevel, number>>,
+      ),
+      employee: EMPLOYEE_USER_LEVELS.reduce(
+        (acc, level) => {
+          acc[level] = config[level];
+          return acc;
+        },
+        {} as Partial<Record<UserLevel, number>>,
+      ),
     };
   }
   public async updateLevel(dto: Record<UserLevel, number>) {
-    await Promise.all(
-      Object.entries(dto).map(([k, value], i) => {
-        const key = k as unknown as UserLevel;
-        if (key == UserLevel.BRONZE) this.bronze = value;
-        if (key == UserLevel.SILVER) this.silver = value;
-        if (key == UserLevel.GOLD) this.gold = value;
-      }),
-    );
+    const entries = this.normalizeLevelConfigPayload(dto as Record<string, any>);
+
+    if (!entries.length) return await this.level();
+
+    await this.dao.upsertAppConfigValues(entries);
+    return await this.level();
   }
   public async checkLevel(user: string) {
+    const config = await this.getLevelConfigMap();
     const count = await this.dao.customerCheck(user);
-    if (count >= this.gold) {
-      await this.user.updateLevel(user, UserLevel.GOLD);
-      return;
+    let targetLevel: UserLevel | null = null;
+
+    for (const level of CUSTOMER_USER_LEVELS) {
+      if (count >= config[level]) {
+        targetLevel = level;
+        await this.voucher.ensureRewardVoucherForLevel(user, level);
+      }
     }
-    if (count >= this.silver) {
-      await this.user.updateLevel(user, UserLevel.SILVER);
-      return;
-    }
-    if (count >= this.bronze) {
-      await this.user.updateLevel(user, UserLevel.BRONZE);
-      return;
+
+    if (targetLevel != null) {
+      await this.user.updateLevel(user, targetLevel);
     }
   }
   public async updatePrePaid(id: string, paid: boolean) {
@@ -1424,6 +1705,7 @@ export class OrderService {
     });
     await this.orderDetail.remove(id);
     await this.dao.updateStatus(id, status);
+    await this.voucher.releaseOrderVoucher(id);
   }
 
   public async checkCallback(user: string, id: string, order_id: string) {

@@ -124,7 +124,8 @@ export class UserController {
   @SAP()
   @Patch('level/:id')
   updateLevel(@Param('id') id: string, @Body() dto: UserDto) {
-    if (dto.level) return this.userService.updateLevel(id, dto.level);
+    if (dto.level !== undefined && dto.level !== null)
+      return this.userService.updateLevel(id, dto.level);
   }
 
   @Delete(':id')

@@ -17,6 +17,7 @@ import { IntegrationModule } from '../integrations/integrations.module';
 import { PaymentModule } from '../payment/payment.module';
 import { OrderLogDao } from './order.log.dao';
 import { AuthModule } from 'src/auth/auth.module';
+import { VoucherModule } from '../voucher/voucher.module';
 
 @Module({
   imports: [
@@ -29,7 +30,8 @@ import { AuthModule } from 'src/auth/auth.module';
     IntegrationModule,
     UserServiceModule,
     forwardRef(() => PaymentModule),
-    AuthModule
+    AuthModule,
+    VoucherModule,
   ],
   controllers: [OrderController],
   providers: [

@@ -22,6 +22,9 @@ jest.mock('../integrations/integrations.service', () => ({
 jest.mock('../payment/payment.service', () => ({
   PaymentService: class {},
 }));
+jest.mock('../voucher/voucher.service', () => ({
+  VoucherService: class {},
+}));
 jest.mock(
   'src/auth/auth.service',
   () => ({
@@ -109,6 +112,8 @@ jest.mock(
       BRONZE: 0,
       SILVER: 10,
       GOLD: 20,
+      JUNIOR: 100,
+      SENIOR: 110,
     },
     usernameFormatter: () => '',
     UserStatus: {
@@ -209,6 +214,12 @@ describe('OrderService', () => {
   let payment: {
     syncManualPayments: jest.Mock;
   };
+  let voucher: {
+    ensureRewardVoucherForLevel: jest.Mock;
+    releaseOrderVoucher: jest.Mock;
+    resolveForOrder: jest.Mock;
+    syncOrderVoucherTx: jest.Mock;
+  };
   let authService: {
     findOne?: jest.Mock;
   };
@@ -279,6 +290,13 @@ describe('OrderService', () => {
       }),
     };
 
+    voucher = {
+      ensureRewardVoucherForLevel: jest.fn(),
+      releaseOrderVoucher: jest.fn(),
+      resolveForOrder: jest.fn().mockResolvedValue(null),
+      syncOrderVoucherTx: jest.fn(),
+    };
+
     authService = {};
 
     db = {
@@ -300,6 +318,7 @@ describe('OrderService', () => {
       authService as any,
       payment as any,
       db as any,
+      voucher as any,
     );
 
     jest.spyOn(service, 'find').mockResolvedValue({
