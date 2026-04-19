@@ -400,6 +400,9 @@ export class OrderService {
       const requiresOnlinePrePayment = !admin;
       const canManagePreAmount = user.role < MANAGER;
       const preMethod = dto.pre_method ?? dto.method;
+      if (!dto.branch_id) {
+        throw new HttpException('Салбар сонгоно уу.', HttpStatus.BAD_REQUEST);
+      }
       if ((dto.details?.length ?? 0) <= 0) this.orderError.serviceNotSelected;
       const parallel = dto.parallel;
       const serviceConfigs = await this.service.getBookingConfigs(
@@ -420,8 +423,25 @@ export class OrderService {
         duration: number;
       }> = [];
       for (const detail of dto.details ?? []) {
+        if (!detail.user_id) {
+          throw new HttpException(
+            'Артист сонгоно уу.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
         const service = serviceMap.get(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
+        const isAssignedToBranch = await this.userService.hasActiveAssignment({
+          user_id: detail.user_id,
+          service_id: detail.service_id,
+          branch_id: dto.branch_id,
+        });
+        if (!isAssignedToBranch) {
+          throw new HttpException(
+            'Сонгосон артист тухайн салбарт энэ үйлчилгээг үзүүлэх боломжгүй байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
         if (+(service.pre ?? '0') > pre) pre = +service.pre;
         detailConfigs.push({
           detail,

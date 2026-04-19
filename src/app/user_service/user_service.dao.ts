@@ -80,6 +80,41 @@ export class UserServiceDao {
     ]);
   }
 
+  async updateBranchByUser(
+    user_id: string,
+    branch_id?: string | null,
+  ): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "branch_id"=$1 WHERE "user_id"=$2`,
+      [branch_id ?? null, user_id],
+    );
+  }
+
+  async hasActiveAssignment(input: {
+    user_id: string;
+    service_id: string;
+    branch_id: string;
+  }) {
+    const { user_id, service_id, branch_id } = input;
+
+    const item = await this._db.selectOne(
+      `
+    SELECT 1
+    FROM "${tableName}" us
+    INNER JOIN users u ON u.id = us.user_id
+    WHERE us.user_id = $1
+      AND us.service_id = $2
+      AND us.branch_id = $3
+      AND us.status = $4
+      AND u.user_status = $5
+    LIMIT 1
+    `,
+      [user_id, service_id, branch_id, STATUS.Active, UserStatus.Active],
+    );
+
+    return !!item;
+  }
+
   async updateTags(data: any): Promise<number> {
     return await this._db._update(
       `UPDATE "${tableName}" SET "tags"=$1 WHERE "id"=$2`,

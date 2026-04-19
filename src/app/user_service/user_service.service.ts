@@ -121,6 +121,18 @@ export class UserServiceService {
     ]);
   }
 
+  public async syncBranchByUser(user_id: string, branch_id?: string | null) {
+    return await this.dao.updateBranchByUser(user_id, branch_id);
+  }
+
+  public async hasActiveAssignment(input: {
+    user_id: string;
+    service_id: string;
+    branch_id: string;
+  }) {
+    return await this.dao.hasActiveAssignment(input);
+  }
+
   public async updateStatus(id: string, status: number) {
     return await this.dao.update({ id, status }, ['id', 'status']);
   }

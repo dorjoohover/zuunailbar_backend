@@ -290,17 +290,24 @@ export class UserService {
   public async update(id: string, dto: UserDto) {
     try {
       const { ...body } = dto;
+      const currentUser = await this.findOne(id);
       body.id = id;
       if (body.password) {
         body.password = await bcrypt.hash(dto.password, saltOrRounds);
       }
-      if (body.branch_id) {
-        body.branch_name = (
-          await this.branchService.findOne(body.branch_id)
-        ).name;
+      if (body.branch_id !== undefined) {
+        body.branch_name = body.branch_id
+          ? (await this.branchService.findOne(body.branch_id)).name
+          : null;
       }
 
       const res = await this.dao.update(body, getDefinedKeys(body));
+      if (
+        body.branch_id !== undefined &&
+        body.branch_id !== currentUser?.branch_id
+      ) {
+        await this.userService.syncBranchByUser(id, body.branch_id ?? null);
+      }
       if (body.percent || body.salary_day) {
         const userSalary = await this.userSalary.findByUser(id);
         if (userSalary) {
