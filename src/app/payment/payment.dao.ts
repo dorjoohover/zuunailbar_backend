@@ -84,6 +84,7 @@ export class PaymentDao {
       STATUS.Active,
       OrderStatus.Finished,
       PaymentMethod[PaymentMethod.CASH],
+      PaymentMethod[PaymentMethod.CARD],
     ];
     let sql = `
       WITH detail_sales AS (
@@ -145,7 +146,16 @@ export class PaymentDao {
         COALESCE(
           SUM(
             CASE
-              WHEN paid_amount > 0 AND transaction_type != $6 THEN paid_amount
+              WHEN paid_amount > 0 AND transaction_type = $7 THEN paid_amount
+              ELSE 0
+            END
+          ),
+          0
+        ) AS card_amount,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN paid_amount > 0 AND transaction_type != $6 AND transaction_type != $7 THEN paid_amount
               ELSE 0
             END
           ),

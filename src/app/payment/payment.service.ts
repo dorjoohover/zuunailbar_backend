@@ -279,14 +279,16 @@ export class PaymentService {
     const pre_amount = Number(result?.pre_amount ?? 0);
     const cash_amount = Number(result?.cash_amount ?? 0);
     const bank_amount = Number(result?.bank_amount ?? 0);
+    const card_amount = Number(result?.card_amount ?? 0);
 
     return {
       from,
       to,
       pre_amount,
       cash_amount,
+      card_amount,
       bank_amount,
-      total_amount: pre_amount + cash_amount + bank_amount,
+      total_amount: pre_amount + cash_amount + bank_amount + card_amount,
     };
   }
 
