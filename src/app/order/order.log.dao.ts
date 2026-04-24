@@ -43,21 +43,28 @@ export class OrderLogDao {
     const builder = new SqlBuilder(query);
     builder
       // nemne
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
-      .conditionIfNotEmpty('order_id', '=', query.customer_id)
-      .conditionIfNotEmpty('new_status', '=', query.new_status)
-      .conditionIfNotEmpty('old_status', '=', query.old_status)
-      .conditionIfNotEmpty('new_order_status', '=', query.new_order_status)
-      .conditionIfNotEmpty('old_order_status', '=', query.old_order_status)
-      .conditionIfNotEmpty('changed_by', '=', query.changed_by)
-      .conditionIfNotEmpty('changed_at', '=', query.changed_at);
+      .conditionIfNotEmpty('"oh"."id"', 'ILIKE', query.id)
+      .conditionIfNotEmpty('"oh"."order_id"', '=', query.customer_id)
+      .conditionIfNotEmpty('"oh"."new_status"', '=', query.new_status)
+      .conditionIfNotEmpty('"oh"."old_status"', '=', query.old_status)
+      .conditionIfNotEmpty(
+        '"oh"."new_order_status"',
+        '=',
+        query.new_order_status,
+      )
+      .conditionIfNotEmpty(
+        '"oh"."old_order_status"',
+        '=',
+        query.old_order_status,
+      )
+      .conditionIfNotEmpty('"oh"."changed_by"', '=', query.changed_by);
 
     const criteria = builder.criteria();
     let date_sql = ``;
     if (query.changed_at) {
       date_sql = `
-    AND changed_at >= '${query.changed_at} 00:00:00'
-    AND changed_at < '${query.changed_at} 23:59:59'
+    ${criteria ? 'AND' : 'WHERE'} oh.changed_at >= '${query.changed_at} 00:00:00'
+    AND oh.changed_at < '${query.changed_at} 23:59:59'
   `;
     }
     const sql = `SELECT ${
@@ -70,11 +77,42 @@ export class OrderLogDao {
       oh.new_order_status,
       oh.changed_by,
       to_char(oh.changed_at, 'YYYY-MM-DD HH24:MI:SS') AS changed_at,
-      u.mobile AS customer_mobile`
+      u.mobile AS customer_mobile,
+      COALESCE(
+        NULLIF(u.nickname, ''),
+        NULLIF(TRIM(CONCAT(
+          CASE
+            WHEN u.lastname IS NOT NULL AND u.lastname <> '' THEN CONCAT(u.lastname, '.')
+            ELSE ''
+          END,
+          COALESCE(u.firstname, '')
+        )), ''),
+        ''
+      ) AS customer_name,
+      o.branch_id,
+      b.name AS branch_name,
+      COALESCE((
+        SELECT STRING_AGG(DISTINCT COALESCE(
+          NULLIF(artist.nickname, ''),
+          NULLIF(TRIM(CONCAT(
+            CASE
+              WHEN artist.lastname IS NOT NULL AND artist.lastname <> '' THEN CONCAT(artist.lastname, '.')
+              ELSE ''
+            END,
+            COALESCE(artist.firstname, '')
+          )), ''),
+          artist.mobile,
+          ''
+        ), ', ')
+        FROM "order_details" od
+        LEFT JOIN users artist ON artist.id = od.user_id
+        WHERE od.order_id = o.id
+      ), '') AS artist_names`
     }
    FROM "${tableName}" oh
    LEFT JOIN orders o ON o.id = oh.order_id
    LEFT JOIN users u ON u.id = o.customer_id
+   LEFT JOIN branches b ON b.id = o.branch_id
    ${criteria} ${date_sql}
    ORDER BY oh.changed_at DESC
    ${query.limit ? `LIMIT ${query.limit}` : ''}

@@ -13,6 +13,13 @@ export class ProductLogService {
     private readonly dao: ProductLogDao,
     private readonly product: ProductService,
   ) {}
+
+  private getPaymentStatus(totalAmount: number, paidAmount: number) {
+    return totalAmount - paidAmount <= 0
+      ? PRODUCT_LOG_STATUS.Bought
+      : PRODUCT_LOG_STATUS.Remainder;
+  }
+
   public async create(dto: ProductLogDto, merchant: string, user: string) {
     await this.product.updateQuantity(dto.product_id, dto.quantity);
     const total_amount = dto.total_amount ?? 0;
@@ -27,10 +34,7 @@ export class ProductLogService {
       cargo: dto.cargo ?? 0,
       total_amount: total_amount,
       paid_amount: paid_amount,
-      product_log_status:
-        total_amount - paid_amount == 0
-          ? PRODUCT_LOG_STATUS.Bought
-          : PRODUCT_LOG_STATUS.Remainder,
+      product_log_status: this.getPaymentStatus(total_amount, paid_amount),
       price: dto.price ?? 0,
       currency: dto.currency ?? 'CNY',
       currency_amount: dto.currency_amount ?? 500,
@@ -46,10 +50,44 @@ export class ProductLogService {
   }
 
   public async update(id: string, dto: ProductLogDto) {
-    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+    const productLog = await this.dao.getById(id);
+    const nextProductId = dto.product_id ?? productLog.product_id;
+    const nextQuantity =
+      dto.quantity !== undefined && dto.quantity !== null
+        ? +dto.quantity
+        : +productLog.quantity;
+
+    if (nextProductId !== productLog.product_id) {
+      await this.product.updateQuantity(
+        productLog.product_id,
+        -+productLog.quantity,
+      );
+      await this.product.updateQuantity(nextProductId, nextQuantity);
+    } else {
+      const diff = nextQuantity - +productLog.quantity;
+      if (diff != 0) {
+        await this.product.updateQuantity(nextProductId, diff);
+      }
+    }
+
+    const total_amount = +(dto.total_amount ?? productLog.total_amount ?? 0);
+    const paid_amount = +(dto.paid_amount ?? productLog.paid_amount ?? 0);
+    const payload = {
+      ...dto,
+      id,
+      product_log_status:
+        dto.product_log_status ??
+        this.getPaymentStatus(total_amount, paid_amount),
+    };
+    return await this.dao.update(payload, getDefinedKeys(payload));
   }
 
   public async remove(id: string) {
+    const productLog = await this.dao.getById(id);
+    await this.product.updateQuantity(
+      productLog.product_id,
+      -+productLog.quantity,
+    );
     return await this.dao.updateStatus(id, STATUS.Hidden);
   }
 }

@@ -79,11 +79,11 @@ export class ProductDao {
 
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('brand_id', '=', query.brand_id)
       .conditionIfNotEmpty('category_id', '=', query.category_id)
       .conditionIfNotEmpty('category_id', '!=', query.spending)
-      .conditionIfNotEmpty('LOWER("name")', 'LIKE', query.name)
+      .conditionIfNotEmpty('LOWER("name")', 'ILIKE', query.name)
       .conditionIfNotEmpty('type', '=', query.type)
 
       .conditionIfNotEmpty('status', '=', query.status)
@@ -112,7 +112,7 @@ export class ProductDao {
       filter.id = `%${filter.id.toLowerCase()}%`;
     }
     if (filter.name) {
-      nameCondition = ` LOWER("name") LIKE $1`;
+      nameCondition = ` LOWER("name") ILIKE $1`;
       filter.name = `%${filter.name.toLowerCase()}%`;
     }
 
@@ -122,12 +122,12 @@ export class ProductDao {
       .conditionIfNotEmpty('status', '=', filter.status)
       .conditionIfNotEmpty('type', '=', filter.type)
       .orConditions([
-        new SqlCondition('LOWER("name")', 'LIKE', filter.name),
-        new SqlCondition('LOWER("name")', 'LIKE', filter.id),
-        new SqlCondition('LOWER("brand_name")', 'LIKE', filter.name),
-        new SqlCondition('LOWER("brand_name")', 'LIKE', filter.id),
-        new SqlCondition('LOWER("category_name")', 'LIKE', filter.name),
-        new SqlCondition('LOWER("category_name")', 'LIKE', filter.id),
+        new SqlCondition('LOWER("name")', 'ILIKE', filter.name),
+        new SqlCondition('LOWER("name")', 'ILIKE', filter.id),
+        new SqlCondition('LOWER("brand_name")', 'ILIKE', filter.name),
+        new SqlCondition('LOWER("brand_name")', 'ILIKE', filter.id),
+        new SqlCondition('LOWER("category_name")', 'ILIKE', filter.name),
+        new SqlCondition('LOWER("category_name")', 'ILIKE', filter.id),
       ]);
     const criteria = builder.criteria();
 

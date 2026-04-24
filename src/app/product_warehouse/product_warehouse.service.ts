@@ -12,6 +12,7 @@ import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { Response } from 'express';
 import { ExcelService } from 'src/excel.service';
+import { BadRequest } from 'src/common/error';
 
 @Injectable()
 export class ProductWarehouseService {
@@ -21,9 +22,66 @@ export class ProductWarehouseService {
     private warehouse: WarehouseService,
     private excel: ExcelService,
   ) {}
+  private async getQuantitySummaryMap(
+    productIds: string[],
+    warehouseId?: string,
+  ) {
+    const summaries = await this.dao.getQuantitySummary(productIds, warehouseId);
+
+    return new Map(
+      summaries.map((item) => [
+        item.product_id,
+        {
+          totalQuantity: Number(item.total_quantity ?? 0),
+          warehouseQuantity: Number(item.warehouse_quantity ?? 0),
+        },
+      ]),
+    );
+  }
+
+  private async validateWarehouseCapacity(
+    products: ProductWarehouseDto[],
+    warehouseId: string,
+  ) {
+    const additions = new Map<string, number>();
+
+    products.forEach((item) => {
+      const productId = String(item.product_id ?? '');
+      const quantity = Number(item.quantity ?? 0);
+      additions.set(productId, (additions.get(productId) ?? 0) + quantity);
+    });
+
+    const productIds = Array.from(additions.keys()).filter(Boolean);
+    const summaryMap = await this.getQuantitySummaryMap(productIds, warehouseId);
+
+    await Promise.all(
+      productIds.map(async (productId) => {
+        const product = await this.product.findOne(productId);
+        const summary = summaryMap.get(productId);
+        const totalStock = Number(product?.quantity ?? 0);
+        const warehouseQuantity = Number(summary?.warehouseQuantity ?? 0);
+        const allocatedOtherWarehouses = Math.max(
+          Number(summary?.totalQuantity ?? 0) - warehouseQuantity,
+          0,
+        );
+        const allowedQuantity = Math.max(
+          totalStock - allocatedOtherWarehouses,
+          0,
+        );
+        const requestedQuantity =
+          warehouseQuantity + Number(additions.get(productId) ?? 0);
+
+        if (requestedQuantity > allowedQuantity) {
+          new BadRequest().STOCK_INSUFFICIENT;
+        }
+      }),
+    );
+  }
+
   public async create(dto: ProductsWarehouseDto, user: string) {
     const warehouse = await this.warehouse.getById(dto.warehouse_id);
     const products = dto.products;
+    await this.validateWarehouseCapacity(products, warehouse.id);
     await Promise.all(
       products.map(async (pro) => {
         const product = await this.product.findOne(pro.product_id);
@@ -62,30 +120,33 @@ export class ProductWarehouseService {
 
   public async search(filter: SearchDto, merchant: string) {
     let results = await this.product.search(filter, merchant);
-    if (filter.warehouse_id) {
-      const warehouseProducts = await this.dao.getByWarehouse(
-        filter.warehouse_id,
+    const productIds = results.map((item) => String(item.id));
+    const summaryMap = await this.getQuantitySummaryMap(
+      productIds,
+      filter.warehouse_id,
+    );
+
+    results = results.map((r) => {
+      const parts = r.value.split('__');
+      const totalStock = parseInt(parts[3], 10) || 0;
+      const summary = summaryMap.get(String(r.id));
+      const warehouseQuantity = Number(summary?.warehouseQuantity ?? 0);
+      const allocatedOtherWarehouses = Math.max(
+        Number(summary?.totalQuantity ?? 0) - warehouseQuantity,
+        0,
       );
-      const warehouseMap = new Map<number, number>();
-      warehouseProducts.forEach((p) =>
-        warehouseMap.set(p.product_id, p.quantity),
+      const allowedQuantity = Math.max(
+        totalStock - allocatedOtherWarehouses,
+        0,
       );
 
-      results = results.map((r) => {
-        const parts = r.value.split('__');
-        let qty = parseInt(parts[3], 10) || 0;
-
-        const whQty = warehouseMap.get(r.id) ?? 0;
-        qty = qty - whQty;
-        qty = qty < 0 ? 0 : qty;
-        parts[3] = qty.toString();
-        return {
-          ...r,
-          value: parts.join('__'),
-          quantity: whQty,
-        };
-      });
-    }
+      parts[3] = allowedQuantity.toString();
+      return {
+        ...r,
+        value: parts.join('__'),
+        quantity: warehouseQuantity,
+      };
+    });
 
     return results;
   }
@@ -153,8 +214,34 @@ export class ProductWarehouseService {
   }
 
   public async update(id: string, dto: ProductsWarehouseDto) {
+    const current = await this.findOne(id);
+
     await Promise.all(
       dto.products.map(async (p) => {
+        const targetProductId = p.product_id ?? current.product_id;
+        const product = await this.product.findOne(targetProductId);
+        const summaryMap = await this.getQuantitySummaryMap(
+          [targetProductId],
+          current.warehouse_id,
+        );
+        const summary = summaryMap.get(targetProductId);
+        const warehouseQuantity =
+          current.product_id === targetProductId
+            ? Number(summary?.warehouseQuantity ?? 0)
+            : 0;
+        const allocatedOtherWarehouses = Math.max(
+          Number(summary?.totalQuantity ?? 0) - warehouseQuantity,
+          0,
+        );
+        const allowedQuantity = Math.max(
+          Number(product?.quantity ?? 0) - allocatedOtherWarehouses,
+          0,
+        );
+
+        if (Number(p.quantity ?? 0) > allowedQuantity) {
+          new BadRequest().STOCK_INSUFFICIENT;
+        }
+
         const payload = p;
         return await this.dao.update(
           { ...payload, id },

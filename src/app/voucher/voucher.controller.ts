@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Put,
   Req,
 } from '@nestjs/common';
@@ -46,11 +47,38 @@ export class VoucherController {
     return this.service.findAll(pg, user.user.role);
   }
 
+  @Get('my')
+  @PQ()
+  findMine(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.service.findMine(pg, user.user.id);
+  }
+
+  @Employee()
+  @Get('available/:user_id')
+  available(
+    @Param('user_id') userId: string,
+    @Query('order_id') orderId?: string,
+  ) {
+    return this.service.availableByUser(userId, orderId);
+  }
+
+  @Get('config')
+  getConfig() {
+    return this.service.getConfig();
+  }
+
   @Get('get/:id')
   @SAP()
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }
+
+  @Admin()
+  @Patch('config')
+  updateConfig(@Body() dto: any) {
+    return this.service.updateConfig(dto);
+  }
+
   @Employee()
   @Patch(':id')
   @SAP()
@@ -59,7 +87,7 @@ export class VoucherController {
   }
 
   @Admin()
-  @Delete(':id/:status')
+  @Delete(':id')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }

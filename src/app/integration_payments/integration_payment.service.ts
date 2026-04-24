@@ -1,9 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import {
   getDefinedKeys,
-  SALARY_LOG_STATUS,
   PaymentType,
   STATUS,
   ubDateAt00,
@@ -16,7 +15,6 @@ import { Response } from 'express';
 import { IntegrationPaymentDto } from './integration_payment.dto';
 import { IntegrationPaymentDao } from './integration_payment.dao';
 import { IntegrationService } from '../integrations/integrations.service';
-import { BadRequest } from 'src/common/error';
 
 const paymentTypeLabel = {
   [PaymentType.SALARY]: 'Цалин',
@@ -32,43 +30,28 @@ export class IntegrationPaymentService {
     private excel: ExcelService,
   ) {}
   public async create(dto: IntegrationPaymentDto) {
-    return this.dao.transaction(async (trx) => {
-      const integrationRes = await this.dao.getIntegrationForUpdate(
-        trx,
-        dto.artist_id,
-      );
-      if (!integrationRes.rows.length) {
-        throw new BadRequest().integrationNotFound;
-      }
+    const amount = Number(dto.amount ?? 0);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new HttpException('Төлөх дүн буруу байна.', HttpStatus.BAD_REQUEST);
+    }
 
-      const integration = integrationRes.rows[0];
-      const integration_id = integration.id;
-      const paidRes = await this.dao.getPaidAmount(trx, integration_id);
-
-      const paidAmount = Number(paidRes.rows[0].total);
-      const totalAmount = Number(integration.amount);
-      const balance = totalAmount - paidAmount;
-
-      if (Number(dto.amount) > balance) {
-        BadRequest.integrationAmountExceeded(balance);
-      }
-
-      await this.dao.insertPayment(trx, {
-        ...dto,
-        id: AppUtils.uuid4(),
-        integration_id,
-      });
-
-      if (Number(dto.amount) === balance) {
-        await this.dao.updateIntegrationStatus(
-          trx,
-          integration_id,
-          SALARY_LOG_STATUS.Approved,
-        );
-      }
-
-      return true;
+    const id = await this.dao.add({
+      ...dto,
+      id: AppUtils.uuid4(),
+      ...(dto.integration_id ? { integration_id: dto.integration_id } : {}),
+      amount,
+      paid_at: dto.paid_at ?? new Date(),
+      status: STATUS.Active,
     });
+
+    if (!id) {
+      throw new HttpException(
+        'Шилжүүлэг хадгалахад алдаа гарлаа.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return true;
   }
   public async findAll(pg: PaginationDto, role: number) {
     const query = applyDefaultStatusFilter(

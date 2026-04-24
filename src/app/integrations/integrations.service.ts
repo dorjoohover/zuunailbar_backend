@@ -327,8 +327,6 @@ export class IntegrationService {
       income_amount: number;
       salary_amount: number;
       order_count: number;
-      transferred_amount: number;
-      balance_amount: number;
     };
 
     const rows: Row[] = artistIds
@@ -353,10 +351,6 @@ export class IntegrationService {
           order_count: Number(
             reconciliationItem?.order_count ?? salary?.order_count ?? 0,
           ),
-          transferred_amount: Number(
-            reconciliationItem?.transferred_amount ?? 0,
-          ),
-          balance_amount: Number(reconciliationItem?.balance_amount ?? 0),
         };
       })
       .sort((a, b) => a.artist.localeCompare(b.artist));
@@ -371,18 +365,11 @@ export class IntegrationService {
         { header: 'Нийт орлого', key: 'income_amount', width: 16 },
         { header: 'Цалин', key: 'salary_amount', width: 16 },
         { header: 'Захиалгын тоо', key: 'order_count', width: 14 },
-        { header: 'Шилжүүлсэн', key: 'transferred_amount', width: 16 },
-        { header: 'Үлдэгдэл', key: 'balance_amount', width: 16 },
       ] as any,
       rows as any,
       {
         sheetName: 'Salary Summary',
-        moneyKeys: [
-          'income_amount',
-          'salary_amount',
-          'transferred_amount',
-          'balance_amount',
-        ],
+        moneyKeys: ['income_amount', 'salary_amount'],
       },
     );
   }

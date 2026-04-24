@@ -307,6 +307,7 @@ export class PaymentService {
         ...item,
         amount: Number(item.amount ?? 0),
         pre_amount: Number(item.pre_amount ?? 0),
+        discount_amount: Number(item.discount_amount ?? 0),
         paid_amount: Number(item.paid_amount ?? 0),
         order_total_amount: Number(item.order_total_amount ?? 0),
       })),

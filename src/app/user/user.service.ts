@@ -292,8 +292,13 @@ export class UserService {
       const { ...body } = dto;
       const currentUser = await this.findOne(id);
       body.id = id;
+      if (typeof body.password === 'string') {
+        body.password = body.password.trim();
+      }
       if (body.password) {
         body.password = await bcrypt.hash(dto.password, saltOrRounds);
+      } else {
+        delete body.password;
       }
       if (body.branch_id !== undefined) {
         body.branch_name = body.branch_id

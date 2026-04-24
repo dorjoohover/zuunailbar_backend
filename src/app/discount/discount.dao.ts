@@ -67,8 +67,13 @@ export class DiscountDao {
   async getByService(id: string) {
     try {
       return await this._db.selectOne(
-        `SELECT * FROM "${tableName}" WHERE "service_id"=$1`,
-        [id],
+        `SELECT * FROM "${tableName}"
+         WHERE "service_id"=$1
+           AND "status" = $2
+           AND CURRENT_DATE BETWEEN "start_date"::date AND "end_date"::date
+         ORDER BY "created_at" DESC
+         LIMIT 1`,
+        [id, STATUS.Active],
       );
     } catch (error) {
       return null;
@@ -85,11 +90,12 @@ export class DiscountDao {
 
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('service_id', '=', query.service_id)
+      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('type', '=', query.type)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
+      .conditionIfNotEmpty('name', 'ILIKE', query.name)
       .criteria();
     let sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
     if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
@@ -105,12 +111,12 @@ export class DiscountDao {
     let nameCondition = ``;
     if (filter.merchantId) {
       filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
       .criteria();
     return await this._db.select(
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,

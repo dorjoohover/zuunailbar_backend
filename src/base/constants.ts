@@ -23,13 +23,18 @@ export function getDefinedKeys(
   return result;
 }
 export const MN_TZ = 'Asia/Ulaanbaatar' as const;
+const cleanNamePart = (value?: string | null) => {
+  const text = `${value ?? ''}`.trim();
+  return text.toLowerCase() === 'null' ? '' : text;
+};
 export const usernameFormatter = (user: User) => {
-  return (
-    user.nickname ??
-    `${user.lastname && `${firstLetterUpper(user.lastname)}.`}${
-      user.firstname ?? ''
-    }`
-  );
+  const nickname = cleanNamePart(user.nickname);
+  if (nickname) return nickname;
+
+  const lastname = cleanNamePart(user.lastname);
+  const firstname = cleanNamePart(user.firstname);
+  const formattedLastname = lastname ? `${firstLetterUpper(lastname)}.` : '';
+  return `${formattedLastname}${firstname}`.trim();
 };
 
 export const saltOrRounds = 1;
@@ -139,6 +144,11 @@ export enum VOUCHER {
   Price = 20,
   Service = 30,
 }
+export enum VoucherStatus {
+  Available = 10,
+  Used = 20,
+  Cancelled = 30,
+}
 export enum SCHEDULE_TYPE {
   Employee = 10,
   Branch = 20,
@@ -181,6 +191,8 @@ export enum UserLevel {
   BRONZE = 0,
   SILVER = 10,
   GOLD = 20,
+  JUNIOR = 100,
+  SENIOR = 110,
 }
 
 export enum OrderStatus {

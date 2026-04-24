@@ -197,6 +197,7 @@ describe('OrderService', () => {
   let userService: {
     getByServices: jest.Mock;
     findOne: jest.Mock;
+    hasActiveAssignment: jest.Mock;
   };
   let orderLog: {
     add: jest.Mock;
@@ -207,10 +208,13 @@ describe('OrderService', () => {
     checkPayment: jest.Mock;
   };
   let payment: {
+    listByOrder: jest.Mock;
+    markInvoicePaid: jest.Mock;
     syncManualPayments: jest.Mock;
   };
   let authService: {
     findOne?: jest.Mock;
+    sendCancelWarning: jest.Mock;
   };
   let db: {
     withTransaction: jest.Mock;
@@ -259,6 +263,7 @@ describe('OrderService', () => {
     userService = {
       getByServices: jest.fn(),
       findOne: jest.fn(),
+      hasActiveAssignment: jest.fn().mockResolvedValue(true),
     };
 
     orderLog = {
@@ -272,6 +277,8 @@ describe('OrderService', () => {
     };
 
     payment = {
+      listByOrder: jest.fn().mockResolvedValue([]),
+      markInvoicePaid: jest.fn(),
       syncManualPayments: jest.fn().mockResolvedValue({
         latestPaidAt: undefined,
         latestMethod: undefined,
@@ -279,7 +286,9 @@ describe('OrderService', () => {
       }),
     };
 
-    authService = {};
+    authService = {
+      sendCancelWarning: jest.fn(),
+    };
 
     db = {
       withTransaction: jest.fn().mockImplementation(async (fn) =>
@@ -493,6 +502,73 @@ describe('OrderService', () => {
         categories: ['category-1'],
       }),
     );
+  });
+
+  it('activates pending orders that already have a paid prepayment', async () => {
+    jest.spyOn(service, 'findOne').mockResolvedValue({
+      id: 'order-paid',
+      order_status: OrderStatus.Pending,
+      status: 10,
+      is_pre_amount_paid: false,
+    } as any);
+    dao.getCancelOrders.mockResolvedValue([
+      {
+        id: 'order-paid',
+        mobile: '99999999',
+        order_date: '2026-04-12',
+        start_time: '10:00:00',
+      },
+    ]);
+    payment.listByOrder.mockResolvedValue([
+      {
+        is_pre_amount: true,
+        status: 20,
+      },
+    ]);
+
+    await service.checkOrders();
+
+    expect(dao.updatePrePaid).toHaveBeenCalledWith('order-paid', true);
+    expect(dao.updateOrderStatus).toHaveBeenCalledWith(
+      'order-paid',
+      OrderStatus.Active,
+    );
+    expect(orderDetail.updateStatusByOrder).toHaveBeenCalledWith(
+      'order-paid',
+      OrderStatus.Active,
+    );
+    expect(authService.sendCancelWarning).not.toHaveBeenCalled();
+  });
+
+  it('does not cancel pending orders when qpay status check is unavailable', async () => {
+    jest.spyOn(service, 'findOne').mockResolvedValue({
+      id: 'order-waiting',
+      order_status: OrderStatus.Pending,
+      status: 10,
+      is_pre_amount_paid: false,
+    } as any);
+    dao.getCancelOrders.mockResolvedValue([
+      {
+        id: 'order-waiting',
+        mobile: '99999999',
+        order_date: '2026-04-12',
+        start_time: '10:00:00',
+      },
+    ]);
+    payment.listByOrder.mockResolvedValue([
+      {
+        invoice_id: 'invoice-1',
+        is_pre_amount: true,
+        status: 10,
+      },
+    ]);
+    qpay.checkPayment.mockRejectedValue(new Error('network'));
+
+    await service.checkOrders();
+
+    expect(dao.updateOrderStatus).not.toHaveBeenCalled();
+    expect(orderDetail.updateStatusByOrder).not.toHaveBeenCalled();
+    expect(authService.sendCancelWarning).not.toHaveBeenCalled();
   });
 
   it('rejects order details that exceed shift finish boundary', async () => {

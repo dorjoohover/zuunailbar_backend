@@ -31,17 +31,22 @@ export class SqlBuilder {
     this.columns = columns;
   }
 
+  private normalizeCondition(cond: string) {
+    return cond.toUpperCase() === 'LIKE' ? 'ILIKE' : cond;
+  }
+
   condition(column: string, cond: string, value: any) {
     const quote = column.indexOf(`"`) === -1 ? `"` : '';
+    const normalizedCond = this.normalizeCondition(cond);
     if (value !== undefined && value !== null && value !== '') {
       this.values.push(value);
       this.conditions.push(
-        `${quote}${column}${quote} ${cond} $${this.values.length}`,
+        `${quote}${column}${quote} ${normalizedCond} $${this.values.length}`,
       );
       return this;
     }
-    if (cond === 'IS NULL' || cond === 'IS NOT NULL') {
-      this.conditions.push(`${quote}${column}${quote} ${cond}`);
+    if (normalizedCond === 'IS NULL' || normalizedCond === 'IS NOT NULL') {
+      this.conditions.push(`${quote}${column}${quote} ${normalizedCond}`);
     }
     throw new AppDBInvalidDataException(`Empty value for "${column}"`);
   }
@@ -57,8 +62,9 @@ export class SqlBuilder {
       ) {
         this.values.push(condition.value);
         const quote = condition.column.indexOf(`"`) === -1 ? `"` : '';
+        const normalizedCond = this.normalizeCondition(condition.cond);
         subConditions.push(
-          `${quote}${condition.column}${quote} ${condition.cond} $${this.values.length}`,
+          `${quote}${condition.column}${quote} ${normalizedCond} $${this.values.length}`,
         );
       } else if (
         condition.cond === 'IS NULL' ||
@@ -80,8 +86,9 @@ export class SqlBuilder {
     if (value !== undefined && value !== null && value !== '') {
       this.values.push(value);
       const quote = column.indexOf(`"`) === -1 ? `"` : '';
+      const normalizedCond = this.normalizeCondition(cond);
       this.conditions.push(
-        `${quote}${column}${quote} ${cond} $${this.values.length}`,
+        `${quote}${column}${quote} ${normalizedCond} $${this.values.length}`,
       );
     }
 

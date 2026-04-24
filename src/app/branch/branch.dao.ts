@@ -150,10 +150,10 @@ export class BranchDao {
 
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('merchant_id', '=', query.merchant_id)
       .conditionIfNotEmpty('address', 'lIKE', query.address)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
+      .conditionIfNotEmpty('name', 'ILIKE', query.name)
       .conditionIfNotEmpty('status', '=', query.status)
 
       .criteria();
@@ -171,12 +171,12 @@ export class BranchDao {
     let nameCondition = ``;
     if (filter.id) {
       filter.id = `%${filter.id.toLowerCase()}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('name', 'LIKE', filter.id)
+      .conditionIfNotEmpty('name', 'ILIKE', filter.id)
       .criteria();
     return await this._db.select(
       ` SELECT "id",

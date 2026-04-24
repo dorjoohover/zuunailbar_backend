@@ -19,6 +19,7 @@ export class IntegrationPaymentDao {
       'amount',
       'paid_by',
       'paid_at',
+      'status',
     ]);
   }
   async transaction<T>(callback: (trx: any) => Promise<T>): Promise<T> {
@@ -27,19 +28,54 @@ export class IntegrationPaymentDao {
     });
   }
 
+  async getLatestIntegrationId(
+    artist_id: string,
+    integration_id?: string | null,
+  ) {
+    const values: Array<string | number> = [artist_id, STATUS.Active];
+    let sql = `
+      SELECT "id"
+      FROM "integrations"
+      WHERE "artist_id" = $1
+        AND COALESCE("status", $2) = $2
+    `;
+
+    if (integration_id) {
+      values.push(integration_id);
+      sql += ` AND "id" = $${values.length}`;
+    }
+
+    sql += `
+      ORDER BY "date" DESC NULLS LAST, "created_at" DESC
+      LIMIT 1
+    `;
+
+    return await this._db.selectOne(sql, values);
+  }
+
   // ---- Existing methods ----
 
-  async getIntegrationForUpdate(trx, artist_id: string) {
-    return trx.query(
-      `SELECT * FROM integrations
+  async getIntegrationForUpdate(
+    trx,
+    artist_id: string,
+    integration_id?: string | null,
+  ) {
+    const values: Array<string | number> = [artist_id];
+    let sql = `SELECT * FROM integrations
        WHERE artist_id = $1
          AND salary_status = ${SALARY_LOG_STATUS.Pending}
-         AND COALESCE(status, ${STATUS.Active}) = ${STATUS.Active}
+         AND COALESCE(status, ${STATUS.Active}) = ${STATUS.Active}`;
+
+    if (integration_id) {
+      values.push(integration_id);
+      sql += ` AND id = $${values.length}`;
+    }
+
+    sql += `
        ORDER BY date ASC NULLS FIRST, created_at ASC
-       LIMIT 1
-       FOR UPDATE`,
-      [artist_id],
-    );
+       FOR UPDATE`;
+
+    return trx.query(sql, values);
   }
 
   async getPaidAmount(trx, integrationId: string) {
@@ -52,11 +88,22 @@ export class IntegrationPaymentDao {
     );
   }
 
+  async getPaidAmounts(trx, integrationIds: string[]) {
+    return trx.query(
+      `SELECT integration_id, COALESCE(SUM(amount), 0) AS total
+       FROM integration_payments
+       WHERE integration_id = ANY($1::text[])
+         AND COALESCE(status, $2) = $2
+       GROUP BY integration_id`,
+      [integrationIds, STATUS.Active],
+    );
+  }
+
   async insertPayment(trx, dto: any) {
     return trx.query(
       `INSERT INTO integration_payments
        (id, integration_id, artist_id, type, amount, paid_by, paid_at, status)
-       VALUES ($1,$2,$3,$4,$5,$6,now(),$7)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [
         dto.id,
         dto.integration_id,
@@ -64,6 +111,7 @@ export class IntegrationPaymentDao {
         dto.type,
         dto.amount,
         dto.paid_by,
+        dto.paid_at ?? new Date(),
         STATUS.Active,
       ],
     );
@@ -129,7 +177,7 @@ export class IntegrationPaymentDao {
 
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('integration_id', '=', query.integration_id)
       .conditionIfNotEmpty('artist_id', '=', query.artist_id)
       .conditionIfNotEmpty('paid_by', '=', query.paid_by)
@@ -189,12 +237,12 @@ export class IntegrationPaymentDao {
     let nameCondition = ``;
     if (filter.merchantId) {
       filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
       .criteria();
     return await this._db.select(
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,

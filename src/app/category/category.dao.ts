@@ -64,10 +64,10 @@ export class CategoryDao {
 
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('type', '=', query.type)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
+      .conditionIfNotEmpty('name', 'ILIKE', query.name)
       .criteria();
     let sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
 
@@ -87,7 +87,7 @@ export class CategoryDao {
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.id)
+      .conditionIfNotEmpty('LOWER("name")', 'ILIKE', filter.id)
       .conditionIfNotEmpty('type', '=', filter.type)
       .conditionIfNotEmpty('status', '=', STATUS.Active)
       .criteria();

@@ -40,17 +40,34 @@ export class ProductTransactionService {
   }
 
   public async update(id: string, dto: ProductTransactionDto) {
-    if (dto.quantity) {
-      const transaction = await this.dao.getById(id);
-      const diff = Math.abs(+dto.quantity - +transaction.quantity);
+    const transaction = await this.dao.getById(id);
+    const nextProductId = dto.product_id ?? transaction.product_id;
+    const nextQuantity =
+      dto.quantity !== undefined && dto.quantity !== null
+        ? +dto.quantity
+        : +transaction.quantity;
+
+    if (nextProductId !== transaction.product_id) {
+      await this.product.updateQuantity(
+        transaction.product_id,
+        +transaction.quantity,
+      );
+      await this.product.updateQuantity(nextProductId, -nextQuantity);
+    } else {
+      const diff = +transaction.quantity - nextQuantity;
       if (diff != 0) {
-        await this.product.updateQuantity(dto.product_id, -diff);
+        await this.product.updateQuantity(nextProductId, diff);
       }
     }
     return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
   }
 
   public async remove(id: string) {
+    const transaction = await this.dao.getById(id);
+    await this.product.updateQuantity(
+      transaction.product_id,
+      +transaction.quantity,
+    );
     return await this.dao.updateStatus(id, STATUS.Hidden);
   }
 }

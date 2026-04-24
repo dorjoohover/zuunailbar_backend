@@ -108,7 +108,7 @@ export class UserProductsDao {
     }
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('product_id', '=', query.product_id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
@@ -134,12 +134,12 @@ export class UserProductsDao {
     let nameCondition = ``;
     if (filter.merchantId) {
       filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
       .criteria();
     return await this._db.select(
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,

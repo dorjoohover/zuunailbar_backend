@@ -36,6 +36,11 @@ export class OrdersDao {
         'total_amount',
         'paid_amount',
         'description',
+        'discount_type',
+        'discount',
+        'voucher_id',
+        'voucher_name',
+        'voucher_value',
         'order_status',
       ]);
     } catch (error) {
@@ -62,6 +67,11 @@ export class OrdersDao {
           'total_amount',
           'paid_amount',
           'description',
+          'discount_type',
+          'discount',
+          'voucher_id',
+          'voucher_name',
+          'voucher_value',
           'parallel',
 
           'order_status',
@@ -153,6 +163,12 @@ export class OrdersDao {
     return await this._db.selectOne(
       `SELECT
         o.*,
+        (
+          SELECT b."name"
+          FROM "branches" b
+          WHERE b."id" = o."branch_id"
+          LIMIT 1
+        ) AS branch_name,
         (
           SELECT p.method
           FROM "payments" p
@@ -260,9 +276,18 @@ export class OrdersDao {
     categories?: string[];
     date?: Date | string;
     parallel?: boolean;
+    requireAllCategoriesForQueue?: boolean;
     time?: Date | string;
   }) {
-    const { branch_id, parallel, artists, categories, date, time } = input;
+    const {
+      branch_id,
+      parallel,
+      artists,
+      categories,
+      date,
+      requireAllCategoriesForQueue = true,
+      time,
+    } = input;
 
     const params: any[] = [];
     let i = 1;
@@ -305,7 +330,7 @@ GROUP BY date, start_time, artist_id, branch_id, finish_time
 HAVING MIN(available) > 0
 AND COUNT(*) FILTER (WHERE end_time IS NOT NULL) = 0
 `;
-    if (!parallel && categories?.length) {
+    if (!parallel && categories?.length && requireAllCategoriesForQueue) {
       sql += ` AND COUNT(DISTINCT category_id) = ${categories.length}`;
     }
     sql += ` ORDER BY date, start_time    
@@ -432,7 +457,7 @@ AND COUNT(*) FILTER (WHERE end_time IS NOT NULL) = 0
     const builder = new SqlBuilder(query);
     builder
       // nemne
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
       .conditionIfNotEmpty('costumer_id', '=', query.costumer_id)
       .conditionIfNotEmpty('o.status', '=', query.status)
@@ -470,6 +495,35 @@ WHERE key = 'availability_days';`;
     return await this._db.select(sql, []);
   }
 
+  async getConfigValues(keys: string[]) {
+    if (!keys.length) return {};
+    const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
+    const rows = await this._db.select(
+      `SELECT "key", "value", "value_text" FROM app_config WHERE "key" IN (${placeholders})`,
+      keys,
+    );
+    return rows.reduce((acc, row) => {
+      acc[row.key] = row;
+      return acc;
+    }, {});
+  }
+
+  async upsertConfigValues(
+    values: { key: string; value: number; value_text?: string | null }[],
+  ) {
+    for (const item of values) {
+      await this._db._update(
+        `INSERT INTO app_config ("key", "value", "value_text")
+         VALUES ($1, $2, $3)
+         ON CONFLICT ("key") DO UPDATE
+         SET "value" = EXCLUDED."value",
+             "value_text" = EXCLUDED."value_text"`,
+        [item.key, item.value, item.value_text ?? null],
+      );
+    }
+    return true;
+  }
+
   async customerCheck(customer_id: string): Promise<number> {
     const sql = `
     SELECT COUNT(*) AS count
@@ -501,7 +555,7 @@ WHERE key = 'availability_days';`;
     const builder = new SqlBuilder(query);
     builder
       // nemne
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('customer_id', '=', query.customer_id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('start_time', '=', query.times)
@@ -527,6 +581,18 @@ WHERE key = 'availability_days';`;
     let additional = '';
 
     builder.conditionIfNotEmpty('order_status', '=', query.order_status);
+    if (query.user_id) {
+      builder.conditionRaw(
+        `EXISTS (
+          SELECT 1
+          FROM "order_details" od
+          WHERE od."order_id" = o."id"
+            AND od."user_id" = $${builder.values.length + 1}
+            AND COALESCE(od."view_status", ${STATUS.Active}) = ${STATUS.Active}
+        )`,
+        [query.user_id],
+      );
+    }
     if (query.customers?.length) {
       builder.values.push(query.customers);
       const index = builder.values.length;
@@ -534,6 +600,12 @@ WHERE key = 'availability_days';`;
     }
     const criteria = builder.criteria();
     const defaultColumns = `o.*,
+      (
+        SELECT b."name"
+        FROM "branches" b
+        WHERE b."id" = o."branch_id"
+        LIMIT 1
+      ) AS branch_name,
       (
         SELECT p.method
         FROM "payments" p
@@ -566,12 +638,12 @@ WHERE key = 'availability_days';`;
     let nameCondition = ``;
     if (filter.merchantId) {
       filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
       .conditionIfNotEmpty('order_status', '!=', OrderStatus.Friend)
       .conditionIfNotEmpty('status', '!=', STATUS.Hidden)
       .criteria();

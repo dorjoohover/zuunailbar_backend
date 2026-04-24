@@ -143,17 +143,17 @@ export class UserDao {
     query.limit == -1 ? (query.limit = undefined) : query.limit;
     const builder = new SqlBuilder(query);
     builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('user_status', '=', query.user_status)
-      .conditionIfNotEmpty('description', 'LIKE', query.description)
-      .conditionIfNotEmpty('firstname', 'LIKE', query.firstname)
-      .conditionIfNotEmpty('lastname', 'LIKE', query.lastname)
+      .conditionIfNotEmpty('description', 'ILIKE', query.description)
+      .conditionIfNotEmpty('firstname', 'ILIKE', query.firstname)
+      .conditionIfNotEmpty('lastname', 'ILIKE', query.lastname)
       .conditionIfNotEmpty('birthday', '=', query.birthday)
       .conditionIfNotEmpty('level', '=', query.level)
-      // .conditionIfNotEmpty('mobile', 'LIKE', query.mobile)
-      // .conditionIfNotEmpty('nickname', 'LIKE', query.nickname)
+      // .conditionIfNotEmpty('mobile', 'ILIKE', query.mobile)
+      // .conditionIfNotEmpty('nickname', 'ILIKE', query.nickname)
       .conditionIfNotEmpty(
         'role',
         query.role == 35 ? '<=' : '=',
@@ -166,8 +166,8 @@ export class UserDao {
       );
     if (query.mobile) {
       builder.orConditions([
-        new SqlCondition('mobile', 'LIKE', query.mobile),
-        new SqlCondition('nickname', 'LIKE', query.mobile),
+        new SqlCondition('mobile', 'ILIKE', query.mobile),
+        new SqlCondition('nickname', 'ILIKE', query.mobile),
       ]);
     }
     const criteria = builder.criteria();
@@ -227,8 +227,8 @@ export class UserDao {
         filter.role == 35 ? 30 : filter.role,
       )
       .orConditions([
-        new SqlCondition('LOWER("nickname")', 'LIKE', filter.id),
-        new SqlCondition('LOWER("mobile")', 'LIKE', filter.id),
+        new SqlCondition('LOWER("nickname")', 'ILIKE', filter.id),
+        new SqlCondition('LOWER("mobile")', 'ILIKE', filter.id),
       ]);
 
     const criteria = builder.criteria();

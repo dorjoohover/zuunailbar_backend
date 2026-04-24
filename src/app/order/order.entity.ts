@@ -15,6 +15,9 @@ export class Order {
   description: string;
   discount: number;
   discount_type: number;
+  voucher_id?: string | null;
+  voucher_name?: string | null;
+  voucher_value?: number | null;
   status: number;
   created_at?: Date;
   created_by?: string;

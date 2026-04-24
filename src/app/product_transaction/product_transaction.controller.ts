@@ -51,7 +51,14 @@ export class ProductTransactionController {
   }
   @Get('admin')
   @Manager()
-  @PQ(['user_id', 'product_id', 'branch_id', 'status', 'transaction_status'])
+  @PQ([
+    'user_id',
+    'product_id',
+    'branch_id',
+    'status',
+    'transaction_status',
+    'product_transaction_status',
+  ])
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.productTransactionService.findAll(pg, user.user.role);
   }

@@ -111,8 +111,8 @@ export class AdminUserDao {
     const builder = new SqlBuilder(filter);
 
     const criteria = builder
-      .conditionIfNotEmpty('name', 'LIKE', filter.name)
-      .conditionIfNotEmpty('username', 'LIKE', filter.username)
+      .conditionIfNotEmpty('name', 'ILIKE', filter.name)
+      .conditionIfNotEmpty('username', 'ILIKE', filter.username)
       .conditionIfNotEmpty('role', '=', filter.role)
       .conditionIfNotEmpty('created_at', '>=', filter.startDate)
       .conditionIfNotEmpty('created_at', '<=', filter.endDate)
@@ -127,15 +127,15 @@ export class AdminUserDao {
     if (filter.searchByUsername && filter.name) {
       const namePattern = `%${filter.name}%`;
       builder.orConditions([
-        new SqlCondition('username', 'LIKE', namePattern),
-        new SqlCondition('name', 'LIKE', namePattern),
+        new SqlCondition('username', 'ILIKE', namePattern),
+        new SqlCondition('name', 'ILIKE', namePattern),
       ]);
       selectFields = `"username" as "id", "name" as "value"`;
     } else if (filter.name) {
       const namePattern = `%${filter.name}%`;
       builder.orConditions([
-        new SqlCondition('id', 'LIKE', namePattern),
-        new SqlCondition('name', 'LIKE', namePattern),
+        new SqlCondition('id', 'ILIKE', namePattern),
+        new SqlCondition('name', 'ILIKE', namePattern),
       ]);
     }
 

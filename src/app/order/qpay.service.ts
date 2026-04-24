@@ -193,10 +193,11 @@ export class QpayService {
   ) {
     try {
       const phone = MobileParser(mobile);
+      const senderInvoiceNo = `${phone}-${order_id.slice(0, 12)}`;
       const res = await this.requestWithToken('POST', 'invoice', {
         // invoice_code: 'Zuunailbar',
         invoice_code: process.env.QPAY_INVOICE_CODE,
-        sender_invoice_no: `${phone}`,
+        sender_invoice_no: senderInvoiceNo,
         sender_branch_code: branch,
         invoice_receiver_code: `${userId}`,
         amount,

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Voucher } from './voucher.entity';
+import { STATUS, VoucherStatus } from 'src/base/constants';
 
 const tableName = 'vouchers';
 
@@ -16,8 +17,16 @@ export class VoucherDao {
       'user_id',
       'service_name',
       'user_name',
+      'mobile',
       'status',
       'type',
+      'value',
+      'level',
+      'voucher_status',
+      'note',
+      'used_order_id',
+      'used_order_date',
+      'used_at',
     ]);
   }
 
@@ -48,6 +57,35 @@ export class VoucherDao {
     );
   }
 
+  async getConfigValues(keys: string[]) {
+    if (!keys.length) return {};
+    const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
+    const rows = await this._db.select(
+      `SELECT "key", "value", "value_text" FROM app_config WHERE "key" IN (${placeholders})`,
+      keys,
+    );
+    return rows.reduce((acc, row) => {
+      acc[row.key] = row;
+      return acc;
+    }, {});
+  }
+
+  async upsertConfigValues(
+    values: { key: string; value: number; value_text?: string | null }[],
+  ) {
+    for (const item of values) {
+      await this._db._update(
+        `INSERT INTO app_config ("key", "value", "value_text")
+         VALUES ($1, $2, $3)
+         ON CONFLICT ("key") DO UPDATE
+         SET "value" = EXCLUDED."value",
+             "value_text" = EXCLUDED."value_text"`,
+        [item.key, item.value, item.value_text ?? null],
+      );
+    }
+    return true;
+  }
+
   async getByMobile(mobile: string) {
     return await this._db.select(
       `SELECT * FROM "${tableName}" WHERE "mobile"=$1`,
@@ -68,6 +106,25 @@ export class VoucherDao {
     );
   }
 
+  async availableByUser(userId: string, orderId?: string) {
+    const params: any[] = [userId, VoucherStatus.Available, STATUS.Active];
+    let usedBySameOrder = '';
+    if (orderId) {
+      params.push(orderId);
+      usedBySameOrder = ` OR "used_order_id"=$${params.length}`;
+    }
+
+    return await this._db.select(
+      `SELECT *
+       FROM "${tableName}"
+       WHERE "user_id"=$1
+         AND "status"=$3
+         AND ("voucher_status"=$2${usedBySameOrder})
+       ORDER BY "created_at" DESC`,
+      params,
+    );
+  }
+
   async list(query) {
     try {
       if (query.id) {
@@ -78,19 +135,24 @@ export class VoucherDao {
       }
 
       const builder = new SqlBuilder(query);
-      const criteria = builder
-        .conditionIfNotEmpty('id', 'LIKE', query.id)
-        .conditionIfNotEmpty('name', 'LIKE', query.name)
-        .conditionIfNotEmpty('user_id', '=', query.user_id)
-        .conditionIfNotEmpty('service_id', '=', query.service_id)
-        .conditionIfNotEmpty('status', '=', query.status)
-        .conditionIfNotEmpty('type', '=', query.type)
-        .criteria();
+      builder
+        .conditionIfNotEmpty('v."id"', 'ILIKE', query.id)
+        .conditionIfNotEmpty('v."name"', 'ILIKE', query.name)
+        .conditionIfNotEmpty('v."user_id"', '=', query.user_id)
+        .conditionIfNotEmpty('v."service_id"', '=', query.service_id)
+        .conditionIfNotEmpty('v."status"', '=', query.status)
+        .conditionIfNotEmpty('v."type"', '=', query.type)
+        .conditionIfNotEmpty('v."voucher_status"', '=', query.voucher_status)
+        .conditionIfNotEmpty('v."level"', '=', query.level);
+      const criteria = builder.criteria();
       const sql =
-        `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+        `SELECT v.*, COALESCE(v."user_name", u."nickname") AS "user_name", u."mobile" AS "mobile", u."level" AS "user_level"
+         FROM "${tableName}" v
+         LEFT JOIN "users" u ON u."id" = v."user_id"
+         ${criteria} order by v."created_at" ${query.sort === 'false' ? 'asc' : 'desc'} ` +
         `${query.limit ? `limit ${query.limit}` : ''}` +
         ` offset ${+query.skip * +(query.limit ?? 0)}`;
-      const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+      const countSql = `SELECT COUNT(*) FROM "${tableName}" v ${criteria}`;
       const count = await this._db.count(countSql, builder.values);
       const items = await this._db.select(sql, builder.values);
       return { count, items };
@@ -103,12 +165,12 @@ export class VoucherDao {
     let nameCondition = ``;
     if (filter.merchantId) {
       filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
       .criteria();
     return await this._db.select(
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,

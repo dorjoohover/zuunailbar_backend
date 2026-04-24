@@ -51,9 +51,9 @@ export class BrandDao {
 
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
+      .conditionIfNotEmpty('name', 'ILIKE', query.name)
       .criteria();
     let sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
     if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
@@ -72,7 +72,7 @@ export class BrandDao {
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('LOWER("name")', 'LIKE', filter.id)
+      .conditionIfNotEmpty('LOWER("name")', 'ILIKE', filter.id)
       .conditionIfNotEmpty('status', '=', STATUS.Active)
 
       .criteria();

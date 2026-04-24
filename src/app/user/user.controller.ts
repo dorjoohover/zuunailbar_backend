@@ -111,7 +111,7 @@ export class UserController {
   }
 
   @SAP()
-  @Patch('update/:id')
+  @Patch('one/:id')
   update(@Param('id') id: string, @Body() dto: UserDto) {
     return this.userService.update(id, dto);
   }

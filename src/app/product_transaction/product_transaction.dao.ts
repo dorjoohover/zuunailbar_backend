@@ -69,10 +69,12 @@ export class ProductTransactionDao {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
+    const transactionStatus =
+      query.transaction_status ?? query.product_transaction_status;
 
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('user_id', '=', query.user_id)
       .conditionIfNotEmpty('product_id', '=', query.product_id)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
@@ -80,7 +82,7 @@ export class ProductTransactionDao {
       .conditionIfNotEmpty(
         'product_transaction_status',
         '=',
-        query.transaction_status,
+        transactionStatus,
       )
 
       .criteria();
@@ -98,12 +100,12 @@ export class ProductTransactionDao {
     let nameCondition = ``;
     if (filter.merchantId) {
       filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
       .criteria();
     return await this._db.select(
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,

@@ -34,7 +34,16 @@ export class CostController {
     return this.costService.create(dto, user.branch);
   }
 
-  @PQ(['category_id', 'product_id', 'date', 'cost_status', 'branch_id'])
+  @PQ([
+    'category_id',
+    'product_id',
+    'date',
+    'start_date',
+    'end_date',
+    'cost_status',
+    'branch_id',
+    'name',
+  ])
   @Get()
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.costService.findAll(pg, user.user.role);

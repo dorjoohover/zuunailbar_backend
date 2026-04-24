@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { ProductWarehouse } from './product_warehouse.entity';
+import { STATUS } from 'src/base/constants';
 
 const tableName = 'product_warehouses';
 
@@ -31,14 +32,37 @@ export class ProductWarehouseDao {
 
   async getByProductWarehouse(productId: string, warehouseId: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "product_id"=$1 and "warehouse_id"=$2`,
-      [productId, warehouseId],
+      `SELECT * FROM "${tableName}" WHERE "product_id"=$1 and "warehouse_id"=$2 and "status"=$3`,
+      [productId, warehouseId, STATUS.Active],
     );
   }
   async getByWarehouse(warehouseId: string) {
     return await this._db.select(
-      `SELECT product_id, quantity FROM "${tableName}" WHERE  "warehouse_id"=$1`,
-      [warehouseId],
+      `SELECT product_id, quantity FROM "${tableName}" WHERE "warehouse_id"=$1 and "status"=$2`,
+      [warehouseId, STATUS.Active],
+    );
+  }
+  async getQuantitySummary(productIds: string[], warehouseId?: string) {
+    if (!productIds?.length) return [];
+
+    return await this._db.select(
+      `SELECT
+        "product_id",
+        COALESCE(SUM("quantity"), 0)::int as "total_quantity",
+        COALESCE(
+          SUM(
+            CASE
+              WHEN $2::varchar IS NOT NULL AND "warehouse_id" = $2::varchar
+                THEN "quantity"
+              ELSE 0
+            END
+          ),
+          0
+        )::int as "warehouse_quantity"
+      FROM "${tableName}"
+      WHERE "status"=$1 AND "product_id" = ANY($3::varchar[])
+      GROUP BY "product_id"`,
+      [STATUS.Active, warehouseId ?? null, productIds],
     );
   }
   async updateStatus(id: string, status: number): Promise<number> {
@@ -78,13 +102,13 @@ export class ProductWarehouseDao {
 
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('warehouse_id', '=', query.warehouse_id)
       .conditionIfNotEmpty('product_id', '=', query.product_id)
       .conditionIfNotEmpty('status', '=', query.status)
       .orConditions([
-        new SqlCondition('product_name', 'LIKE', query.name),
-        new SqlCondition('warehouse_name', 'LIKE', query.name),
+        new SqlCondition('product_name', 'ILIKE', query.name),
+        new SqlCondition('warehouse_name', 'ILIKE', query.name),
       ])
       .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date')
       .criteria();
@@ -102,12 +126,12 @@ export class ProductWarehouseDao {
     let nameCondition = ``;
     if (filter.merchantId) {
       filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
       .criteria();
     return await this._db.select(
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,

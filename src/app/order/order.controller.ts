@@ -59,7 +59,15 @@ export class OrderController {
   }
 
   @Get()
-  @PQ(['order_status', 'friend'])
+  @PQ([
+    'date',
+    'end_date',
+    'order_status',
+    'user_id',
+    'branch_id',
+    'customer',
+    'friend',
+  ])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.orderService.find(pg, user.user.role, user.user.id);
   }
@@ -126,13 +134,27 @@ export class OrderController {
     return this.orderService.getOrderLimit();
   }
   @Get('slots')
-  @PQ(['artists', 'date', 'branch_id', 'parellel', 'artist_id'])
+  @PQ([
+    'artists',
+    'date',
+    'branch_id',
+    'parellel',
+    'artist_id',
+    'multi_artist_queue',
+  ])
   findSlots(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.orderService.getSlots(pg);
   }
   @Public()
   @Get('public/slots')
-  @PQ(['artists', 'date', 'branch_id', 'parellel', 'artist_id'])
+  @PQ([
+    'artists',
+    'date',
+    'branch_id',
+    'parellel',
+    'artist_id',
+    'multi_artist_queue',
+  ])
   findPublicSlots(@Pagination() pg: PaginationDto) {
     return this.orderService.getSlots(pg);
   }
@@ -174,6 +196,15 @@ export class OrderController {
   ) {
     return this.orderService.checkPayment(
       invoice,
+      id,
+      user.user.id,
+      user.user.role,
+    );
+  }
+  @Get('payment/:id')
+  @ApiParam({ name: 'id' })
+  async payment(@Param('id') id: string, @Req() { user }) {
+    return this.orderService.getPaymentInvoice(
       id,
       user.user.id,
       user.user.role,

@@ -90,7 +90,7 @@ export class ScheduleDao {
 
       const builder = new SqlBuilder(query);
       builder
-        .conditionIfNotEmpty('id', 'LIKE', query.id)
+        .conditionIfNotEmpty('id', 'ILIKE', query.id)
         .conditionIfNotEmpty('approved_by', '=', query.approved_by)
         .conditionIfNotEmpty('branch_id', '=', query.branch_id)
         .conditionIfNotEmpty('schedule_status', '=', query.schedule_status)
@@ -115,13 +115,20 @@ export class ScheduleDao {
     let nameCondition = ``;
     if (filter.merchantId) {
       filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
       .conditionIfNotEmpty('index', '=', filter.index)
+      .conditionIfNotEmpty(
+        'schedule_status',
+        '=',
+        filter.schedule_status ?? ScheduleStatus.Active,
+      )
+      .conditionIsNotNull('times')
+      .conditionRaw(`"times" <> ''`)
       .criteria();
     return await this._db.select(
       `SELECT "id", "user_id", "times" as value FROM "${tableName}" ${criteria}${nameCondition}`,

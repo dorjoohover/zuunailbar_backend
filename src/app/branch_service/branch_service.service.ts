@@ -25,17 +25,10 @@ export class BranchServiceService {
       if (!service) throw new BadRequest().notFound('Үйлчилгээ');
       const branch = await this.branchService.findOne(dto.branch_id);
       if (!branch) throw new BadRequest().notFound('Салбар');
-      const meta = {
-        branchName: branch.name,
-        serviceName: service.name,
-        description: service.description ?? '',
-        categoryName: service.meta?.name,
-      };
       const res = await this.dao.add({
         id: AppUtils.uuid4(),
         ...dto,
         index: service.index,
-        meta,
         created_by: u.id,
       });
       await this.updateServiceCountById(res.id, dto.service_count);
@@ -125,20 +118,12 @@ export class BranchServiceService {
       });
       await Promise.all(
         items.items.map(async (item) => {
-          const prevMeta = {
-            branchName: item.meta.branchName,
-          };
-          const meta = {
-            ...dto.meta,
-            ...prevMeta,
-          };
           await this.dao.update(
             {
               duration: dto.duration,
               max_price: dto.max_price,
               min_price: dto.min_price,
               pre: dto.pre,
-              meta,
               id: item.id,
               index: dto.index,
               updated_at: mnDate(),

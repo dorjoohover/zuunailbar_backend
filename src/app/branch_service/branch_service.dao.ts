@@ -66,7 +66,24 @@ export class BranchServiceDao {
 
   async getById(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "id"=$1`,
+      `SELECT
+        t.*,
+        b.name AS branch_name,
+        s.name AS service_name,
+        sc.name AS category_name,
+        jsonb_strip_nulls(
+          jsonb_build_object(
+            'serviceName', s.name,
+            'branchName', b.name,
+            'description', COALESCE(s.description, ''),
+            'categoryName', sc.name
+          )
+        ) AS meta
+      FROM "${tableName}" t
+      LEFT JOIN services s ON s.id = t.service_id
+      LEFT JOIN service_categories sc ON sc.id = s.category_id
+      LEFT JOIN branches b ON b.id = t.branch_id
+      WHERE t."id"=$1`,
       [id],
     );
   }
@@ -123,16 +140,44 @@ export class BranchServiceDao {
     const builder = new SqlBuilder(query);
 
     builder
-      .conditionIfNotEmpty('id', '=', query.id)
-      .conditionIfNotEmpty('service_id', '=', query.service_id)
-      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
-      .conditionIfNotEmpty('status', '=', STATUS.Active);
+      .conditionIfNotEmpty('"t"."id"', '=', query.id)
+      .conditionIfNotEmpty('"t"."service_id"', '=', query.service_id)
+      .conditionIfNotEmpty('"t"."branch_id"', '=', query.branch_id)
+      .conditionIfNotEmpty('"t"."status"', '=', query.status ?? STATUS.Active);
 
     const criteria = builder.criteria();
-    let sql = `SELECT ${columns ?? '*'} FROM "${tableName}" ${criteria} order by ${query.order_by ?? 'created_at'} ${query.sort === 'false' ? 'asc' : 'desc'} `;
+    const allowedOrderColumns = new Set([
+      'created_at',
+      'updated_at',
+      'index',
+      'min_price',
+      'max_price',
+      'pre',
+      'duration',
+    ]);
+    const orderBy = allowedOrderColumns.has(query.order_by)
+      ? query.order_by
+      : 'created_at';
+    const defaultColumns = `t.*,
+      b.name AS branch_name,
+      s.name AS service_name,
+      sc.name AS category_name,
+      jsonb_strip_nulls(
+        jsonb_build_object(
+          'serviceName', s.name,
+          'branchName', b.name,
+          'description', COALESCE(s.description, ''),
+          'categoryName', sc.name
+        )
+      ) AS meta`;
+    let sql = `SELECT ${columns ?? defaultColumns} FROM "${tableName}" t
+      LEFT JOIN services s ON s.id = t.service_id
+      LEFT JOIN service_categories sc ON sc.id = s.category_id
+      LEFT JOIN branches b ON b.id = t.branch_id
+      ${criteria} order by t."${orderBy}" ${query.sort === 'false' ? 'asc' : 'desc'} `;
     if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
     if (query.skip) ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" t ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };

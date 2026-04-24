@@ -85,12 +85,12 @@ export class ServiceDao {
 
     const builder = new SqlBuilder(query);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', query.id)
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('merchant_id', '=', query.merchant_id)
       .conditionIfNotEmpty('category_id', '=', query.category_id)
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('view', '=', query.view)
-      .conditionIfNotEmpty('name', 'LIKE', query.name)
+      .conditionIfNotEmpty('name', 'ILIKE', query.name)
       .criteria();
     let sql = `SELECT ${column ?? '*'} FROM "${tableName}" ${criteria} order by index ${query.sort === 'false' ? 'asc' : 'desc'} `;
     if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;

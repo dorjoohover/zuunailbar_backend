@@ -49,6 +49,79 @@ import { OrderLogDao } from './order.log.dao';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { AuthService } from 'src/auth/auth.service';
 
+const normalizePriceValue = (value?: number | string | null) => {
+  const amount = Number(value ?? 0);
+
+  if (!Number.isFinite(amount)) return 0;
+
+  return Math.max(amount, 0);
+};
+
+const normalizeOrderDetailPrices = <T extends { price?: number | null }>(
+  details: T[],
+  orderTotal?: number | null,
+  orderDiscount?: number | null,
+) => {
+  if (!Array.isArray(details) || details.length === 0) return [];
+
+  const normalizedDetails = details.map((detail) => ({
+    ...detail,
+    price: normalizePriceValue(detail?.price),
+  }));
+  const subtotal = normalizedDetails.reduce(
+    (sum, detail) => sum + Number(detail.price ?? 0),
+    0,
+  );
+
+  if (subtotal <= 0) return normalizedDetails;
+
+  const expectedTotal = normalizePriceValue(orderTotal);
+  const expectedDiscount = normalizePriceValue(orderDiscount);
+  const hasExpectedTotal =
+    orderTotal != null && Number.isFinite(Number(orderTotal));
+  const discountToApply = Math.min(
+    subtotal,
+    Math.max(
+      0,
+      hasExpectedTotal && expectedTotal < subtotal
+        ? subtotal - expectedTotal
+        : expectedDiscount,
+    ),
+  );
+
+  if (discountToApply <= 0) return normalizedDetails;
+
+  const discountable = normalizedDetails
+    .map((detail, index) => ({
+      index,
+      price: Number(detail.price ?? 0),
+    }))
+    .filter((detail) => detail.price > 0);
+
+  if (!discountable.length) return normalizedDetails;
+
+  let distributed = 0;
+  const shares = new Map<number, number>();
+
+  discountable.forEach((detail, index) => {
+    const share =
+      index === discountable.length - 1
+        ? discountToApply - distributed
+        : Math.min(
+            detail.price,
+            Math.round((detail.price / subtotal) * discountToApply),
+          );
+
+    distributed += share;
+    shares.set(detail.index, share);
+  });
+
+  return normalizedDetails.map((detail, index) => ({
+    ...detail,
+    price: Math.max(Number(detail.price ?? 0) - (shares.get(index) ?? 0), 0),
+  }));
+};
+
 @Injectable()
 export class OrderService {
   private orderError = new OrderError();
@@ -56,8 +129,18 @@ export class OrderService {
   private bronze = 10;
   private silver = 20;
   private gold = 30;
+  private customerLevelNames: Record<number, string> = {
+    [UserLevel.BRONZE]: 'Bronze',
+    [UserLevel.SILVER]: 'Silver',
+    [UserLevel.GOLD]: 'Gold',
+  };
+  private employeeLevelNames: Record<number, string> = {
+    [UserLevel.JUNIOR]: 'Junior',
+    [UserLevel.SENIOR]: 'Senior',
+  };
   private pendingCleanupPromise?: Promise<void>;
   private lastPendingCleanupAt = 0;
+  private readonly prePaymentInvoiceTtlMs = 10 * 60 * 1000;
   constructor(
     private readonly dao: OrdersDao,
     private readonly orderDetail: OrderDetailService,
@@ -126,17 +209,19 @@ export class OrderService {
   public async getSlots(pg: PaginationDto) {
     await this.reconcilePendingOrdersForSlots();
 
-    const { parallel, branch_id, services, date, time } = pg;
+    const { parallel, branch_id, services, date, time, multi_artist_queue } = pg;
     let artists = [];
     let result: Slot[] = [];
 
     const p = parallel === 'true';
+    const allowQueueMultiArtist =
+      !p && (multi_artist_queue === true || multi_artist_queue === 'true');
     const service = services ? services.split(',') : [];
     if (services) {
       if (service.length > 0) {
         const artists_res = await this.userService.getByServices({
           services: service,
-          parallel: p,
+          parallel: p || allowQueueMultiArtist,
           branch_id,
         });
         artists = artists_res.map((r) => r.user_id);
@@ -155,7 +240,7 @@ export class OrderService {
       ),
     ];
     const durations = selected_services.map((d) => Number(d.duration) || 0);
-    const needDuration = p
+    const needDuration = p || allowQueueMultiArtist
       ? Math.max(0, ...durations)
       : durations.reduce((a, b) => a + b, 0);
 
@@ -166,6 +251,7 @@ export class OrderService {
       date: date ? `${date}`.slice(0, 10) : undefined,
       time: time ? `${time}` : undefined,
       parallel: p,
+      requireAllCategoriesForQueue: !allowQueueMultiArtist,
     });
     const validSlots = [];
     const dates = [...new Set(result.map((r) => r.date))];
@@ -377,6 +463,91 @@ export class OrderService {
   private async clearOrderPaidMeta(orderId: string) {
     await this.dao.clearPaidMeta(orderId);
   }
+  private isActivePrePayment(payment: any) {
+    return (
+      payment?.is_pre_amount === true &&
+      payment?.status === PAYMENT_STATUS.Active
+    );
+  }
+  private async syncPaidPrePayment(orderId: string): Promise<boolean | null> {
+    const order = await this.findOne(orderId);
+    if (order?.is_pre_amount_paid) return true;
+
+    const payments = await this.payment.listByOrder(orderId);
+    const activePrePayment = payments.find((payment) =>
+      this.isActivePrePayment(payment),
+    );
+
+    if (activePrePayment) {
+      await this.updatePrePaid(orderId, true);
+      return true;
+    }
+
+    const invoice = [...payments]
+      .reverse()
+      .find((payment) => Boolean(payment?.invoice_id));
+
+    if (!invoice?.invoice_id) return false;
+
+    let result;
+    try {
+      result = await this.qpay.checkPayment(invoice.invoice_id);
+    } catch (error) {
+      console.error('QPay pending order check failed:', error);
+      return null;
+    }
+
+    if (!result?.paid_amount) return false;
+
+    const row = result?.rows?.[0];
+    await this.payment.markInvoicePaid({
+      invoice_id: invoice.invoice_id,
+      paid_at: new Date(),
+      payment_id: row?.payment_id,
+    });
+    await this.updatePrePaid(orderId, true);
+
+    return true;
+  }
+  private toPrePaymentInvoiceResponse(payment: any, order: any) {
+    return {
+      invoice_id: payment.invoice_id,
+      qr_image: payment.qr_image,
+      qr_text: payment.qr_text,
+      urls: payment.urls ?? [],
+      price: Number(payment.amount ?? order.pre_amount ?? 0),
+      status: order.order_status ?? OrderStatus.Pending,
+      created: payment.created_at ?? new Date(),
+    };
+  }
+  private isPrePaymentInvoiceExpired(payment: any) {
+    const created = new Date(payment?.created_at ?? Date.now()).getTime();
+    if (!Number.isFinite(created)) return false;
+    return Date.now() - created >= this.prePaymentInvoiceTtlMs;
+  }
+  private async markOrderPrePaymentActive(orderId: string, user?: string) {
+    await this.updateStatus({
+      id: orderId,
+      order_status: OrderStatus.Active,
+      user,
+    });
+    await this.orderDetail.updateStatusByOrder(orderId, OrderStatus.Active);
+  }
+  private async cancelPendingOrder(row: any) {
+    await this.updateStatus({
+      id: row.id,
+      order_status: OrderStatus.Cancelled,
+    });
+    await this.orderDetail.updateStatusByOrder(row.id, OrderStatus.Cancelled);
+
+    const mobile = MobileParser(row.mobile);
+    const date = mnDate(row.order_date);
+    const time = row.start_time ? row.start_time?.slice(0, 5) : '';
+    await this.authService.sendCancelWarning(mobile, {
+      order_date: date,
+      time,
+    });
+  }
   public async updateOrderLimit(limit: number) {
     await this.dao.orderLimit(limit);
     // this.slot.updateOrderLimit(limit);
@@ -400,13 +571,22 @@ export class OrderService {
       const requiresOnlinePrePayment = !admin;
       const canManagePreAmount = user.role < MANAGER;
       const preMethod = dto.pre_method ?? dto.method;
+      const normalizedDetails = normalizeOrderDetailPrices(
+        dto.details ?? [],
+        dto.total_amount ?? null,
+        dto.discount ?? 0,
+      );
+      const normalizedTotalAmount = normalizedDetails.reduce(
+        (sum, detail) => sum + Number(detail.price ?? 0),
+        0,
+      );
       if (!dto.branch_id) {
         throw new HttpException('Салбар сонгоно уу.', HttpStatus.BAD_REQUEST);
       }
-      if ((dto.details?.length ?? 0) <= 0) this.orderError.serviceNotSelected;
+      if (normalizedDetails.length <= 0) this.orderError.serviceNotSelected;
       const parallel = dto.parallel;
       const serviceConfigs = await this.service.getBookingConfigs(
-        (dto.details ?? []).map((detail) => detail.service_id),
+        normalizedDetails.map((detail) => detail.service_id),
         dto.branch_id,
       );
       const serviceMap = new Map(
@@ -422,7 +602,7 @@ export class OrderService {
         service: any;
         duration: number;
       }> = [];
-      for (const detail of dto.details ?? []) {
+      for (const detail of normalizedDetails) {
         if (!detail.user_id) {
           throw new HttpException(
             'Артист сонгоно уу.',
@@ -477,9 +657,12 @@ export class OrderService {
         duration: duration,
         description: dto.description ?? null,
         discount_type: dto.discount_type ?? null,
-        discount: dto.discount ?? null,
-        total_amount: dto.total_amount ?? null,
-        paid_amount: dto.paid_amount ?? null,
+        discount: dto.discount ?? 0,
+        voucher_id: dto.voucher_id ?? null,
+        voucher_name: dto.voucher_name ?? null,
+        voucher_value: dto.voucher_value ?? 0,
+        total_amount: normalizedTotalAmount,
+        paid_amount: dto.paid_amount ?? 0,
         pre_amount: orderPreAmount,
         is_pre_amount_paid: orderPreAmount == 0,
         order_status,
@@ -507,7 +690,7 @@ export class OrderService {
             start_time: dto.start_time.toString(),
           },
           user,
-          dto.details,
+          normalizedDetails,
           merchant,
         );
       }
@@ -650,10 +833,14 @@ export class OrderService {
     role: number,
   ) {
     await this.ensureOrderAccess(id, user, role);
+    const payments = await this.payment.listByOrder(id);
+    if (!payments.some((payment) => payment?.invoice_id === invoiceId)) {
+      throw new UnauthorizedException();
+    }
     const res = await this.qpay.checkPayment(invoiceId);
     if (res?.paid_amount) {
       const row = res?.rows?.[0];
-      const payment = await this.payment.markInvoicePaid({
+      await this.payment.markInvoicePaid({
         invoice_id: invoiceId,
         paid_at: new Date(),
         payment_id: row?.payment_id,
@@ -663,9 +850,8 @@ export class OrderService {
         order_status: OrderStatus.Active,
         user,
       });
-      if (row) {
-        await this.updatePrePaid(id, true);
-      }
+      await this.orderDetail.updateStatusByOrder(id, OrderStatus.Active);
+      await this.updatePrePaid(id, true);
       return {
         status: OrderStatus.Active,
         paid: true,
@@ -675,10 +861,84 @@ export class OrderService {
       paid: false,
     };
   }
+  public async getPaymentInvoice(id: string, user: string, role: number) {
+    const order = await this.ensureOrderAccess(id, user, role);
+
+    if (order.is_pre_amount_paid || order.order_status === OrderStatus.Active) {
+      return {
+        status: OrderStatus.Active,
+        paid: true,
+      };
+    }
+
+    if (order.order_status !== OrderStatus.Pending) {
+      return {
+        status: order.order_status,
+        payable: false,
+      };
+    }
+
+    const paid = await this.syncPaidPrePayment(id);
+    const paymentCheckUnavailable = paid === null;
+    if (paid === true) {
+      await this.markOrderPrePaymentActive(id, user);
+      return {
+        status: OrderStatus.Active,
+        paid: true,
+      };
+    }
+
+    const payments = await this.payment.listByOrder(id);
+    const invoice = [...payments]
+      .reverse()
+      .find(
+        (payment) =>
+          payment?.invoice_id &&
+          payment?.is_pre_amount === true &&
+          payment?.status !== PAYMENT_STATUS.Cancelled,
+      );
+
+    if (!invoice) {
+      return {
+        status: order.order_status,
+        payable: false,
+      };
+    }
+
+    if (this.isPrePaymentInvoiceExpired(invoice)) {
+      if (paymentCheckUnavailable) {
+        return {
+          status: order.order_status,
+          payment_check_unavailable: true,
+        };
+      }
+      await this.dao.updateOrderStatus(id, OrderStatus.Absent);
+      await this.orderDetail.updateStatusByOrder(id, OrderStatus.Absent);
+      return {
+        status: OrderStatus.Absent,
+        expired: true,
+      };
+    }
+
+    return this.toPrePaymentInvoiceResponse(invoice, order);
+  }
 
   public async cancelOrder(id: string, user: string, role: number) {
     try {
-      await this.ensureOrderAccess(id, user, role);
+      const order = await this.ensureOrderAccess(id, user, role);
+      if (order.order_status === OrderStatus.Pending) {
+        const paid = await this.syncPaidPrePayment(id);
+        if (paid === true) {
+          await this.markOrderPrePaymentActive(id, user);
+          return true;
+        }
+        if (paid === null) {
+          throw new HttpException(
+            'Төлбөрийн төлөв шалгаж чадсангүй. Түр хүлээгээд дахин оролдоно уу.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
       await this.dao.updateOrderStatus(id, OrderStatus.Absent);
       await this.orderDetail.updateStatusByOrder(id, OrderStatus.Absent);
       return true;
@@ -749,13 +1009,11 @@ export class OrderService {
       // 🔥 5. merge
       const items = res.items.map((item) => {
         const detailItems = detailsMap.get(item.id) ?? [];
-        const branch_id = detailItems?.[0]?.branch_id;
         return {
           ...item,
           order_date: mnDate(new Date(item.order_date)),
           customer: customerMap.get(item.customer_id),
           created_by: creatorMap.get(item.created_by),
-          branch_id,
           details: detailItems,
         };
       });
@@ -930,17 +1188,14 @@ export class OrderService {
     const { user, order_status, status, order_id, client } = input;
     const order = await this.findOne(order_id);
     if (!order) return;
-    if (
-      order_status &&
-      order_status == order.order_status &&
-      status &&
-      status == order.status
-    )
+    const newStatus = status ?? order.status;
+    const newOrderStatus = order_status ?? order.order_status;
+    if (newStatus == order.status && newOrderStatus == order.order_status)
       return;
     const payload = {
       changed_by: user,
-      new_status: status ?? order.status,
-      new_order_status: order_status ?? order.order_status,
+      new_status: newStatus,
+      new_order_status: newOrderStatus,
       old_order_status: order.order_status,
       old_status: order.status,
       order_id,
@@ -956,29 +1211,15 @@ export class OrderService {
     const res = await this.dao.getCancelOrders();
     await Promise.all(
       res.map(async (r) => {
-        const invoice = await this.payment.findByOrder(r.id);
-        let payment;
-        try {
-          payment = await this.qpay.checkPayment(invoice?.invoice_id);
-        } catch (error) {
-          payment = null;
+        const paid = await this.syncPaidPrePayment(r.id);
+        if (paid === true) {
+          await this.markOrderPrePaymentActive(r.id);
+          return;
         }
 
-        const order_status = payment?.paid_amount
-          ? OrderStatus.Active
-          : OrderStatus.Cancelled;
-        await this.updateStatus({
-          id: r.id,
-          order_status,
-        });
-        await this.orderDetail.updateStatusByOrder(r.id, order_status);
-        const mobile = MobileParser(r.mobile);
-        const date = mnDate(r.order_date);
-        const time = r.start_time ? r.start_time?.slice(0, 5) : '';
-        await this.authService.sendCancelWarning(mobile, {
-          order_date: date,
-          time: time,
-        });
+        if (paid === null) return;
+
+        await this.cancelPendingOrder(r);
       }),
     );
   }
@@ -990,13 +1231,38 @@ export class OrderService {
     role: number,
     merchant?: string,
   ) {
-    const { details = [], parallel, order_date, ...body } = dto;
+    const normalizedDetails = normalizeOrderDetailPrices(
+      dto.details ?? [],
+      dto.total_amount ?? null,
+      dto.discount ?? 0,
+    );
+    const {
+      details: _details,
+      services: _services,
+      user_id: _user_id,
+      branch_name: _branch_name,
+      method: _method,
+      pre_method: _pre_method,
+      parallel,
+      order_date,
+      ...body
+    } = dto;
     const payload = { order_date, ...body };
     try {
       const preMethod = dto.pre_method ?? dto.method;
       const order = await this.findOne(id);
       if (!order) return;
-      if (details.length <= 0) this.orderError.serviceNotSelected;
+      if (normalizedDetails.length <= 0) this.orderError.serviceNotSelected;
+      const normalizedTotalAmount = normalizedDetails.reduce(
+        (sum, detail) => sum + Number(detail.price ?? 0),
+        0,
+      );
+      payload.discount = payload.discount ?? 0;
+      payload.voucher_value = payload.voucher_value ?? 0;
+      payload.total_amount = normalizedTotalAmount;
+      payload.paid_amount = payload.paid_amount ?? order.paid_amount ?? 0;
+      const existingDetails = await this.orderDetail.findByOrder(id);
+      const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
 
       // 💰 PAYMENT LOGIC
       const canManagePreAmount = role < MANAGER;
@@ -1010,12 +1276,60 @@ export class OrderService {
         : preservedPreAmount;
       const status = payload.order_status || order.order_status;
 
+      if (order.salary_date && role >= MANAGER) {
+        const normalizedExistingDetails = existingDetails.map((detail) => ({
+          id: detail.id ?? null,
+          service_id: detail.service_id ?? null,
+          user_id: detail.user_id ?? null,
+          price: +(detail.price ?? 0),
+        }));
+        const normalizedIncomingDetails = normalizedDetails.map((detail, index) => ({
+          id: detail.id ?? normalizedExistingDetails[index]?.id ?? null,
+          service_id: detail.service_id ?? null,
+          user_id: detail.user_id ?? null,
+          price: +(detail.price ?? 0),
+        }));
+        const lockedFieldsChanged =
+          status !== order.order_status ||
+          +(payload.total_amount ?? order.total_amount ?? 0) !==
+            +(order.total_amount ?? 0) ||
+          +(dto.pre_amount ?? order.pre_amount ?? 0) !== +(order.pre_amount ?? 0) ||
+          +(payload.paid_amount ?? order.paid_amount ?? 0) !==
+            +(order.paid_amount ?? 0) ||
+          (dto.method ?? order.method ?? null) !== (order.method ?? null) ||
+          (preMethod ?? order.pre_method ?? null) !==
+            (order.pre_method ?? null) ||
+          (dto.voucher_id ?? order.voucher_id ?? null) !==
+            (order.voucher_id ?? null) ||
+          +(dto.discount_type ?? order.discount_type ?? 0) !==
+            +(order.discount_type ?? 0) ||
+          +(dto.discount ?? order.discount ?? 0) !== +(order.discount ?? 0) ||
+          normalizedIncomingDetails.length !== normalizedExistingDetails.length ||
+          normalizedIncomingDetails.some((detail, index) => {
+            const existing = normalizedExistingDetails[index];
+            return (
+              !existing ||
+              detail.id !== existing.id ||
+              detail.service_id !== existing.service_id ||
+              detail.user_id !== existing.user_id ||
+              detail.price !== existing.price
+            );
+          });
+
+        if (lockedFieldsChanged) {
+          throw new HttpException(
+            'Админаас хаасан захиалгын дүнг артист өөрчлөх боломжгүй байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
       if (status === OrderStatus.Finished) {
         const total = preAmount + paidAmount;
 
         const artistAmounts =
-          details.length > 1
-            ? details.reduce((sum, d) => sum + +(d.price ?? 0), 0)
+          normalizedDetails.length > 1
+            ? normalizedDetails.reduce((sum, d) => sum + +(d.price ?? 0), 0)
             : total;
 
         if (total !== artistAmounts) {
@@ -1024,18 +1338,15 @@ export class OrderService {
 
         payload.total_amount = total;
 
-        if (details.length === 1 && +details[0].price === 0) {
-          details[0].price = total;
+        if (normalizedDetails.length === 1 && +normalizedDetails[0].price === 0) {
+          normalizedDetails[0].price = total;
         }
       }
 
       if (order.order_status !== payload.order_status) {
         payload.updated_at = new Date();
       }
-
-      const existingDetails = await this.orderDetail.findByOrder(id);
-      const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
-      const incomingIds = details.filter((d) => d.id).map((d) => d.id);
+      const incomingIds = normalizedDetails.filter((d) => d.id).map((d) => d.id);
       const orderDetailDate = order_date ?? order.order_date;
       const resolvedStartTime = this.normalizeTimeValue(
         `${dto.start_time ?? order.start_time}`,
@@ -1050,7 +1361,7 @@ export class OrderService {
         nickname?: string | null;
       }> = [];
 
-      for (const detail of details) {
+      for (const detail of normalizedDetails) {
         const prev = detail.id ? existingMap.get(detail.id) : null;
         const service = await this.service.findOne(detail.service_id);
         const durationMinutes = this.normalizeDurationMinutes(
@@ -1140,7 +1451,15 @@ export class OrderService {
           payload: detailPayload,
           nickname,
         } of detailPayloads) {
-          const { category_id, ...updatePayload } = detailPayload;
+          const {
+            category_id,
+            max_price,
+            min_price,
+            original_price,
+            pre,
+            user,
+            ...updatePayload
+          } = detailPayload;
           if (prev) {
             await this.orderDetail.updateTx(client, detail.id!, updatePayload);
           } else {
@@ -1399,21 +1718,145 @@ export class OrderService {
     }
   }
   public async level() {
+    const keys = [
+      'user_level_bronze',
+      'user_level_silver',
+      'user_level_gold',
+      'user_level_bronze_name',
+      'user_level_silver_name',
+      'user_level_gold_name',
+      'artist_level_junior_name',
+      'artist_level_senior_name',
+    ];
+    const config = await this.dao.getConfigValues(keys).catch(() => ({}));
+    const numberValue = (key: string, fallback: number) => {
+      const value = Number(config?.[key]?.value);
+      return Number.isFinite(value) ? value : fallback;
+    };
+    const textValue = (key: string, fallback: string) => {
+      return config?.[key]?.value_text || fallback;
+    };
+
+    this.bronze = numberValue('user_level_bronze', this.bronze);
+    this.silver = numberValue('user_level_silver', this.silver);
+    this.gold = numberValue('user_level_gold', this.gold);
+    this.customerLevelNames[UserLevel.BRONZE] = textValue(
+      'user_level_bronze_name',
+      this.customerLevelNames[UserLevel.BRONZE],
+    );
+    this.customerLevelNames[UserLevel.SILVER] = textValue(
+      'user_level_silver_name',
+      this.customerLevelNames[UserLevel.SILVER],
+    );
+    this.customerLevelNames[UserLevel.GOLD] = textValue(
+      'user_level_gold_name',
+      this.customerLevelNames[UserLevel.GOLD],
+    );
+    this.employeeLevelNames[UserLevel.JUNIOR] = textValue(
+      'artist_level_junior_name',
+      this.employeeLevelNames[UserLevel.JUNIOR],
+    );
+    this.employeeLevelNames[UserLevel.SENIOR] = textValue(
+      'artist_level_senior_name',
+      this.employeeLevelNames[UserLevel.SENIOR],
+    );
+
     return {
-      [UserLevel.BRONZE]: this.bronze,
-      [UserLevel.SILVER]: this.silver,
-      [UserLevel.GOLD]: this.gold,
+      customer: {
+        [UserLevel.BRONZE]: {
+          name: this.customerLevelNames[UserLevel.BRONZE],
+          threshold: this.bronze,
+        },
+        [UserLevel.SILVER]: {
+          name: this.customerLevelNames[UserLevel.SILVER],
+          threshold: this.silver,
+        },
+        [UserLevel.GOLD]: {
+          name: this.customerLevelNames[UserLevel.GOLD],
+          threshold: this.gold,
+        },
+      },
+      employee: {
+        [UserLevel.JUNIOR]: {
+          name: this.employeeLevelNames[UserLevel.JUNIOR],
+        },
+        [UserLevel.SENIOR]: {
+          name: this.employeeLevelNames[UserLevel.SENIOR],
+        },
+      },
     };
   }
-  public async updateLevel(dto: Record<UserLevel, number>) {
-    await Promise.all(
-      Object.entries(dto).map(([k, value], i) => {
-        const key = k as unknown as UserLevel;
-        if (key == UserLevel.BRONZE) this.bronze = value;
-        if (key == UserLevel.SILVER) this.silver = value;
-        if (key == UserLevel.GOLD) this.gold = value;
-      }),
-    );
+  public async updateLevel(dto: Record<string, any>) {
+    const customer = dto.customer ?? dto;
+    const employee = dto.employee ?? {};
+
+    Object.entries(customer).forEach(([k, rawValue]) => {
+      const key = Number(k) as UserLevel;
+      const item =
+        typeof rawValue === 'object' && rawValue !== null
+          ? (rawValue as Record<string, any>)
+          : null;
+      const value =
+        item !== null ? Number(item.threshold ?? item.value) : Number(rawValue);
+      const name = item !== null ? String(item.name ?? '') : '';
+
+      if (key == UserLevel.BRONZE && Number.isFinite(value)) this.bronze = value;
+      if (key == UserLevel.SILVER && Number.isFinite(value)) this.silver = value;
+      if (key == UserLevel.GOLD && Number.isFinite(value)) this.gold = value;
+      if (name && [UserLevel.BRONZE, UserLevel.SILVER, UserLevel.GOLD].includes(key)) {
+        this.customerLevelNames[key] = name;
+      }
+    });
+
+    Object.entries(employee).forEach(([k, rawValue]) => {
+      const key = Number(k) as UserLevel;
+      const item =
+        typeof rawValue === 'object' && rawValue !== null
+          ? (rawValue as Record<string, any>)
+          : null;
+      const name = item !== null ? String(item.name ?? '') : '';
+
+      if (name && [UserLevel.JUNIOR, UserLevel.SENIOR].includes(key)) {
+        this.employeeLevelNames[key] = name;
+      }
+    });
+
+    await this.dao
+      .upsertConfigValues([
+        { key: 'user_level_bronze', value: this.bronze },
+        { key: 'user_level_silver', value: this.silver },
+        { key: 'user_level_gold', value: this.gold },
+        {
+          key: 'user_level_bronze_name',
+          value: 0,
+          value_text: this.customerLevelNames[UserLevel.BRONZE],
+        },
+        {
+          key: 'user_level_silver_name',
+          value: 0,
+          value_text: this.customerLevelNames[UserLevel.SILVER],
+        },
+        {
+          key: 'user_level_gold_name',
+          value: 0,
+          value_text: this.customerLevelNames[UserLevel.GOLD],
+        },
+        {
+          key: 'artist_level_junior_name',
+          value: 0,
+          value_text: this.employeeLevelNames[UserLevel.JUNIOR],
+        },
+        {
+          key: 'artist_level_senior_name',
+          value: 0,
+          value_text: this.employeeLevelNames[UserLevel.SENIOR],
+        },
+      ])
+      .catch((error) => {
+        console.error('Level config persist failed:', error);
+      });
+
+    return this.level();
   }
   public async checkLevel(user: string) {
     const count = await this.dao.customerCheck(user);
@@ -1447,28 +1890,38 @@ export class OrderService {
   }
 
   public async checkCallback(user: string, id: string, order_id: string) {
-    const res = await this.qpay.getInvoice(id);
-
-    if (res.status === 'PAID') {
-      try {
-        const invoice = await this.payment.findByOrder(order_id);
-        const payment = invoice?.invoice_id
-          ? await this.payment.markInvoicePaid({
-              invoice_id: invoice.invoice_id,
-              paid_at: new Date(),
-              payment_id: id,
-            })
-          : null;
-        await this.dao.getById(order_id);
-        await this.updateStatus({
-          id: order_id,
-          order_status: OrderStatus.Active,
-          user,
-        });
-        await this.updatePrePaid(order_id, true);
-      } catch (error) {
-        throw error;
+    try {
+      const invoice = await this.payment.findByOrder(order_id);
+      if (!invoice?.invoice_id) {
+        return { paid: false };
       }
+
+      const res = await this.qpay.checkPayment(invoice.invoice_id);
+      if (!res?.paid_amount) {
+        return { paid: false };
+      }
+
+      const row = res?.rows?.[0];
+      await this.payment.markInvoicePaid({
+        invoice_id: invoice.invoice_id,
+        paid_at: new Date(),
+        payment_id: row?.payment_id ?? id,
+      });
+      await this.updateStatus({
+        id: order_id,
+        order_status: OrderStatus.Active,
+        user,
+      });
+      await this.orderDetail.updateStatusByOrder(order_id, OrderStatus.Active);
+      await this.updatePrePaid(order_id, true);
+
+      return {
+        status: OrderStatus.Active,
+        paid: true,
+      };
+    } catch (error) {
+      console.error('QPay callback check failed:', error);
+      return { paid: false };
     }
   }
 }

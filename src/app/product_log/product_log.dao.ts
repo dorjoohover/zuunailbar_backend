@@ -83,7 +83,7 @@ export class ProductLogDao {
       }
       const builder = new SqlBuilder(query);
       builder
-        .conditionIfNotEmpty('id', 'LIKE', query.id)
+        .conditionIfNotEmpty('id', 'ILIKE', query.id)
 
         .conditionIfNotEmpty('product_id', '=', query.product_id)
         .conditionIfNotEmpty('merchant_id', '=', query.merchant_id)
@@ -97,7 +97,7 @@ export class ProductLogDao {
         .conditionIfDateBetweenValues(query.start_date, query.end_date, 'date');
       if (query.name) {
         builder.conditionRaw(
-          `EXISTS (SELECT 1 FROM "products" p WHERE p."id" = "${tableName}"."product_id" AND p."name" LIKE $${builder.values.length + 1})`,
+          `EXISTS (SELECT 1 FROM "products" p WHERE p."id" = "${tableName}"."product_id" AND p."name" ILIKE $${builder.values.length + 1})`,
           [query.name],
         );
       }
@@ -119,12 +119,12 @@ export class ProductLogDao {
     let nameCondition = ``;
     if (filter.merchantId) {
       filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" LIKE $1`;
+      nameCondition = ` OR "name" ILIKE $1`;
     }
 
     const builder = new SqlBuilder(filter);
     const criteria = builder
-      .conditionIfNotEmpty('id', 'LIKE', filter.merchantId)
+      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
       .criteria();
     return await this._db.select(
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
