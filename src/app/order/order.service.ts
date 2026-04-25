@@ -640,6 +640,7 @@ export class OrderService {
       const orderPreAmount = canManagePreAmount
         ? +(dto.pre_amount ?? pre ?? 0)
         : +(pre ?? 0);
+      const orderTotalAmount = Math.max(normalizedTotalAmount, orderPreAmount, 0);
       const start_time = this.normalizeTimeValue(dto.start_time.toString());
       const startHour = timeToDecimal(start_time);
       const end_time = this.addDurationToTimeString(start_time, duration);
@@ -661,7 +662,7 @@ export class OrderService {
         voucher_id: dto.voucher_id ?? null,
         voucher_name: dto.voucher_name ?? null,
         voucher_value: dto.voucher_value ?? 0,
-        total_amount: normalizedTotalAmount,
+        total_amount: orderTotalAmount,
         paid_amount: dto.paid_amount ?? 0,
         pre_amount: orderPreAmount,
         is_pre_amount_paid: orderPreAmount == 0,
@@ -1274,7 +1275,9 @@ export class OrderService {
       const preAmount = canManagePreAmount
         ? +(payload.pre_amount ?? preservedPreAmount)
         : preservedPreAmount;
+      const nextTotalAmount = Math.max(normalizedTotalAmount, preAmount, 0);
       const status = payload.order_status || order.order_status;
+      payload.total_amount = nextTotalAmount;
 
       if (order.salary_date && role >= MANAGER) {
         const normalizedExistingDetails = existingDetails.map((detail) => ({
@@ -1291,7 +1294,7 @@ export class OrderService {
         }));
         const lockedFieldsChanged =
           status !== order.order_status ||
-          +(payload.total_amount ?? order.total_amount ?? 0) !==
+          +(nextTotalAmount ?? order.total_amount ?? 0) !==
             +(order.total_amount ?? 0) ||
           +(dto.pre_amount ?? order.pre_amount ?? 0) !== +(order.pre_amount ?? 0) ||
           +(payload.paid_amount ?? order.paid_amount ?? 0) !==

@@ -38,7 +38,6 @@ async function bootstrap() {
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
   app.useGlobalInterceptors(new LoggingInterceptor());
   setupSwagger(app);
-console.log('start')
   await app.listen(process.env.PORT ?? 5000);
   // await app.listen(5050);
 }
