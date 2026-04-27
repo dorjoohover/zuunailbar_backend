@@ -229,7 +229,7 @@ export class OrderDetailDao {
           o."transaction_type",
           o."branch_id",
           b."name" AS branch_name,
-          COALESCE(od."nickname", u."nickname") AS artist_names,
+          COALESCE(NULLIF(u."nickname", ''), od."nickname") AS artist_names,
           od."service_name" AS service_names,
           SUM(COALESCE(od."price", 0)) OVER (PARTITION BY o."id") AS detail_total,
           CASE

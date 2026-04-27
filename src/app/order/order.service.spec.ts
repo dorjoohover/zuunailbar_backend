@@ -940,6 +940,55 @@ describe('OrderService', () => {
     );
   });
 
+  it('refreshes detail nickname when an order is reassigned to another artist', async () => {
+    orderDetail.findByOrder.mockResolvedValue([
+      {
+        id: 'detail-1',
+        user_id: 'artist-1',
+        nickname: 'Artist 1',
+        start_time: '10:00:00',
+        end_time: '11:00:00',
+      },
+    ]);
+    serviceConfig.findOne.mockResolvedValue({ duration: '60' });
+    user.findOne.mockResolvedValue({
+      id: 'artist-2',
+      nickname: 'Artist 2',
+    });
+
+    await service.update(
+      'order-1',
+      {
+        branch_id: 'branch-1',
+        order_date: '2026-04-08',
+        order_status: OrderStatus.Active,
+        paid_amount: 0,
+        pre_amount: 0,
+        parallel: false,
+        start_time: '10:00:00',
+        details: [
+          {
+            id: 'detail-1',
+            service_id: 'service-1',
+            user_id: 'artist-2',
+            duration: 60,
+          },
+        ],
+      } as any,
+      'admin-1',
+      20,
+    );
+
+    expect(orderDetail.updateTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'detail-1',
+      expect.objectContaining({
+        user_id: 'artist-2',
+        nickname: 'Artist 2',
+      }),
+    );
+  });
+
   it('clears order paid meta when remaining payment is removed', async () => {
     orderDetail.findByOrder.mockResolvedValue([
       {

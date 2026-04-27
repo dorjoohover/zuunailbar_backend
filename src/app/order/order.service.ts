@@ -1356,6 +1356,7 @@ export class OrderService {
       );
       const startTimeDecimal = timeToDecimal(resolvedStartTime);
       let startDate = startTimeDecimal;
+      const artistNicknameCache = new Map<string, string | null>();
       const normalizedDurations: number[] = [];
       const detailPayloads: Array<{
         detail: OrderDetailDto;
@@ -1384,10 +1385,14 @@ export class OrderService {
           order_date: orderDetailDate,
         };
 
-        let nickname: string | null | undefined;
-        if (!prev) {
-          const artist = await this.userService.findOne(detail.user_id);
-          nickname = artist?.nickname ?? null;
+        let nickname: string | null | undefined = null;
+        if (detail.user_id) {
+          if (!artistNicknameCache.has(detail.user_id)) {
+            const artist = await this.user.findOne(detail.user_id);
+            artistNicknameCache.set(detail.user_id, artist?.nickname ?? null);
+          }
+
+          nickname = artistNicknameCache.get(detail.user_id) ?? null;
         }
 
         detailPayloads.push({
@@ -1464,7 +1469,10 @@ export class OrderService {
             ...updatePayload
           } = detailPayload;
           if (prev) {
-            await this.orderDetail.updateTx(client, detail.id!, updatePayload);
+            await this.orderDetail.updateTx(client, detail.id!, {
+              ...updatePayload,
+              nickname: nickname ?? null,
+            } as any);
           } else {
             await this.orderDetail.createTx(client, {
               ...updatePayload,

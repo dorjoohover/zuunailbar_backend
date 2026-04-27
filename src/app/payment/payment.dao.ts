@@ -198,7 +198,7 @@ export class PaymentDao {
           o."transaction_type",
           o."branch_id",
           b."name" AS branch_name,
-          COALESCE(od."nickname", u."nickname") AS artist_names,
+          COALESCE(NULLIF(u."nickname", ''), od."nickname") AS artist_names,
           od."service_name" AS service_names
       FROM "orders" o
       INNER JOIN "branches" b ON b."id" = o."branch_id"
