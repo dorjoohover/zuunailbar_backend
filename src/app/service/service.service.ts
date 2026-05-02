@@ -131,6 +131,9 @@ export class ServiceService {
   public async findByName(name: string) {
     return await this.dao.findName(name);
   }
+  public async findImportName(name: string, merchantId: string) {
+    return await this.dao.findImportName(name, merchantId);
+  }
 
   public async update(id: string, dto: ServiceDto, merchant: string) {
     const { ...body } = dto;

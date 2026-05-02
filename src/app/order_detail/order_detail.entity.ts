@@ -3,6 +3,7 @@ export class OrderDetail {
   public order_id: string;
   public service_id: string;
   public service_name: string;
+  public duration?: number;
   public user_id: string;
   public nickname: string;
   public description: string;

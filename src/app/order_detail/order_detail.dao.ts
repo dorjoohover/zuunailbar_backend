@@ -24,6 +24,7 @@ export class OrderDetailDao {
       'description',
       'service_name',
       'price',
+      'duration',
       'status',
     ]);
   }
@@ -48,6 +49,7 @@ export class OrderDetailDao {
           'view_status',
           'service_name',
           'price',
+          'duration',
           'status',
         ],
       );

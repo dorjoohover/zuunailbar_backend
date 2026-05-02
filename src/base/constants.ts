@@ -39,7 +39,11 @@ export const usernameFormatter = (user: User) => {
 
 export const saltOrRounds = 1;
 export function toTimeString(hour: number | string, half?: boolean): string {
-  const h = String(hour).padStart(2, '0');
+  const numericHour = Number(hour);
+  const normalizedHour = Number.isFinite(numericHour)
+    ? ((Math.floor(numericHour) % 24) + 24) % 24
+    : 0;
+  const h = String(normalizedHour).padStart(2, '0');
   return half ? `${h}:30:00` : `${h}:00:00`;
 }
 

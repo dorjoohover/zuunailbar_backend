@@ -265,6 +265,9 @@ export class UserService {
   public async findMobile(mobile: string) {
     return await this.dao.getByMobile(mobile);
   }
+  public async findMobileByMerchant(mobile: string, merchantId: string) {
+    return await this.dao.getByMobileAndMerchant(mobile, merchantId);
+  }
   public async findOne(id: string) {
     return await this.dao.getById(id);
   }

@@ -10,17 +10,22 @@ import {
   Query,
   Res,
   HttpStatus,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiProduces,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   AvailableTimeDto,
   OrderDto,
@@ -35,6 +40,7 @@ import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { Response } from 'express';
 import { CLIENT } from 'src/base/constants';
 import { BadRequest } from 'src/common/error';
+import { memoryStorage } from 'multer';
 
 const COLS: any[] = [
   { header: 'Date', key: 'date', width: 14 },
@@ -56,6 +62,35 @@ export class OrderController {
   create(@Body() dto: OrderDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.orderService.create(dto, user.user, user.merchant.id);
+  }
+
+  @Admin()
+  @Post('import/xlsx')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Excel file (.xlsx)',
+        },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 20 * 1024 * 1024 },
+    }),
+  )
+  importXlsxCalendar(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() { user },
+  ) {
+    return this.orderService.importCalendarXlsx(file, user.user);
   }
 
   @Get()
@@ -113,7 +148,15 @@ export class OrderController {
   // }
 
   @Get('report')
-  @PQ(['date', 'end_date', 'order_status', 'user_id', 'branch_id', 'customer', 'friend'])
+  @PQ([
+    'date',
+    'end_date',
+    'order_status',
+    'user_id',
+    'branch_id',
+    'customer',
+    'friend',
+  ])
   async reports(
     @Pagination() pg: PaginationDto,
     @Req() { user },
@@ -172,7 +215,10 @@ export class OrderController {
   @Post('confirm')
   @Admin()
   @PQ(['from', 'to'])
-  async confirmOrders(@Body() body: { from?: string; to?: string }, @Req() { user }) {
+  async confirmOrders(
+    @Body() body: { from?: string; to?: string },
+    @Req() { user },
+  ) {
     return this.orderService.confirmSalaryProcessStatus(
       user.user.id,
       body?.from,

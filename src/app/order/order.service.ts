@@ -37,7 +37,7 @@ import { QpayService } from './qpay.service';
 import { ExcelService } from 'src/excel.service';
 import { Response } from 'express';
 import { UserService } from '../user/user.service';
-import { MobileParser } from 'src/common/formatter';
+import { MobileFormat, MobileParser } from 'src/common/formatter';
 import { isSameDay } from 'date-fns';
 import { User } from '../user/user.entity';
 import { BadRequest, OrderError } from 'src/common/error';
@@ -48,6 +48,7 @@ import { PaymentService } from '../payment/payment.service';
 import { OrderLogDao } from './order.log.dao';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { AuthService } from 'src/auth/auth.service';
+import * as ExcelJS from 'exceljs';
 
 const normalizePriceValue = (value?: number | string | null) => {
   const amount = Number(value ?? 0);
@@ -120,6 +121,42 @@ const normalizeOrderDetailPrices = <T extends { price?: number | null }>(
     ...detail,
     price: Math.max(Number(detail.price ?? 0) - (shares.get(index) ?? 0), 0),
   }));
+};
+
+const ORDER_IMPORT_DEFAULTS = {
+  artistId: 'f68c7f45b6ec44d08be750c6b2b1a7b4',
+  concurrentArtistIds: [
+    '89cef0efaa794e84bc5a2a86098dedc2',
+    '2069709f0c594424a6f5223e7bec0084',
+    'fa48d2ab3296411388337a259d7a1b90',
+    '2e9b10afdec14a178eda815aaedb8985',
+    'f1816bfe90a349619f11ce42ed97af94',
+    'bb32c0c704e34e68be52478fd63f0c89',
+    '8c97f4ba24cd41f8b873edc377303a85',
+    'c44a544393424525a7d6b8e91e84bae7',
+    '17a45f8c4fd34d5aa7e7544709b53601',
+  ],
+  branchId: '799defb4cfe7412baab0605d7146e634',
+  merchantId: '3f86c0b23a5a4ef89a745269e7849640',
+} as const;
+
+const ORDER_IMPORT_HEADERS = {
+  orderDate: 'Огноо (Монгол цаг)',
+  startTime: 'эхэлсэн цаг',
+  duration: 'Үйлчилгээний хугацаа',
+  serviceName: 'Үйлчилгээ',
+  mobile: 'Утасны дугаар',
+  description: 'Анхны тэмдэглэл',
+} as const;
+
+type ImportedCalendarOrderRow = {
+  rowNumber: number;
+  orderDate: string;
+  startTime: string;
+  duration: number;
+  serviceName: string;
+  mobile: string;
+  description: string;
 };
 
 @Injectable()
@@ -326,6 +363,439 @@ export class OrderService {
   }
   private isOverlapping(startA: Date, endA: Date, startB: Date, endB: Date) {
     return startA < endB && endA > startB;
+  }
+  private normalizeImportHeader(value: string) {
+    return value.trim().toLowerCase();
+  }
+  private getCellText(cell?: ExcelJS.Cell | null) {
+    return `${cell?.text ?? ''}`.trim();
+  }
+  private padTimeSegment(value: string) {
+    return value.padStart(2, '0');
+  }
+  private normalizeImportedTime(
+    primaryValue?: Date | string | null,
+    fallbackValue?: Date | string | null,
+  ) {
+    const candidates = [primaryValue, fallbackValue];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+
+      if (candidate instanceof Date) {
+        return candidate.toTimeString().slice(0, 8);
+      }
+
+      const match = `${candidate}`
+        .trim()
+        .match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+
+      if (match) {
+        return `${this.padTimeSegment(match[1])}:${match[2]}:${this.padTimeSegment(
+          match[3] ?? '00',
+        )}`;
+      }
+    }
+
+    return '';
+  }
+  private parseImportedDurationMinutes(value?: Date | string | number | null) {
+    if (value instanceof Date) {
+      return value.getHours() * 60 + value.getMinutes();
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (value > 0 && value < 1) return Math.round(value * 24 * 60);
+      return Math.round(value);
+    }
+
+    const raw = `${value ?? ''}`.trim();
+    if (!raw) return 0;
+
+    const timeMatch = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (timeMatch) {
+      return (
+        Number(timeMatch[1]) * 60 +
+        Number(timeMatch[2]) +
+        Math.round(Number(timeMatch[3] ?? 0) / 60)
+      );
+    }
+
+    const numeric = Number(raw);
+    if (Number.isFinite(numeric)) {
+      if (numeric > 0 && numeric < 1) return Math.round(numeric * 24 * 60);
+      return Math.round(numeric);
+    }
+
+    return 0;
+  }
+  private parseImportedOrderDate(value?: Date | string | null) {
+    if (value instanceof Date) {
+      return toYMD(value);
+    }
+
+    const match = `${value ?? ''}`.trim().match(/(\d{4}-\d{2}-\d{2})/);
+
+    return match?.[1] ?? '';
+  }
+  private getImportHeaderIndex(headerMap: Map<string, number>, header: string) {
+    const index = headerMap.get(this.normalizeImportHeader(header));
+    if (!index) {
+      throw new HttpException(
+        `${header} багана олдсонгүй.`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return index;
+  }
+  private parseCalendarImportRows(
+    worksheet: ExcelJS.Worksheet,
+  ): ImportedCalendarOrderRow[] {
+    const headerMap = new Map<string, number>();
+    worksheet.getRow(1).eachCell((cell, colNumber) => {
+      const header = this.normalizeImportHeader(this.getCellText(cell));
+      if (header) {
+        headerMap.set(header, colNumber);
+      }
+    });
+
+    const orderDateIndex = this.getImportHeaderIndex(
+      headerMap,
+      ORDER_IMPORT_HEADERS.orderDate,
+    );
+    const startTimeIndex = this.getImportHeaderIndex(
+      headerMap,
+      ORDER_IMPORT_HEADERS.startTime,
+    );
+    const durationIndex = this.getImportHeaderIndex(
+      headerMap,
+      ORDER_IMPORT_HEADERS.duration,
+    );
+    const serviceNameIndex = this.getImportHeaderIndex(
+      headerMap,
+      ORDER_IMPORT_HEADERS.serviceName,
+    );
+    const mobileIndex = this.getImportHeaderIndex(
+      headerMap,
+      ORDER_IMPORT_HEADERS.mobile,
+    );
+    const descriptionIndex = this.getImportHeaderIndex(
+      headerMap,
+      ORDER_IMPORT_HEADERS.description,
+    );
+
+    const rows: ImportedCalendarOrderRow[] = [];
+
+    for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
+      const row = worksheet.getRow(rowNumber);
+      const orderDateCell = row.getCell(orderDateIndex);
+      const startTimeCell = row.getCell(startTimeIndex);
+      const durationCell = row.getCell(durationIndex);
+      const serviceNameCell = row.getCell(serviceNameIndex);
+      const mobileCell = row.getCell(mobileIndex);
+      const descriptionCell = row.getCell(descriptionIndex);
+
+      const orderDateValue = this.parseImportedOrderDate(
+        (orderDateCell.value as Date | string | null) ?? orderDateCell.text,
+      );
+      const startTimeValue = this.normalizeImportedTime(
+        (startTimeCell.value as Date | string | null) ?? startTimeCell.text,
+        (orderDateCell.value as Date | string | null) ?? orderDateCell.text,
+      );
+      const durationValue = this.parseImportedDurationMinutes(
+        (durationCell.value as Date | string | number | null) ??
+          durationCell.text,
+      );
+      const serviceNameValue = this.getCellText(serviceNameCell);
+      const mobileValue = this.getCellText(mobileCell).replace(/\s+/g, '');
+      const descriptionValue = this.getCellText(descriptionCell);
+
+      if (
+        !orderDateValue &&
+        !startTimeValue &&
+        !durationValue &&
+        !serviceNameValue &&
+        !mobileValue &&
+        !descriptionValue
+      ) {
+        continue;
+      }
+
+      rows.push({
+        rowNumber,
+        orderDate: orderDateValue,
+        startTime: startTimeValue,
+        duration: durationValue,
+        serviceName: serviceNameValue,
+        mobile: mobileValue,
+        description: descriptionValue,
+      });
+    }
+
+    return rows;
+  }
+  private normalizeImportServiceName(value: string) {
+    return `${value ?? ''}`
+      .normalize('NFC')
+      .replace(/["']/g, '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+  private resolveImportedArtistId(
+    row: ImportedCalendarOrderRow,
+    artistSchedules: Map<
+      string,
+      Map<string, Array<{ start: number; end: number }>>
+    >,
+  ) {
+    const dateKey = row.orderDate;
+    const availableArtistIds = [
+      ORDER_IMPORT_DEFAULTS.artistId,
+      ...ORDER_IMPORT_DEFAULTS.concurrentArtistIds,
+    ];
+    const start = timeToDecimal(this.normalizeImportedTime(row.startTime));
+    const end = start + this.normalizeDurationMinutes(row.duration) / 60;
+
+    let schedulesByArtist = artistSchedules.get(dateKey);
+    if (!schedulesByArtist) {
+      schedulesByArtist = new Map<
+        string,
+        Array<{ start: number; end: number }>
+      >();
+      artistSchedules.set(dateKey, schedulesByArtist);
+    }
+
+    for (const artistId of availableArtistIds) {
+      const schedules = schedulesByArtist.get(artistId) ?? [];
+      const hasOverlap = schedules.some(
+        (schedule) => start < schedule.end && end > schedule.start,
+      );
+
+      if (hasOverlap) continue;
+
+      schedules.push({ start, end });
+      schedulesByArtist.set(artistId, schedules);
+      return artistId;
+    }
+
+    throw new HttpException(
+      `Row ${row.rowNumber}: ${row.orderDate} ${row.startTime} цаг дээр давхцалтай artist хүрэлцэхгүй байна.`,
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+  private buildImportedDuplicateKey(row: ImportedCalendarOrderRow) {
+    return [
+      row.orderDate,
+      this.normalizeImportedTime(row.startTime),
+      MobileFormat(row.mobile),
+      this.normalizeImportServiceName(row.serviceName),
+    ].join('__');
+  }
+  private sortImportedCalendarRows(rows: ImportedCalendarOrderRow[]) {
+    return [...rows].sort((a, b) => {
+      const dateCompare = a.orderDate.localeCompare(b.orderDate);
+      if (dateCompare !== 0) return dateCompare;
+
+      const timeCompare =
+        timeToDecimal(this.normalizeImportedTime(a.startTime)) -
+        timeToDecimal(this.normalizeImportedTime(b.startTime));
+      if (timeCompare !== 0) return timeCompare;
+
+      return a.rowNumber - b.rowNumber;
+    });
+  }
+  private async findOrCreateImportedCustomer(mobile: string) {
+    let customer = await this.user.findMobileByMerchant(
+      mobile,
+      ORDER_IMPORT_DEFAULTS.merchantId,
+    );
+    let created = false;
+
+    if (!customer) {
+      created = true;
+      await this.user.register(
+        {
+          mobile: MobileFormat(mobile),
+          password: mobile,
+          firstname: '',
+          lastname: '',
+        },
+        ORDER_IMPORT_DEFAULTS.merchantId,
+      );
+      customer = await this.user.findMobileByMerchant(
+        mobile,
+        ORDER_IMPORT_DEFAULTS.merchantId,
+      );
+    }
+
+    if (!customer) {
+      throw new HttpException(
+        'Хэрэглэгч үүсгэж чадсангүй.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return {
+      customer,
+      created,
+    };
+  }
+  public async importCalendarXlsx(file: Express.Multer.File, user: User) {
+    if (!file) BadRequest.required('file');
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.buffer);
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      throw new HttpException('Excel sheet олдсонгүй.', HttpStatus.BAD_REQUEST);
+    }
+
+    const rows = this.sortImportedCalendarRows(
+      this.parseCalendarImportRows(worksheet),
+    );
+    const artistSchedules = new Map<
+      string,
+      Map<string, Array<{ start: number; end: number }>>
+    >();
+    const importedDuplicateKeys = new Set<string>();
+    const errors: Array<{
+      rowNumber: number;
+      mobile: string;
+      service_name: string;
+      message: string;
+    }> = [];
+    let importedCount = 0;
+    let skippedCount = 0;
+    let createdUserCount = 0;
+
+    for (const row of rows) {
+      try {
+        if (!row.orderDate) {
+          throw new HttpException(
+            'Захиалгын огноо хоосон байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        if (!row.startTime) {
+          throw new HttpException(
+            'Эхлэх цаг хоосон байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        if (!row.duration) {
+          throw new HttpException(
+            'Үйлчилгээний хугацаа буруу байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        if (!row.serviceName) {
+          throw new HttpException(
+            'Үйлчилгээ хоосон байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        if (!row.mobile) {
+          throw new HttpException(
+            'Утасны дугаар хоосон байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        const duplicateKey = this.buildImportedDuplicateKey(row);
+        if (importedDuplicateKeys.has(duplicateKey)) {
+          skippedCount += 1;
+          continue;
+        }
+
+        const { customer, created } = await this.findOrCreateImportedCustomer(
+          row.mobile,
+        );
+        const service = await this.service.findImportName(
+          row.serviceName,
+          ORDER_IMPORT_DEFAULTS.merchantId,
+        );
+
+        if (!service) {
+          throw new HttpException(
+            `"${row.serviceName}" үйлчилгээ олдсонгүй.`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        const description = row.description || row.serviceName;
+        const artistId = this.resolveImportedArtistId(row, artistSchedules);
+        await this.create(
+          {
+            user_id: artistId,
+            customer_id: customer.id,
+            order_date: new Date(`${row.orderDate}T12:00:00`),
+            start_time: row.startTime,
+            end_time: this.addDurationToTimeString(row.startTime, row.duration),
+            order_status: OrderStatus.Active,
+            total_amount: 0,
+            paid_amount: 0,
+            description,
+            branch_name: '',
+            discount_type: 0,
+            discount: 0,
+            duration: row.duration,
+            parallel: false,
+            branch_id: ORDER_IMPORT_DEFAULTS.branchId,
+            details: [
+              {
+                service_id: service.id,
+                service_name: service.name,
+                description,
+                user_id: artistId,
+                order_date: row.orderDate,
+                nickname: '',
+                price: 0,
+                duration: row.duration,
+                status: OrderStatus.Active,
+                start_time: row.startTime,
+                end_time: this.addDurationToTimeString(
+                  row.startTime,
+                  row.duration,
+                ),
+                order_id: '',
+              },
+            ],
+          },
+          user,
+          ORDER_IMPORT_DEFAULTS.merchantId,
+        );
+
+        importedCount += 1;
+        if (created) createdUserCount += 1;
+        importedDuplicateKeys.add(duplicateKey);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Import хийхэд алдаа гарлаа.';
+        errors.push({
+          rowNumber: row.rowNumber,
+          mobile: row.mobile,
+          service_name: row.serviceName,
+          message,
+        });
+      }
+    }
+
+    return {
+      total_rows: rows.length,
+      imported_count: importedCount,
+      skipped_count: skippedCount,
+      failed_count: errors.length,
+      created_user_count: createdUserCount,
+      artist_id: ORDER_IMPORT_DEFAULTS.artistId,
+      branch_id: ORDER_IMPORT_DEFAULTS.branchId,
+      merchant_id: ORDER_IMPORT_DEFAULTS.merchantId,
+      errors,
+    };
   }
   private normalizeTimeValue(time: Date | string) {
     if (time instanceof Date) {

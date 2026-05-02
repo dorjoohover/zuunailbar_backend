@@ -337,6 +337,7 @@ CREATE TABLE public.order_details (
     user_id character varying NOT NULL,
     nickname character varying,
     description character varying,
+    duration integer,
     start_time time without time zone,
     end_time time without time zone
 );

@@ -87,6 +87,18 @@ export class UserDao {
       [mobile, MobileFormat(mobile), mobile],
     );
   }
+  async getByMobileAndMerchant(mobile: string, merchantId: string) {
+    return await this._db.selectOne(
+      `
+      SELECT *
+      FROM "${tableName}"
+      WHERE ("mobile" = $1 OR "mobile" = $2 OR lower("mail") = lower($3))
+        AND "merchant_id" = $4
+        AND "status" != $5
+      `,
+      [mobile, MobileFormat(mobile), mobile, merchantId, UserStatus.Deleted],
+    );
+  }
   async getByDevice(device: string) {
     return await this._db.select(
       `SELECT * FROM "${tableName}" WHERE "device"=$1`,

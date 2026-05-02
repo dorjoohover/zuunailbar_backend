@@ -1,9 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Service } from './service.entity';
 
 const tableName = 'services';
+const SERVICE_IMPORT_ALIASES: Record<string, string> = {
+  'Маникюр цэвэрлэгээ': 'Маникюр цэвэрлэгээ будалтгүй',
+  'Смарт хумс салгалт': 'Маникюр хиймэл хумс салгалт',
+  'Гелэн будалт арилгалт': 'Маникюр арилгалт',
+  'Педикюр arilgalt': 'Педикюр арилгалт',
+};
 
 @Injectable()
 export class ServiceDao {
@@ -70,8 +77,33 @@ export class ServiceDao {
   }
   async findName(name: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "name" like %$1%`,
-      [name],
+      `SELECT * FROM "${tableName}" WHERE lower("name") like %$1%`,
+      [name?.toLowerCase()],
+    );
+  }
+  async findImportName(name: string, merchantId?: string) {
+    let normalizedName = `${name ?? ''}`
+      .normalize('NFC')
+      .replace(/["']/g, '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!normalizedName) return null;
+
+    normalizedName = SERVICE_IMPORT_ALIASES[normalizedName] ?? normalizedName;
+    const fuzzyName = `${normalizedName}`;
+
+    return await this._db.selectOne(
+      `
+      SELECT *
+      FROM "${tableName}"
+      WHERE trim("name") = $1
+        AND "status" = 10
+      ORDER BY "created_at" ASC
+      LIMIT 1
+      `,
+      [fuzzyName],
     );
   }
 
