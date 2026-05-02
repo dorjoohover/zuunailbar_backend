@@ -124,17 +124,16 @@ const normalizeOrderDetailPrices = <T extends { price?: number | null }>(
 };
 
 const ORDER_IMPORT_DEFAULTS = {
-  artistId: 'f68c7f45b6ec44d08be750c6b2b1a7b4',
+  artistId: '6c6f282afd154dab86e5cb6226907196',
   concurrentArtistIds: [
-    '89cef0efaa794e84bc5a2a86098dedc2',
-    '2069709f0c594424a6f5223e7bec0084',
-    'fa48d2ab3296411388337a259d7a1b90',
-    '2e9b10afdec14a178eda815aaedb8985',
-    'f1816bfe90a349619f11ce42ed97af94',
-    'bb32c0c704e34e68be52478fd63f0c89',
-    '8c97f4ba24cd41f8b873edc377303a85',
-    'c44a544393424525a7d6b8e91e84bae7',
-    '17a45f8c4fd34d5aa7e7544709b53601',
+    'ded3e8f60aa7486381645d7918232231',
+    '4ed073f53bbc45ec843df5aca5deefc5',
+    '0405241731944396aa28d5cc4e48d317',
+    '6b8f47fd44c44e75bd52ad0a9fecaff1',
+    '4b876b6e51454263b6a93f78b3411c1b',
+    '252d41f274ea43369331465e6737a3f3',
+    '535cee57657149d4a8874c754e782210',
+    'b119575e695e40ebada16a08fe8ede00',
   ],
   branchId: '799defb4cfe7412baab0605d7146e634',
   merchantId: '3f86c0b23a5a4ef89a745269e7849640',
@@ -246,7 +245,8 @@ export class OrderService {
   public async getSlots(pg: PaginationDto) {
     await this.reconcilePendingOrdersForSlots();
 
-    const { parallel, branch_id, services, date, time, multi_artist_queue } = pg;
+    const { parallel, branch_id, services, date, time, multi_artist_queue } =
+      pg;
     let artists = [];
     let result: Slot[] = [];
 
@@ -277,9 +277,10 @@ export class OrderService {
       ),
     ];
     const durations = selected_services.map((d) => Number(d.duration) || 0);
-    const needDuration = p || allowQueueMultiArtist
-      ? Math.max(0, ...durations)
-      : durations.reduce((a, b) => a + b, 0);
+    const needDuration =
+      p || allowQueueMultiArtist
+        ? Math.max(0, ...durations)
+        : durations.reduce((a, b) => a + b, 0);
 
     result = await this.dao.getSlotsUnified({
       branch_id,
@@ -1074,10 +1075,7 @@ export class OrderService {
       }> = [];
       for (const detail of normalizedDetails) {
         if (!detail.user_id) {
-          throw new HttpException(
-            'Артист сонгоно уу.',
-            HttpStatus.BAD_REQUEST,
-          );
+          throw new HttpException('Артист сонгоно уу.', HttpStatus.BAD_REQUEST);
         }
         const service = serviceMap.get(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
@@ -1110,7 +1108,11 @@ export class OrderService {
       const orderPreAmount = canManagePreAmount
         ? +(dto.pre_amount ?? pre ?? 0)
         : +(pre ?? 0);
-      const orderTotalAmount = Math.max(normalizedTotalAmount, orderPreAmount, 0);
+      const orderTotalAmount = Math.max(
+        normalizedTotalAmount,
+        orderPreAmount,
+        0,
+      );
       const start_time = this.normalizeTimeValue(dto.start_time.toString());
       const startHour = timeToDecimal(start_time);
       const end_time = this.addDurationToTimeString(start_time, duration);
@@ -1756,17 +1758,20 @@ export class OrderService {
           user_id: detail.user_id ?? null,
           price: +(detail.price ?? 0),
         }));
-        const normalizedIncomingDetails = normalizedDetails.map((detail, index) => ({
-          id: detail.id ?? normalizedExistingDetails[index]?.id ?? null,
-          service_id: detail.service_id ?? null,
-          user_id: detail.user_id ?? null,
-          price: +(detail.price ?? 0),
-        }));
+        const normalizedIncomingDetails = normalizedDetails.map(
+          (detail, index) => ({
+            id: detail.id ?? normalizedExistingDetails[index]?.id ?? null,
+            service_id: detail.service_id ?? null,
+            user_id: detail.user_id ?? null,
+            price: +(detail.price ?? 0),
+          }),
+        );
         const lockedFieldsChanged =
           status !== order.order_status ||
           +(nextTotalAmount ?? order.total_amount ?? 0) !==
             +(order.total_amount ?? 0) ||
-          +(dto.pre_amount ?? order.pre_amount ?? 0) !== +(order.pre_amount ?? 0) ||
+          +(dto.pre_amount ?? order.pre_amount ?? 0) !==
+            +(order.pre_amount ?? 0) ||
           +(payload.paid_amount ?? order.paid_amount ?? 0) !==
             +(order.paid_amount ?? 0) ||
           (dto.method ?? order.method ?? null) !== (order.method ?? null) ||
@@ -1777,7 +1782,8 @@ export class OrderService {
           +(dto.discount_type ?? order.discount_type ?? 0) !==
             +(order.discount_type ?? 0) ||
           +(dto.discount ?? order.discount ?? 0) !== +(order.discount ?? 0) ||
-          normalizedIncomingDetails.length !== normalizedExistingDetails.length ||
+          normalizedIncomingDetails.length !==
+            normalizedExistingDetails.length ||
           normalizedIncomingDetails.some((detail, index) => {
             const existing = normalizedExistingDetails[index];
             return (
@@ -1811,7 +1817,10 @@ export class OrderService {
 
         payload.total_amount = total;
 
-        if (normalizedDetails.length === 1 && +normalizedDetails[0].price === 0) {
+        if (
+          normalizedDetails.length === 1 &&
+          +normalizedDetails[0].price === 0
+        ) {
           normalizedDetails[0].price = total;
         }
       }
@@ -1819,7 +1828,9 @@ export class OrderService {
       if (order.order_status !== payload.order_status) {
         payload.updated_at = new Date();
       }
-      const incomingIds = normalizedDetails.filter((d) => d.id).map((d) => d.id);
+      const incomingIds = normalizedDetails
+        .filter((d) => d.id)
+        .map((d) => d.id);
       const orderDetailDate = order_date ?? order.order_date;
       const resolvedStartTime = this.normalizeTimeValue(
         `${dto.start_time ?? order.start_time}`,
@@ -2281,10 +2292,15 @@ export class OrderService {
         item !== null ? Number(item.threshold ?? item.value) : Number(rawValue);
       const name = item !== null ? String(item.name ?? '') : '';
 
-      if (key == UserLevel.BRONZE && Number.isFinite(value)) this.bronze = value;
-      if (key == UserLevel.SILVER && Number.isFinite(value)) this.silver = value;
+      if (key == UserLevel.BRONZE && Number.isFinite(value))
+        this.bronze = value;
+      if (key == UserLevel.SILVER && Number.isFinite(value))
+        this.silver = value;
       if (key == UserLevel.GOLD && Number.isFinite(value)) this.gold = value;
-      if (name && [UserLevel.BRONZE, UserLevel.SILVER, UserLevel.GOLD].includes(key)) {
+      if (
+        name &&
+        [UserLevel.BRONZE, UserLevel.SILVER, UserLevel.GOLD].includes(key)
+      ) {
         this.customerLevelNames[key] = name;
       }
     });
