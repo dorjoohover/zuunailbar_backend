@@ -1084,12 +1084,12 @@ export class OrderService {
           service_id: detail.service_id,
           branch_id: dto.branch_id,
         });
-        // if (!isAssignedToBranch) {
-        //   throw new HttpException(
-        //     'Сонгосон артист тухайн салбарт энэ үйлчилгээг үзүүлэх боломжгүй байна.',
-        //     HttpStatus.BAD_REQUEST,
-        //   );
-        // }
+        if (!isAssignedToBranch) {
+          throw new HttpException(
+            'Сонгосон артист тухайн салбарт энэ үйлчилгээг үзүүлэх боломжгүй байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
         if (+(service.pre ?? '0') > pre) pre = +service.pre;
         detailConfigs.push({
           detail,
