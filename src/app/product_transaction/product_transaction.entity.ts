@@ -2,13 +2,14 @@ export class ProductTransaction {
   public id: string;
   public product_id: string;
   public branch_id: string;
-  public user_id: string;
+  public user_id: string | null;
   public quantity: number;
   public price: number;
   public total_amount: number;
   public paid_amount: number;
+  public date: Date | string | null;
   public status: number;
-  public product_transaction_status: number;
+  public product_transaction_status?: number;
   public created_by: string;
   public created_at?: Date;
 }

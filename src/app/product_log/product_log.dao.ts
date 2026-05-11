@@ -21,7 +21,6 @@ export class ProductLogDao {
         'merchant_id',
         'created_by',
         'cargo',
-        'unit_price',
         'status',
         'currency',
         'currency_amount',
@@ -116,18 +115,14 @@ export class ProductLogDao {
   }
 
   async search(filter: any): Promise<any[]> {
-    let nameCondition = ``;
-    if (filter.merchantId) {
-      filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" ILIKE $1`;
-    }
-
+    const term = ((filter.id ?? filter.name ?? '') + '').trim().toLowerCase();
     const builder = new SqlBuilder(filter);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
-      .criteria();
+    if (term) {
+      builder.conditionIfNotEmpty('LOWER("name")', 'ILIKE', `%${term}%`);
+    }
+    const criteria = builder.criteria();
     return await this._db.select(
-      `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
+      `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}`,
       builder.values,
     );
   }

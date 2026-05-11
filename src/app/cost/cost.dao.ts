@@ -12,12 +12,11 @@ export class CostDao {
   async add(data: Cost) {
     return await this._db.insert(tableName, data, [
       'id',
-      'category_id',
+      'cost_category_id',
+      'cost_category_name',
       'branch_id',
       'branch_name',
       'paid_amount',
-      'product_id',
-      'product_name',
       'status',
       'cost_status',
       'date',
@@ -73,11 +72,10 @@ export class CostDao {
       .conditionIfNotEmpty('status', '=', query.status)
       .conditionIfNotEmpty('cost_status', '=', query.cost_status)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
-      .conditionIfNotEmpty('product_id', '=', query.product_id)
-      .conditionIfNotEmpty('category_id', '=', query.category_id)
+      .conditionIfNotEmpty('cost_category_id', '=', query.cost_category_id)
       .conditionIfBetween('date', query.start_date, query.end_date)
       .orConditions([
-        new SqlCondition('product_name', 'ILIKE', query.name),
+        new SqlCondition('cost_category_name', 'ILIKE', query.name),
         new SqlCondition('branch_name', 'ILIKE', query.name),
       ])
       .criteria();
@@ -92,25 +90,21 @@ export class CostDao {
   }
 
   async search(filter: any): Promise<any[]> {
-    let nameCondition = ``;
-    if (filter.merchantId) {
-      filter.merchantId = `%${filter.merchantId}%`;
-      nameCondition = ` OR "name" ILIKE $1`;
-    }
-
+    const term = ((filter.id ?? filter.name ?? '') + '').trim().toLowerCase();
     const builder = new SqlBuilder(filter);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'ILIKE', filter.merchantId)
-      .criteria();
+    if (term) {
+      builder.conditionIfNotEmpty('LOWER("name")', 'ILIKE', `%${term}%`);
+    }
+    const criteria = builder.criteria();
     return await this._db.select(
-      `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
+      `SELECT "id", CONCAT("id", '-', "cost_category_name") as "value" FROM "${tableName}" ${criteria}`,
       builder.values,
     );
   }
 
   async pairs(query) {
     const items = await this._db.select(
-      `SELECT "id" as "key", CONCAT("id", '-', "name") as "value" FROM "${tableName}" order by "id" asc`,
+      `SELECT "id" as "key", CONCAT("id", '-', "cost_category_name") as "value" FROM "${tableName}" order by "id" asc`,
       {},
     );
     return items;
@@ -118,7 +112,7 @@ export class CostDao {
 
   async getMerchantsByTag(value: string) {
     return await this._db.select(
-      `SELECT * FROM "${tableName}" m 
+      `SELECT * FROM "${tableName}" m
              WHERE $1 = ANY(m."tags")`,
       [value],
     );

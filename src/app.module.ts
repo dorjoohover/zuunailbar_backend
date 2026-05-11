@@ -16,6 +16,7 @@ import { UserModule } from './app/user/user.module';
 import { ServiceModule } from './app/service/service.module';
 import { DiscountModule } from './app/discount/discount.module';
 import { CategoryModule } from './app/category/category.module';
+import { CostCategoryModule } from './app/cost_category/cost_category.module';
 import { BrandModule } from './app/brand/brand.module';
 import { ScheduleModule } from './app/schedule/schedule.module';
 import { IntegrationModule } from './app/integrations/integrations.module';
@@ -48,6 +49,7 @@ import { ArtistLeavesModule } from './app/artist_leaves/artist_leaves.module';
 import { PaymentModule } from './app/payment/payment.module';
 import { IntegrationPaymentModule } from './app/integration_payments/integration_payment.module';
 import { ResendService } from './auth/resend.service';
+import { DashboardModule } from './app/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -65,6 +67,7 @@ import { ResendService } from './auth/resend.service';
     ServiceModule,
     DiscountModule,
     CategoryModule,
+    CostCategoryModule,
     BrandModule,
     ScheduleModule,
     IntegrationModule,
@@ -90,6 +93,7 @@ import { ResendService } from './auth/resend.service';
     ArtistLeavesModule,
     PaymentModule,
     IntegrationPaymentModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [

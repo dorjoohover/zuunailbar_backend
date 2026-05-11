@@ -11,6 +11,7 @@ import {
 import { UserService } from 'src/app/user/user.service';
 import { ADMIN, CLIENT } from 'src/base/constants';
 import { AuthError, BadRequest } from 'src/common/error';
+import { MobileFormat } from 'src/common/formatter';
 import axios from 'axios';
 import { ResendService } from './resend.service';
 type CancelWarningPayload = {
@@ -27,6 +28,29 @@ export class AuthService {
   ) {}
   private authError = new AuthError();
   private otps: Record<string, string> = {};
+
+  private getOtpKeys(identifier?: string | null) {
+    if (!identifier) return [];
+
+    const value = identifier.trim();
+    if (!value) return [];
+
+    const keys = new Set<string>([value]);
+
+    if (value.includes('@')) {
+      keys.add(value.toLowerCase());
+    } else {
+      keys.add(MobileFormat(value));
+    }
+
+    return [...keys];
+  }
+
+  private saveOtp(identifier: string, otp: string) {
+    this.getOtpKeys(identifier).forEach((key) => {
+      this.otps[key] = otp;
+    });
+  }
 
   async validateAdminUser(mobile: string, pass: string): Promise<any> {
     let user;
@@ -134,7 +158,7 @@ export class AuthService {
   async sentOtpMail(email: string) {
     try {
       const otp = this.generateOtp();
-      this.otps[email] = otp;
+      this.saveOtp(email, otp);
       await this.mailer.sendMail({
         to: email,
         subject: 'И-мэйл хаяг баталгаажуулах – Zunailbar Salon',
@@ -215,7 +239,7 @@ private async sendSms(mobile: string, text: string): Promise<boolean> {
 
 async sendOtp(mobile: string): Promise<boolean> {
   const otp = this.generateOtp();
-  this.otps[mobile] = otp;
+  this.saveOtp(mobile, otp);
 
   const text = [
     `Your OTP code is: ${otp}`,
@@ -236,7 +260,19 @@ async sendCancelWarning(
   return this.sendSms(mobile, text);
 }
   async checkOtp(otp: string, mobile: string) {
-    return this.otps[mobile] && this.otps[mobile] == otp;
+    const keys = new Set(this.getOtpKeys(mobile));
+    let user = null;
+
+    try {
+      user = await this.checkMobile(mobile);
+    } catch (error) {
+      user = null;
+    }
+
+    this.getOtpKeys(user?.mobile).forEach((key) => keys.add(key));
+    this.getOtpKeys(user?.mail).forEach((key) => keys.add(key));
+
+    return [...keys].some((key) => this.otps[key] === otp);
   }
 
   async reset(dto: ResetPasswordDto) {
@@ -257,8 +293,16 @@ async sendCancelWarning(
 
     return updated;
   }
-  async resetPassword(dto: ResetCurrentPasswordDto, mobile: string) {
-    await this.validateAdminUser(mobile, dto.password);
+  async resetPassword(
+    dto: ResetCurrentPasswordDto,
+    mobile: string,
+    role?: number,
+  ) {
+    if (role !== undefined && role >= CLIENT) {
+      await this.validateClientUser(mobile, dto.password);
+    } else {
+      await this.validateAdminUser(mobile, dto.password);
+    }
     const res = await this.userService.resetPassword(
       mobile,
       dto.newPassword,

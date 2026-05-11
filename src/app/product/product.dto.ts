@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { CategoryType } from 'src/base/constants';
 
 export class ProductDto {
   @ApiProperty()
@@ -12,8 +11,6 @@ export class ProductDto {
   name: string;
   @ApiProperty()
   quantity: number;
-  @ApiProperty()
-  type: CategoryType;
   @ApiProperty()
   color: string;
   @ApiProperty()

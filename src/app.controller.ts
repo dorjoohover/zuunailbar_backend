@@ -100,7 +100,7 @@ export class AppController {
 
   @Post('/reset_password')
   async resetPassword(@Body() dto: ResetCurrentPasswordDto, @Req() { user }) {
-    await this.authService.resetPassword(dto, user.user.mobile);
+    await this.authService.resetPassword(dto, user.user.mobile, user.user.role);
     return true;
   }
 

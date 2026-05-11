@@ -299,7 +299,7 @@ export class UserService {
         body.password = body.password.trim();
       }
       if (body.password) {
-        body.password = await bcrypt.hash(dto.password, saltOrRounds);
+        body.password = await bcrypt.hash(body.password, saltOrRounds);
       } else {
         delete body.password;
       }

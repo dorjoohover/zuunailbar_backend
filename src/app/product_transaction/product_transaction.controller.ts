@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Req,
+  Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { Admin, Employee, Manager } from 'src/auth/guards/role/role.decorator';
@@ -17,6 +18,7 @@ import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { PRODUCT_TRANSACTION_STATUS } from 'src/base/constants';
 import { ProductTransactionService } from './product_transaction.service';
 import { ProductTransactionDto } from './product_transaction.dto';
+import { Response } from 'express';
 @ApiBearerAuth('access-token')
 @ApiHeader({
   name: 'branch-id',
@@ -58,9 +60,40 @@ export class ProductTransactionController {
     'status',
     'transaction_status',
     'product_transaction_status',
+    'start_date',
+    'end_date',
   ])
   find(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.productTransactionService.findAll(pg, user.user.role);
+  }
+
+  @Manager()
+  @Get('purchase-prices/:productId')
+  async lastPrices(@Param('productId') productId: string) {
+    return await this.productTransactionService.getLastPurchasePrices(
+      productId,
+      3,
+    );
+  }
+
+  @Manager()
+  @Get('report')
+  @PQ([
+    'user_id',
+    'product_id',
+    'branch_id',
+    'status',
+    'transaction_status',
+    'product_transaction_status',
+    'start_date',
+    'end_date',
+  ])
+  async report(
+    @Pagination() pg: PaginationDto,
+    @Req() { user },
+    @Res() res: Response,
+  ) {
+    return await this.productTransactionService.report(pg, user.user.role, res);
   }
 
   @Employee()

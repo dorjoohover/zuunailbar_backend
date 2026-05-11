@@ -22,7 +22,6 @@ export class ProductDao {
       'category_name',
       'brand_name',
       'status',
-      'type',
       'size',
       'merchant_id',
     ]);
@@ -84,8 +83,6 @@ export class ProductDao {
       .conditionIfNotEmpty('category_id', '=', query.category_id)
       .conditionIfNotEmpty('category_id', '!=', query.spending)
       .conditionIfNotEmpty('LOWER("name")', 'ILIKE', query.name)
-      .conditionIfNotEmpty('type', '=', query.type)
-
       .conditionIfNotEmpty('status', '=', query.status)
       .criteria();
     const sql =
@@ -120,7 +117,6 @@ export class ProductDao {
     builder
       .conditionIfNotEmpty('merchant_id', '=', filter.merchant)
       .conditionIfNotEmpty('status', '=', filter.status)
-      .conditionIfNotEmpty('type', '=', filter.type)
       .orConditions([
         new SqlCondition('LOWER("name")', 'ILIKE', filter.name),
         new SqlCondition('LOWER("name")', 'ILIKE', filter.id),

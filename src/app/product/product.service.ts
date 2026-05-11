@@ -6,9 +6,7 @@ import { CategoryService } from '../category/category.service';
 import { BrandService } from '../brand/brand.service';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import {
-  CategoryType,
   getDefinedKeys,
-  mnDate,
   PRODUCT_STATUS,
   STATUS,
   ubDateAt00,
@@ -51,7 +49,6 @@ export class ProductService {
       price: 0,
       quantity: 0,
       category_name: category,
-      type: category?.type ?? dto.type ?? CategoryType.DEFAULT,
     });
   }
 

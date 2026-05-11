@@ -155,6 +155,15 @@ jest.mock(
   }),
   { virtual: true },
 );
+jest.mock('../dashboard/dashboard.service', () => ({
+  DashboardService: class {},
+}));
+jest.mock('../cost/cost.dao', () => ({
+  CostDao: class {},
+}));
+jest.mock('../product_log/product_log.dao', () => ({
+  ProductLogDao: class {},
+}));
 
 import { OrderStatus } from 'src/base/constants';
 import { OrderService } from './order.service';
@@ -309,6 +318,10 @@ describe('OrderService', () => {
       authService as any,
       payment as any,
       db as any,
+      { upsertSnapshot: jest.fn() } as any,
+      { list: jest.fn().mockResolvedValue({ items: [] }) } as any,
+      { list: jest.fn().mockResolvedValue({ items: [] }) } as any,
+      { list: jest.fn().mockResolvedValue({ items: [] }) } as any,
     );
 
     jest.spyOn(service, 'find').mockResolvedValue({

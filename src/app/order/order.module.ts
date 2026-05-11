@@ -17,6 +17,10 @@ import { IntegrationModule } from '../integrations/integrations.module';
 import { PaymentModule } from '../payment/payment.module';
 import { OrderLogDao } from './order.log.dao';
 import { AuthModule } from 'src/auth/auth.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
+import { CostModule } from '../cost/cost.module';
+import { ProductLogModule } from '../product_log/product_log.module';
+import { ProductTransactionModule } from '../product_transaction/product_transaction.module';
 
 @Module({
   imports: [
@@ -29,7 +33,11 @@ import { AuthModule } from 'src/auth/auth.module';
     IntegrationModule,
     UserServiceModule,
     forwardRef(() => PaymentModule),
-    AuthModule
+    AuthModule,
+    DashboardModule,
+    CostModule,
+    ProductLogModule,
+    ProductTransactionModule,
   ],
   controllers: [OrderController],
   providers: [

@@ -35,13 +35,13 @@ export class CategoryController {
   }
 
   @Get()
-  @PQ(['status', 'name'])
+  @PQ(['name'])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.categoryService.findAll(pg, user.user.role);
   }
   @Get('search')
   @Manager()
-  @SQ(['id', 'limit', 'page', 'type'])
+  @SQ(['id', 'limit', 'page'])
   async search(@Filter() sd: SearchDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
     const res = await this.categoryService.search(sd, user.merchant.id);

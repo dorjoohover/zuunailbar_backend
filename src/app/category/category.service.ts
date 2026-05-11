@@ -3,14 +3,7 @@ import { CategoryDao } from './category.dao';
 import { CategoryDto } from './category.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
-import {
-  ADMIN,
-  ADMINUSERS,
-  CategoryType,
-  getDefinedKeys,
-  STATUS,
-} from 'src/base/constants';
-import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { getDefinedKeys } from 'src/base/constants';
 
 @Injectable()
 export class CategoryService {
@@ -20,8 +13,6 @@ export class CategoryService {
       ...dto,
       id: AppUtils.uuid4(),
       merchant_id: merchant,
-      status: STATUS.Active,
-      type: dto.type ?? CategoryType.DEFAULT,
     });
   }
 
@@ -30,13 +21,13 @@ export class CategoryService {
   }
 
   public async findAll(pg: PaginationDto, role: number) {
-    return await this.dao.list(applyDefaultStatusFilter(pg, role));
+    const { status, ...rest } = pg as any;
+    return await this.dao.list(rest);
   }
   public async search(filter: SearchDto, merchant: string) {
     return await this.dao.search({
       ...filter,
       merchant,
-      status: STATUS.Active,
     });
   }
 
@@ -45,6 +36,6 @@ export class CategoryService {
   }
 
   public async remove(id: string) {
-    return await this.dao.updateStatus(id, STATUS.Hidden);
+    return await this.dao.deleteById(id);
   }
 }

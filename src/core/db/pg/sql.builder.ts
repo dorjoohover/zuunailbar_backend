@@ -35,18 +35,38 @@ export class SqlBuilder {
     return cond.toUpperCase() === 'LIKE' ? 'ILIKE' : cond;
   }
 
+  // Identifier-уудыг зөв quote хийх:
+  //   "name"           → ` "name" `  (өөрчлөхгүй; өмнө нь quote хийгдсэн)
+  //   LOWER("name")    → ` LOWER("name") ` (function call → өөрчлөхгүй)
+  //   pt.status        → ` pt."status" ` (qualified → зөвхөн баруун хэсгийг quote)
+  //   status           → ` "status" `
+  private quoteIdentifier(column: string): string {
+    const trimmed = column.trim();
+    if (!trimmed) return trimmed;
+    // Аль хэдийн quote хийгдсэн эсвэл function call (parenthesis-тэй) бол өөрчлөхгүй
+    if (trimmed.includes('"') || trimmed.includes('(')) return trimmed;
+    // Qualified нэр (pt.status гэх мэт)
+    if (trimmed.includes('.')) {
+      const parts = trimmed.split('.');
+      return parts
+        .map((p, i) => (i === parts.length - 1 ? `"${p}"` : p))
+        .join('.');
+    }
+    return `"${trimmed}"`;
+  }
+
   condition(column: string, cond: string, value: any) {
-    const quote = column.indexOf(`"`) === -1 ? `"` : '';
+    const col = this.quoteIdentifier(column);
     const normalizedCond = this.normalizeCondition(cond);
     if (value !== undefined && value !== null && value !== '') {
       this.values.push(value);
       this.conditions.push(
-        `${quote}${column}${quote} ${normalizedCond} $${this.values.length}`,
+        `${col} ${normalizedCond} $${this.values.length}`,
       );
       return this;
     }
     if (normalizedCond === 'IS NULL' || normalizedCond === 'IS NOT NULL') {
-      this.conditions.push(`${quote}${column}${quote} ${normalizedCond}`);
+      this.conditions.push(`${col} ${normalizedCond}`);
     }
     throw new AppDBInvalidDataException(`Empty value for "${column}"`);
   }
@@ -54,25 +74,22 @@ export class SqlBuilder {
   orConditions(conditions: SqlCondition[]) {
     const subConditions: string[] = [];
     conditions.forEach((condition) => {
-      const quote = condition.column.indexOf(`"`) === -1 ? `"` : '';
+      const col = this.quoteIdentifier(condition.column);
       if (
         condition.value !== undefined &&
         condition.value !== null &&
         condition.value !== ''
       ) {
         this.values.push(condition.value);
-        const quote = condition.column.indexOf(`"`) === -1 ? `"` : '';
         const normalizedCond = this.normalizeCondition(condition.cond);
         subConditions.push(
-          `${quote}${condition.column}${quote} ${normalizedCond} $${this.values.length}`,
+          `${col} ${normalizedCond} $${this.values.length}`,
         );
       } else if (
         condition.cond === 'IS NULL' ||
         condition.cond === 'IS NOT NULL'
       ) {
-        subConditions.push(
-          `${quote}${condition.column}${quote} ${condition.cond}`,
-        );
+        subConditions.push(`${col} ${condition.cond}`);
       }
     });
 
@@ -85,10 +102,10 @@ export class SqlBuilder {
   conditionIfNotEmpty(column: string, cond: string, value: any) {
     if (value !== undefined && value !== null && value !== '') {
       this.values.push(value);
-      const quote = column.indexOf(`"`) === -1 ? `"` : '';
+      const col = this.quoteIdentifier(column);
       const normalizedCond = this.normalizeCondition(cond);
       this.conditions.push(
-        `${quote}${column}${quote} ${normalizedCond} $${this.values.length}`,
+        `${col} ${normalizedCond} $${this.values.length}`,
       );
     }
 
@@ -102,35 +119,29 @@ export class SqlBuilder {
   conditionIfArray(column: string, value: any[]) {
     if (!Array.isArray(value) || value.length === 0) return this;
 
-    const quote = column.includes(`"`) ? '' : '"';
+    const col = this.quoteIdentifier(column);
 
     // Postgres array параметр ашиглах
     this.values.push(value);
-    this.conditions.push(
-      `${quote}${column}${quote} = ANY($${this.values.length})`,
-    );
+    this.conditions.push(`${col} = ANY($${this.values.length})`);
 
     return this;
   }
 
   conditionIfBetween(column: string, start: any, end: any) {
-    const quote = column.indexOf(`"`) === -1 ? `"` : '';
+    const col = this.quoteIdentifier(column);
 
     if (start && end) {
       this.values.push(start, end);
       this.conditions.push(
-        `${quote}${column}${quote} BETWEEN $${this.values.length - 1} AND $${this.values.length}`,
+        `${col} BETWEEN $${this.values.length - 1} AND $${this.values.length}`,
       );
     } else if (start) {
       this.values.push(start);
-      this.conditions.push(
-        `${quote}${column}${quote} >= $${this.values.length}`,
-      );
+      this.conditions.push(`${col} >= $${this.values.length}`);
     } else if (end) {
       this.values.push(end);
-      this.conditions.push(
-        `${quote}${column}${quote} <= $${this.values.length}`,
-      );
+      this.conditions.push(`${col} <= $${this.values.length}`);
     }
 
     return this;
@@ -170,7 +181,7 @@ export class SqlBuilder {
     column?: string,
   ) {
     if (!column || (!startDate && !endDate)) return this;
-    const col = column.includes('"') ? column : `"${column}"`;
+    const col = this.quoteIdentifier(column);
 
     if (startDate && endDate) {
       this.values.push(this.toPgDate(startDate), this.toPgDate(endDate));
@@ -187,14 +198,12 @@ export class SqlBuilder {
     return this;
   }
   conditionIsNull(column: string) {
-    const quote = column.indexOf(`"`) === -1 ? `"` : '';
-    this.conditions.push(`${quote}${column}${quote} IS NULL`);
+    this.conditions.push(`${this.quoteIdentifier(column)} IS NULL`);
     return this;
   }
 
   conditionIsNotNull(column: string) {
-    const quote = column.indexOf(`"`) === -1 ? `"` : '';
-    this.conditions.push(`${quote}${column}${quote} IS NOT NULL`);
+    this.conditions.push(`${this.quoteIdentifier(column)} IS NOT NULL`);
     return this;
   }
 

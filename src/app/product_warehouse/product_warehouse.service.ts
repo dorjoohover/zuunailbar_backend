@@ -85,6 +85,7 @@ export class ProductWarehouseService {
     await Promise.all(
       products.map(async (pro) => {
         const product = await this.product.findOne(pro.product_id);
+        const addedQty = +(pro.quantity ?? 0);
 
         let productWarehouse;
         try {
@@ -96,8 +97,7 @@ export class ProductWarehouseService {
           productWarehouse = null;
         }
         if (productWarehouse && productWarehouse != null) {
-          const quantity =
-            +(productWarehouse.quantity ?? 0) + +(pro.quantity ?? 0);
+          const quantity = +(productWarehouse.quantity ?? 0) + addedQty;
           await this.dao.updateQuantity(productWarehouse.id, quantity);
         } else {
           await this.dao.add({
@@ -109,6 +109,9 @@ export class ProductWarehouseService {
             created_by: user,
             status: STATUS.Active,
           });
+        }
+        if (addedQty > 0) {
+          await this.product.updateQuantity(pro.product_id, -addedQty);
         }
       }),
     );
@@ -238,8 +241,25 @@ export class ProductWarehouseService {
           0,
         );
 
-        if (Number(p.quantity ?? 0) > allowedQuantity) {
+        const newQty = Number(p.quantity ?? 0);
+        if (newQty > allowedQuantity) {
           new BadRequest().STOCK_INSUFFICIENT;
+        }
+
+        const oldQty = Number(current.quantity ?? 0);
+        const sameProduct = current.product_id === targetProductId;
+        if (sameProduct) {
+          const diff = newQty - oldQty;
+          if (diff !== 0) {
+            await this.product.updateQuantity(targetProductId, -diff);
+          }
+        } else {
+          if (oldQty > 0) {
+            await this.product.updateQuantity(current.product_id, oldQty);
+          }
+          if (newQty > 0) {
+            await this.product.updateQuantity(targetProductId, -newQty);
+          }
         }
 
         const payload = p;
@@ -252,6 +272,11 @@ export class ProductWarehouseService {
   }
 
   public async remove(id: string) {
+    const current = await this.findOne(id);
+    const oldQty = Number(current?.quantity ?? 0);
+    if (current?.product_id && oldQty > 0) {
+      await this.product.updateQuantity(current.product_id, oldQty);
+    }
     return await this.dao.updateStatus(id, STATUS.Hidden);
   }
 }

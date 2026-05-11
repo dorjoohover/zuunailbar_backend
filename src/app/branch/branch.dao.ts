@@ -168,22 +168,16 @@ export class BranchDao {
   }
 
   async search(filter: any): Promise<any[]> {
-    let nameCondition = ``;
-    if (filter.id) {
-      filter.id = `%${filter.id.toLowerCase()}%`;
-      nameCondition = ` OR "name" ILIKE $1`;
-    }
-
+    const term = ((filter.id ?? filter.name ?? '') + '').trim().toLowerCase();
     const builder = new SqlBuilder(filter);
-    const criteria = builder
-      .conditionIfNotEmpty('name', 'ILIKE', filter.id)
-      .criteria();
+    if (term) {
+      builder.conditionIfNotEmpty('LOWER("name")', 'ILIKE', `%${term}%`);
+    }
+    const criteria = builder.criteria();
     return await this._db.select(
       ` SELECT "id",
-           CONCAT(
-             COALESCE("name", ''), ''
-
-           ) AS "value" FROM "${tableName}" ${criteria}${nameCondition}`,
+           CONCAT(COALESCE("name", ''), '') AS "value"
+        FROM "${tableName}" ${criteria}`,
       builder.values,
     );
   }

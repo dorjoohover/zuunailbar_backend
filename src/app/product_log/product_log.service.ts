@@ -30,7 +30,6 @@ export class ProductLogService {
       id: AppUtils.uuid4(),
       created_by: user,
       status: STATUS.Active,
-      unit_price: dto.unit_price ?? 0,
       cargo: dto.cargo ?? 0,
       total_amount: total_amount,
       paid_amount: paid_amount,

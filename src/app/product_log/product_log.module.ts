@@ -10,6 +10,6 @@ import { ProductModule } from '../product/product.module';
   imports: [AppDbModule, BaseModule, ProductModule],
   controllers: [ProductLogController],
   providers: [ProductLogService, ProductLogDao],
-  exports: [ProductLogService],
+  exports: [ProductLogService, ProductLogDao],
 })
 export class ProductLogModule {}

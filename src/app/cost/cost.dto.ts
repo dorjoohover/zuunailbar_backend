@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class CostDto {
   @ApiProperty()
-  product_id: string;
+  cost_category_id: string;
 
   @ApiProperty()
   date: Date;

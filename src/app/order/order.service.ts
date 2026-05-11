@@ -49,6 +49,10 @@ import { OrderLogDao } from './order.log.dao';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { AuthService } from 'src/auth/auth.service';
 import * as ExcelJS from 'exceljs';
+import { DashboardService } from '../dashboard/dashboard.service';
+import { CostDao } from '../cost/cost.dao';
+import { ProductLogDao } from '../product_log/product_log.dao';
+import { ProductTransactionDao } from '../product_transaction/product_transaction.dao';
 
 const normalizePriceValue = (value?: number | string | null) => {
   const amount = Number(value ?? 0);
@@ -191,6 +195,10 @@ export class OrderService {
     // @Inject(forwardRef(() => PaymentService))
     private payment: PaymentService,
     private readonly db: AppDB,
+    private readonly dashboardService: DashboardService,
+    private readonly costDao: CostDao,
+    private readonly productLogDao: ProductLogDao,
+    private readonly productTransactionDao: ProductTransactionDao,
   ) {}
   public async canPlaceOrder(
     dto: Order,
@@ -1412,6 +1420,11 @@ export class OrderService {
           );
         }
       }
+      await this.register_status_logs({
+        order_id: id,
+        user,
+        order_status: OrderStatus.Absent,
+      });
       await this.dao.updateOrderStatus(id, OrderStatus.Absent);
       await this.orderDetail.updateStatusByOrder(id, OrderStatus.Absent);
       return true;
@@ -2010,7 +2023,10 @@ export class OrderService {
   ) {
     return await this.dao.updatePaidDate(id, date, type);
   }
-  private isFullDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+  private isFullDate = (value: string) =>
+    /^\d{4}[-/]\d{2}[-/]\d{2}$/.test(value);
+  private normalizeYMD = (value?: string) =>
+    value ? value.replace(/\//g, '-') : value;
 
   private normalizeSalaryDay(value?: number | null) {
     const day = Number(value);
@@ -2202,12 +2218,230 @@ export class OrderService {
             });
           }),
       );
+
+      // 📊 Dashboard snapshot-г (огноо × салбар) тус бүрд бичих
+      try {
+        await this.writeDashboardSnapshots(
+          confirmedOrders,
+          userCache,
+          approver,
+        );
+      } catch (snapshotErr) {
+        console.error('Dashboard snapshot write failed:', snapshotErr);
+      }
+
       return {
         count: confirmedOrders.length,
       };
     } catch (error) {
       console.log(error);
     }
+  }
+
+  // Хуучин захиалга/зардал/бараа-н үлдсэн өгөгдлөөс dashboard_snapshots-г дахин үүсгэх.
+  // Дуудаж буй админ заавал byd өдрийн range өгөх ёсгүй; эс өгөвсөн бол бүх амжилттай захиалга.
+  public async backfillDashboardSnapshots(input: {
+    start_date?: string;
+    end_date?: string;
+    approver?: string;
+  }) {
+    const { start_date, end_date, approver } = input;
+    const validStart = this.isFullDate(start_date)
+      ? this.normalizeYMD(start_date)
+      : undefined;
+    const validEnd = this.isFullDate(end_date)
+      ? this.normalizeYMD(end_date)
+      : undefined;
+    const orders = await this.find(
+      {
+        limit: -1,
+        skip: 0,
+        sort: false,
+        date: validStart,
+        end_date: validEnd,
+        order_status: OrderStatus.Finished,
+      },
+      ADMIN,
+    );
+    const items = orders?.items ?? [];
+
+    // Order_detail-аас холбогдох артистуудын percent/salary_day-ийг cache хийнэ.
+    const userCache = new Map<
+      string,
+      { id: string; day: number; percent: number }
+    >();
+    for (const order of items) {
+      const details = await this.orderDetail.findByOrder(order.id);
+      for (const d of details ?? []) {
+        if (!d?.user_id || userCache.has(d.user_id)) continue;
+        try {
+          const u = await this.user.findOne(d.user_id);
+          if (!u) continue;
+          userCache.set(d.user_id, {
+            id: u.id,
+            day: this.normalizeSalaryDay(u.salary_day),
+            percent: Number(u.percent ?? 0),
+          });
+        } catch {
+          // алгасна
+        }
+      }
+    }
+
+    await this.writeDashboardSnapshots(items, userCache, approver, {
+      start_date: validStart,
+      end_date: validEnd,
+    });
+    return { count: items.length, snapshots: items.length };
+  }
+
+  private async writeDashboardSnapshots(
+    confirmedOrders: any[],
+    userCache: Map<string, { id: string; day: number; percent: number }>,
+    approver?: string,
+    options?: { start_date?: string; end_date?: string },
+  ) {
+    // Захиалга байхгүй өдөрт ч costs/product_transactions-ийн дагуу snapshot үүсгэх боломжтой болгож,
+    // explicit range байвал тэрхүү хүрээгээр шууд хайна.
+    const hasExplicitRange = !!(options?.start_date || options?.end_date);
+    if (!confirmedOrders?.length && !hasExplicitRange) return;
+
+    type Bucket = {
+      revenue: number;
+      salary: number;
+      order_count: number;
+    };
+    const buckets = new Map<string, Bucket>();
+    const dateBranchSet = new Set<string>();
+    const branches = new Set<string | null>();
+    const dates = new Set<string>();
+
+    const keyOf = (date: string, branchId: string | null) =>
+      `${date}__${branchId ?? ''}`;
+
+    for (const order of confirmedOrders) {
+      const orderDate = toYMD(order?.order_date);
+      if (!orderDate) continue;
+      // Хоосон string UUID-руу очихоос сэргийлэх — || ашиглаж "" → null.
+      const branchId = order?.branch_id || null;
+      branches.add(branchId);
+      dates.add(orderDate);
+      const total = Number(order?.total_amount ?? 0);
+      const discount = Number(order?.discount ?? 0);
+      const revenue = Math.max(total - discount, 0);
+
+      const k = keyOf(orderDate, branchId);
+      dateBranchSet.add(k);
+      const bucket = buckets.get(k) ?? {
+        revenue: 0,
+        salary: 0,
+        order_count: 0,
+      };
+      bucket.revenue += revenue;
+      bucket.order_count += 1;
+
+      const details = await this.orderDetail.findByOrder(order.id);
+      if (details?.length) {
+        for (const d of details) {
+          if (!d?.user_id) continue;
+          const u = userCache.get(d.user_id);
+          const pct = u?.percent ?? 0;
+          const price = Number(d?.price ?? 0);
+          if (price > 0 && pct > 0) {
+            bucket.salary += this.calculateSalaryAmount(price, pct);
+          }
+        }
+      }
+      buckets.set(k, bucket);
+    }
+
+    // Costs/product_transactions нь захиалгагүй өдрөөс үл хамаарч бичигдэх боломжтой тул
+    // тэдгээрийн өөрсдийн date range-аар хайхдаа орлогогүй өдрийг ч багтаана.
+    const sortedDates = dates.size ? [...dates].sort() : [];
+    const orderStart =
+      options?.start_date ?? (sortedDates.length ? sortedDates[0] : undefined);
+    const orderEnd =
+      options?.end_date ?? (sortedDates.length ? sortedDates.at(-1)! : undefined);
+
+    // Costs in date range, grouped by (date, branch_id)
+    const costExpense = new Map<string, number>();
+    try {
+      const costRes = await this.costDao.list({
+        start_date: orderStart,
+        end_date: orderEnd,
+        status: STATUS.Active,
+      });
+      for (const c of costRes?.items ?? []) {
+        const d = toYMD(c?.date);
+        if (!d) continue;
+        const k = keyOf(d, c?.branch_id || null);
+        costExpense.set(k, (costExpense.get(k) ?? 0) + Number(c?.price ?? 0));
+      }
+    } catch (e) {
+      console.error('cost fetch for snapshot failed:', e);
+    }
+
+    // Product transactions (хэрэглээ) date × branch_id-аар — шууд expense-руу нэмнэ.
+    const productTxExpense = new Map<string, number>();
+    try {
+      const ptRes = await this.productTransactionDao.list({
+        limit: -1,
+        skip: 0,
+        sort: false,
+        start_date: orderStart,
+        end_date: orderEnd,
+        status: STATUS.Active,
+      });
+      for (const t of ptRes?.items ?? []) {
+        const d = toYMD(t?.date ?? t?.created_at);
+        if (!d) continue;
+        const k = keyOf(d, t?.branch_id || null);
+        productTxExpense.set(
+          k,
+          (productTxExpense.get(k) ?? 0) + Number(t?.total_amount ?? 0),
+        );
+      }
+    } catch (e) {
+      console.error('product_transaction fetch for snapshot failed:', e);
+    }
+
+    // Захиалга байхгүй өдөрт ч cost эсвэл product_transaction-ийн дагуу snapshot үүсгэх.
+    const allKeys = new Set<string>([
+      ...buckets.keys(),
+      ...costExpense.keys(),
+      ...productTxExpense.keys(),
+    ]);
+
+    // Upsert
+    await Promise.all(
+      [...allKeys].map(async (k) => {
+        const [date, branchPart] = k.split('__');
+        if (!date) return;
+        const branchId = branchPart && branchPart !== '' ? branchPart : null;
+        const b = buckets.get(k) ?? {
+          revenue: 0,
+          salary: 0,
+          order_count: 0,
+        };
+        const cost = costExpense.get(k) ?? 0;
+        const productTx = productTxExpense.get(k) ?? 0;
+        // Зардал = costs (хэрэглээний зардал) + product_transactions (бүтээгдэхүүний хэрэглээ)
+        const expense = cost + productTx;
+        const profit = b.revenue - expense - b.salary;
+        await this.dashboardService.upsertSnapshot({
+          date,
+          branch_id: branchId,
+          revenue: Math.round(b.revenue),
+          expense: Math.round(expense),
+          cost_total: Math.round(cost),
+          product_total: Math.round(productTx),
+          salary: Math.round(b.salary),
+          profit: Math.round(profit),
+          order_count: b.order_count,
+          created_by: approver,
+        });
+      }),
+    );
   }
   public async level() {
     const keys = [

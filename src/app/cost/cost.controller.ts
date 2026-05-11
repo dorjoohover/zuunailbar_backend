@@ -35,8 +35,7 @@ export class CostController {
   }
 
   @PQ([
-    'category_id',
-    'product_id',
+    'cost_category_id',
     'date',
     'start_date',
     'end_date',

@@ -225,6 +225,19 @@ export class OrderController {
       body?.to,
     );
   }
+
+  @Post('dashboard/backfill')
+  @Admin()
+  async backfillDashboard(
+    @Body() body: { start_date?: string; end_date?: string },
+    @Req() { user },
+  ) {
+    return this.orderService.backfillDashboardSnapshots({
+      start_date: body?.start_date,
+      end_date: body?.end_date,
+      approver: user.user.id,
+    });
+  }
   @Post('confirm/:date')
   @Admin()
   @ApiParam({ name: 'date' })

@@ -58,6 +58,14 @@ jest.mock(
   { virtual: true },
 );
 jest.mock(
+  'src/common/formatter',
+  () => ({
+    MobileFormat: (mobile: string) =>
+      mobile.startsWith('+') ? mobile : `+976${mobile}`,
+  }),
+  { virtual: true },
+);
+jest.mock(
   './resend.service',
   () => ({
     ResendService: class {},
@@ -164,5 +172,50 @@ describe('AuthService', () => {
         lastname: 'User',
       }),
     ).rejects.toThrow('Бүртгэлгүй хэрэглэгч байна');
+  });
+
+  it('accepts an email otp when reset is submitted with the phone number', async () => {
+    (service as any).otps['user@example.com'] = '1234';
+    userService.findMobile.mockResolvedValue({
+      mobile: '99001122',
+      mail: 'user@example.com',
+    });
+    userService.resetPassword.mockResolvedValue(1);
+
+    await expect(
+      service.reset({
+        mobile: '99001122',
+        otp: '1234',
+        password: 'secret',
+        firstname: 'Test',
+        lastname: 'User',
+      }),
+    ).resolves.toBe(1);
+
+    expect(userService.resetPassword).toHaveBeenCalledWith(
+      '99001122',
+      'secret',
+      'User',
+      'Test',
+    );
+  });
+
+  it('accepts a normalized phone otp during reset', async () => {
+    (service as any).otps['+97699001122'] = '4321';
+    userService.findMobile.mockResolvedValue({
+      mobile: '+97699001122',
+      mail: null,
+    });
+    userService.resetPassword.mockResolvedValue(1);
+
+    await expect(
+      service.reset({
+        mobile: '99001122',
+        otp: '4321',
+        password: 'secret',
+        firstname: 'Test',
+        lastname: 'User',
+      }),
+    ).resolves.toBe(1);
   });
 });

@@ -77,10 +77,24 @@ export const firstLetterUpper = (value: string) => {
   if (value.length == 0) return value;
   return `${value.substring(0, 1).toUpperCase()}${value.substring(1)}`;
 };
-export function toYMD(d: Date) {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+export function toYMD(d: Date | string | number | null | undefined): string {
+  if (d == null) return '';
+  // String ирвэл ISO эсвэл "YYYY-MM-DD"-ийг шууд таних боломжтой, эс өгөвсөн Date руу хөрвүүлнэ.
+  if (typeof d === 'string') {
+    // Хэрэв "YYYY-MM-DD..." гэсэн форматаар эхэлж байвал шууд авна.
+    const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    const parsed = new Date(d);
+    if (!isNaN(parsed.getTime())) {
+      return toYMD(parsed);
+    }
+    return '';
+  }
+  const date = d instanceof Date ? d : new Date(d);
+  if (isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
@@ -124,10 +138,6 @@ export function ubDateAt00(d: Date | string | number = new Date()): Date {
 export enum AdminUserStatus {
   Active = 10,
   Deleted = 20,
-}
-export enum CategoryType {
-  DEFAULT = 10,
-  COST = 20,
 }
 export enum UserStatus {
   Active = 10,
