@@ -37,9 +37,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     ) {
       throw new UnauthorizedException();
     }
-    if (payload.branch_id && headerBranchId && headerBranchId !== payload.branch_id) {
-      throw new UnauthorizedException();
-    }
+    // if (payload.branch_id && headerBranchId && headerBranchId !== payload.branch_id) {
+    //   throw new UnauthorizedException();
+    // }
     if (merchantId) {
       merchant = await this.merchantService.findOne(merchantId);
     }

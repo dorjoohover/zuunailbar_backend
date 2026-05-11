@@ -1158,12 +1158,12 @@ export class OrderService {
           HttpStatus.BAD_REQUEST,
         );
       }
-      if (requiresOnlinePrePayment && preMethod !== PaymentMethod.QPAY) {
-        throw new HttpException(
-          'Урьдчилгаа төлбөр үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+      // if (requiresOnlinePrePayment && preMethod !== PaymentMethod.QPAY) {
+      //   throw new HttpException(
+      //     'Урьдчилгаа төлбөр үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.',
+      //     HttpStatus.BAD_REQUEST,
+      //   );
+      // }
       if (!admin) {
         await this.canPlaceOrder(
           {
