@@ -14,6 +14,7 @@ export class CostCategoryDao {
       'id',
       'name',
       'merchant_id',
+      'parent_id',
     ]);
   }
 
@@ -25,9 +26,20 @@ export class CostCategoryDao {
 
   async getById(id: string) {
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "id"=$1`,
+      `SELECT c.*, p."name" AS "parent_name"
+       FROM "${tableName}" c
+       LEFT JOIN "${tableName}" p ON p."id" = c."parent_id"
+       WHERE c."id"=$1`,
       [id],
     );
+  }
+
+  async hasChildren(id: string): Promise<boolean> {
+    const row = await this._db.selectOne(
+      `SELECT 1 AS "x" FROM "${tableName}" WHERE "parent_id" = $1 LIMIT 1`,
+      [id],
+    );
+    return !!row;
   }
 
   async deleteById(id: string) {
@@ -45,15 +57,29 @@ export class CostCategoryDao {
     }
 
     const builder = new SqlBuilder(query);
-    const criteria = builder
-      .conditionIfNotEmpty('id', 'ILIKE', query.id)
-      .conditionIfNotEmpty('name', 'ILIKE', query.name)
-      .criteria();
-    let sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
+    builder
+      .conditionIfNotEmpty('c.id', 'ILIKE', query.id)
+      .conditionIfNotEmpty('c.name', 'ILIKE', query.name)
+      .conditionIfNotEmpty('c.parent_id', '=', query.parent_id);
+    if (query.top_level === 'true' || query.top_level === true) {
+      builder.conditionRaw('c."parent_id" IS NULL');
+    }
+    if (query.leaf === 'true' || query.leaf === true) {
+      builder.conditionRaw(
+        `NOT EXISTS (SELECT 1 FROM "${tableName}" cc WHERE cc."parent_id" = c."id")`,
+      );
+    }
+    const criteria = builder.criteria();
+
+    let sql = `SELECT c.*, p."name" AS "parent_name"
+               FROM "${tableName}" c
+               LEFT JOIN "${tableName}" p ON p."id" = c."parent_id"
+               ${criteria}
+               ORDER BY c.created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
 
     if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
     if (query.skip) sql += ` offset ${+query.skip * +(query.limit ?? 0)}`;
-    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" c ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
     const items = await this._db.select(sql, builder.values);
     return { count, items };
@@ -65,9 +91,19 @@ export class CostCategoryDao {
     }
 
     const builder = new SqlBuilder(filter);
-    const criteria = builder
-      .conditionIfNotEmpty('LOWER("name")', 'ILIKE', filter.id)
-      .criteria();
+    builder.conditionIfNotEmpty('LOWER("name")', 'ILIKE', filter.id);
+    if (filter.exclude_id) {
+      builder.conditionIfNotEmpty('id', '!=', filter.exclude_id);
+    }
+    if (filter.top_level === 'true' || filter.top_level === true) {
+      builder.conditionRaw('"parent_id" IS NULL');
+    }
+    if (filter.leaf === 'true' || filter.leaf === true) {
+      builder.conditionRaw(
+        `NOT EXISTS (SELECT 1 FROM "${tableName}" cc WHERE cc."parent_id" = "${tableName}"."id")`,
+      );
+    }
+    const criteria = builder.criteria();
 
     return await this._db.select(
       `SELECT "id",

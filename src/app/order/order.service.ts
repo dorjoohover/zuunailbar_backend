@@ -2427,7 +2427,8 @@ export class OrderService {
         const productTx = productTxExpense.get(k) ?? 0;
         // Зардал = costs (хэрэглээний зардал) + product_transactions (бүтээгдэхүүний хэрэглээ)
         const expense = cost + productTx;
-        const profit = b.revenue - expense - b.salary;
+        // Profit-аас зардлыг (cost + productTx) ХАСАХГҮЙ — зөвхөн цалинг хасна.
+        const profit = b.revenue - b.salary;
         await this.dashboardService.upsertSnapshot({
           date,
           branch_id: branchId,

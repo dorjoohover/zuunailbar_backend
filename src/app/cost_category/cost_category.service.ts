@@ -1,18 +1,55 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { CostCategoryDao } from './cost_category.dao';
 import { CostCategoryDto } from './cost_category.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
-import { getDefinedKeys } from 'src/base/constants';
 
 @Injectable()
 export class CostCategoryService {
   constructor(private readonly dao: CostCategoryDao) {}
+
+  private async assertValidParent(
+    id: string | null,
+    parent_id?: string | null,
+  ) {
+    if (!parent_id) return;
+    if (id && parent_id === id) {
+      throw new HttpException(
+        'Өөрийгөө эцэг ангилал болгож болохгүй',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const parent = await this.dao.getById(parent_id);
+    if (!parent) {
+      throw new HttpException(
+        'Эцэг ангилал олдсонгүй',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (parent.parent_id) {
+      throw new HttpException(
+        'Зөвхөн дээд түвшний ангилалыг эцэг болгож болно',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (id) {
+      const has = await this.dao.hasChildren(id);
+      if (has) {
+        throw new HttpException(
+          'Хүүхэдтэй ангилалыг өөр ангилалын дор хийх боломжгүй',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+  }
+
   public async create(dto: CostCategoryDto, merchant: string) {
+    await this.assertValidParent(null, dto.parent_id ?? null);
     await this.dao.add({
-      ...dto,
       id: AppUtils.uuid4(),
+      name: dto.name,
       merchant_id: merchant,
+      parent_id: dto.parent_id ?? null,
     });
   }
 
@@ -32,7 +69,22 @@ export class CostCategoryService {
   }
 
   public async update(id: string, dto: CostCategoryDto) {
-    return await this.dao.update({ ...dto, id }, getDefinedKeys(dto));
+    const hasParentKey = Object.prototype.hasOwnProperty.call(dto, 'parent_id');
+    const nextParent = hasParentKey ? (dto.parent_id ?? null) : undefined;
+    if (hasParentKey) {
+      await this.assertValidParent(id, nextParent);
+    }
+    const payload: Record<string, any> = { id };
+    const attrs: string[] = [];
+    if (dto.name !== undefined && dto.name !== null) {
+      payload.name = dto.name;
+      attrs.push('name');
+    }
+    if (hasParentKey) {
+      payload.parent_id = nextParent;
+      attrs.push('parent_id');
+    }
+    return await this.dao.update(payload, attrs);
   }
 
   public async remove(id: string) {

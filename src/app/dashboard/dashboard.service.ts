@@ -14,8 +14,9 @@ export class DashboardService {
     const product_total = Number(dto.product_total ?? 0);
     const expense = Number(dto.expense ?? cost_total + product_total);
     const salary = Number(dto.salary ?? 0);
+    // Profit-аас зардлыг (cost + productTx) хасахгүй — зөвхөн цалин хасна.
     const profit = Number(
-      dto.profit ?? Math.max(revenue - expense - salary, -1e15),
+      dto.profit ?? Math.max(revenue - salary, -1e15),
     );
     // Хоосон string ('') UUID-руу очвол PG syntax error өгөх тул null болгох.
     const branch_id =
