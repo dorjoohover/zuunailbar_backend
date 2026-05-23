@@ -22,6 +22,7 @@ export class ProductLogDao {
         'created_by',
         'cargo',
         'status',
+        'unit_price',
         'currency',
         'currency_amount',
         'product_log_status',
