@@ -224,10 +224,7 @@ export enum OrderStatus {
   Friend = 70,
 }
 
-export enum COST_STATUS {
-  Paid = 10,
-  Pending = 20,
-}
+
 
 export enum PRODUCT_STATUS {
   Active = 10,

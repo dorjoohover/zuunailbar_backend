@@ -25,6 +25,7 @@ export class ProductLogDao {
         'currency',
         'currency_amount',
         'product_log_status',
+        'date',
       ]);
     } catch (error) {
       console.log(error);

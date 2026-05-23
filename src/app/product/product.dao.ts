@@ -105,28 +105,31 @@ export class ProductDao {
   }
   async search(filter: any): Promise<any[]> {
     let nameCondition = ``;
+    const orConditions = [];
     if (filter.id) {
-      filter.id = `%${filter.id.toLowerCase()}%`;
-    }
-    if (filter.name) {
-      nameCondition = ` LOWER("name") ILIKE $1`;
-      filter.name = `%${filter.name.toLowerCase()}%`;
+      const id = `%${filter.id.toLowerCase()}%`;
+      orConditions.push(new SqlCondition('LOWER("name")', 'ILIKE', id));
+      orConditions.push(new SqlCondition('LOWER("brand_name")', 'ILIKE', id));
+      orConditions.push(
+        new SqlCondition('LOWER("category_name")', 'ILIKE', id),
+      );
     }
 
+    if (filter.name) {
+      const name = `%${filter.name.toLowerCase()}%`;
+      orConditions.push(new SqlCondition('LOWER("name")', 'ILIKE', name));
+      orConditions.push(new SqlCondition('LOWER("brand_name")', 'ILIKE', name));
+      orConditions.push(
+        new SqlCondition('LOWER("category_name")', 'ILIKE', name),
+      );
+    }
     const builder = new SqlBuilder(filter);
     builder
       .conditionIfNotEmpty('merchant_id', '=', filter.merchant)
       .conditionIfNotEmpty('status', '=', filter.status)
-      .orConditions([
-        new SqlCondition('LOWER("name")', 'ILIKE', filter.name),
-        new SqlCondition('LOWER("name")', 'ILIKE', filter.id),
-        new SqlCondition('LOWER("brand_name")', 'ILIKE', filter.name),
-        new SqlCondition('LOWER("brand_name")', 'ILIKE', filter.id),
-        new SqlCondition('LOWER("category_name")', 'ILIKE', filter.name),
-        new SqlCondition('LOWER("category_name")', 'ILIKE', filter.id),
-      ]);
+      .orConditions(orConditions);
     const criteria = builder.criteria();
-
+console.log(` ${criteria}${nameCondition}`, builder.values)
     return await this._db.select(
       `SELECT "id", 
      CONCAT(

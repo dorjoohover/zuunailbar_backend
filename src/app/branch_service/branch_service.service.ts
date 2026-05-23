@@ -25,9 +25,16 @@ export class BranchServiceService {
       if (!service) throw new BadRequest().notFound('Үйлчилгээ');
       const branch = await this.branchService.findOne(dto.branch_id);
       if (!branch) throw new BadRequest().notFound('Салбар');
+      const meta = dto.meta ?? {
+        serviceName: service.name ?? '',
+        branchName: branch.name ?? '',
+        description: service.description ?? '',
+        categoryName: service.meta?.name ?? '',
+      };
       const res = await this.dao.add({
         id: AppUtils.uuid4(),
         ...dto,
+        meta,
         index: service.index,
         created_by: u.id,
       });

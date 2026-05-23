@@ -7,7 +7,9 @@ import {
   Param,
   Delete,
   Req,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { CostService } from './cost.service';
 import { CostDto } from './cost.dto';
 import { Admin } from 'src/auth/guards/role/role.decorator';
@@ -39,13 +41,29 @@ export class CostController {
     'date',
     'start_date',
     'end_date',
-    'cost_status',
     'branch_id',
     'name',
   ])
   @Get()
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.costService.findAll(pg, user.user.role);
+  }
+
+  @Get('report')
+  @PQ([
+    'cost_category_id',
+    'date',
+    'start_date',
+    'end_date',
+    'branch_id',
+    'name',
+  ])
+  async report(
+    @Pagination() pg: PaginationDto,
+    @Req() { user },
+    @Res() res: Response,
+  ) {
+    return await this.costService.report(pg, user.user.role, res);
   }
 
   @Get(':id')

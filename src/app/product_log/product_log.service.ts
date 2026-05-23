@@ -71,8 +71,10 @@ export class ProductLogService {
 
     const total_amount = +(dto.total_amount ?? productLog.total_amount ?? 0);
     const paid_amount = +(dto.paid_amount ?? productLog.paid_amount ?? 0);
+    // `unit_price` багана DB-ээс хасагдсан тул update payload-оос гаргана.
+    const { unit_price, ...rest } = dto as any;
     const payload = {
-      ...dto,
+      ...rest,
       id,
       product_log_status:
         dto.product_log_status ??

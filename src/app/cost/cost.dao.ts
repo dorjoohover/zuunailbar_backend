@@ -12,13 +12,12 @@ export class CostDao {
   async add(data: Cost) {
     return await this._db.insert(tableName, data, [
       'id',
+      'name',
       'cost_category_id',
       'cost_category_name',
       'branch_id',
       'branch_name',
-      'paid_amount',
       'status',
-      'cost_status',
       'date',
       'price',
     ]);
@@ -70,11 +69,11 @@ export class CostDao {
     const criteria = builder
       .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('status', '=', query.status)
-      .conditionIfNotEmpty('cost_status', '=', query.cost_status)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('cost_category_id', '=', query.cost_category_id)
       .conditionIfBetween('date', query.start_date, query.end_date)
       .orConditions([
+        new SqlCondition('name', 'ILIKE', query.name),
         new SqlCondition('cost_category_name', 'ILIKE', query.name),
         new SqlCondition('branch_name', 'ILIKE', query.name),
       ])
