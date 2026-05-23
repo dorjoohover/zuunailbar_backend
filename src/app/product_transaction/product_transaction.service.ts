@@ -49,7 +49,7 @@ export class ProductTransactionService {
       product: it.product_name ?? '',
       category: it.category_name ?? '',
       quantity: Number(it.quantity ?? 0),
-      unit_price: Number(it.unit_price ?? 0),
+      unit_price: Number(it.price ?? it.unit_price ?? 0),
       total_amount: Number(it.total_amount ?? 0),
       user: it.user_name ?? '',
     }));

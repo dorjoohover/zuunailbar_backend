@@ -51,15 +51,16 @@ export class ScheduleService {
         'Боломжтой сул цагтай артист энэ цагт байхгүй байна',
         400,
       );
-    // (user_id, index) давхцлыг блоклоно: ижил артистын ижил гарагт давхар мөр үүсэх ёсгүй.
+    // (user_id, index) давхцалтай бол хуучин хуваарийг устгаад шинийг оруулна (upsert).
     const existing = await this.dao.list({
       user_id: dto.user_id,
       index: dto.index,
     });
     if (existing?.items?.length) {
-      throw new HttpException(
-        'Энэ артистын тухайн өдрийн хуваарь хэдийн бүртгэгдсэн байна.',
-        409,
+      await Promise.all(
+        existing.items.map((schedule) =>
+          this.dao.deleteSchedule(schedule.id),
+        ),
       );
     }
     const artist = await this.userService.findOne(dto.user_id);
