@@ -83,7 +83,7 @@ export class ProductTransactionService {
     user: string,
   ) {
     await this.product.updateQuantity(dto.product_id, -dto.quantity);
-    const unit_price = Number(dto.unit_price ?? 0);
+    const unit_price = Number(dto.price ?? 0);
     const quantity = Number(dto.quantity ?? 0);
     const total_amount = Number(
       dto.total_amount ?? (unit_price > 0 ? unit_price * quantity : 0),
