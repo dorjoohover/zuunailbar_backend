@@ -42,7 +42,8 @@ export class ProductService {
       ...dto,
       id: AppUtils.uuid4(),
       merchant_id: merchant,
-      brand_id: dto.brand_id ?? null,
+      brand_id: dto.brand_id ? dto.brand_id : null,
+      category_id: dto.category_id ? dto.category_id : null,
       ref: ref,
       status: PRODUCT_STATUS.Active,
       brand_name: brand,
@@ -167,9 +168,11 @@ export class ProductService {
       ...headers,
     ]);
   }
-  public async updateQuantity(id: string, qty: number) {
-    const { quantity } = await this.findOne(id);
-    if (quantity + qty < 0) new BadRequest().STOCK_INSUFFICIENT;
+  public async updateQuantity(id: string, qty: number, allowNegative = false) {
+    const product = await this.findOne(id);
+    if (!product) return 0;
+    const { quantity } = product;
+    if (!allowNegative && quantity + qty < 0) new BadRequest().STOCK_INSUFFICIENT;
     const body = {
       id,
       quantity: quantity + qty,

@@ -1861,6 +1861,14 @@ export class OrderService {
 
       for (const detail of normalizedDetails) {
         const prev = detail.id ? existingMap.get(detail.id) : null;
+        const resolvedUserId = detail.user_id || prev?.user_id || null;
+        if (!resolvedUserId) {
+          throw new HttpException(
+            'Артист сонгоно уу.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        detail.user_id = resolvedUserId;
         const service = await this.service.findOne(detail.service_id);
         const durationMinutes = this.normalizeDurationMinutes(
           detail.duration ?? +service.duration,
@@ -1871,6 +1879,7 @@ export class OrderService {
 
         const detailPayload: any = {
           ...detail,
+          user_id: resolvedUserId,
           duration: durationMinutes,
           start_time: toTimeString(Math.floor(startDate), startDate % 1 !== 0),
           end_time: toTimeString(Math.floor(endDate), endDate % 1 !== 0),
@@ -1880,13 +1889,13 @@ export class OrderService {
         };
 
         let nickname: string | null | undefined = null;
-        if (detail.user_id) {
-          if (!artistNicknameCache.has(detail.user_id)) {
-            const artist = await this.user.findOne(detail.user_id);
-            artistNicknameCache.set(detail.user_id, artist?.nickname ?? null);
+        if (resolvedUserId) {
+          if (!artistNicknameCache.has(resolvedUserId)) {
+            const artist = await this.user.findOne(resolvedUserId);
+            artistNicknameCache.set(resolvedUserId, artist?.nickname ?? null);
           }
 
-          nickname = artistNicknameCache.get(detail.user_id) ?? null;
+          nickname = artistNicknameCache.get(resolvedUserId) ?? null;
         }
 
         detailPayloads.push({

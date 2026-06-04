@@ -85,10 +85,15 @@ export class ProductLogService {
 
   public async remove(id: string) {
     const productLog = await this.dao.getById(id);
-    await this.product.updateQuantity(
-      productLog.product_id,
-      -+productLog.quantity,
-    );
+    if (productLog) {
+      // Худалдан авалт устгахад үлдэгдэл сөрөг болохыг зөвшөөрнө —
+      // эс бөгөөс хэрэглэгч буруу мэдээллийг засаж чадахгүй болно.
+      await this.product.updateQuantity(
+        productLog.product_id,
+        -+(productLog.quantity ?? 0),
+        true,
+      );
+    }
     return await this.dao.updateStatus(id, STATUS.Hidden);
   }
 }
