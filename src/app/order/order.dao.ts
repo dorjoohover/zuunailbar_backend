@@ -248,26 +248,43 @@ export class OrdersDao {
 
     return await this._db.select(sql, params);
   }
-  async get_order_details(input: { date: Date[]; artists: string[] }) {
-    const { date, artists } = input;
+  async isArtistAvailableOnDate(input: {
+    artist_id: string;
+    date: string;
+    start_time: string;
+  }): Promise<boolean> {
+    const rows = await this._db.select(
+      `SELECT 1
+       FROM availability_slots
+       WHERE artist_id = $1
+         AND date = $2::date
+         AND start_time = $3::time
+       LIMIT 1`,
+      [input.artist_id, input.date, input.start_time],
+    );
+    return rows.length > 0;
+  }
+
+  async get_order_details(input: { date: Date[]; artists: string[]; branch_id: string }) {
+    const { date, artists, branch_id } = input;
 
     return await this._db.select(
       `
-    SELECT 
-      od.user_id, 
-      od.start_ts, 
+    SELECT
+      od.user_id,
+      od.start_ts,
       od.end_ts
     FROM order_details od
     JOIN orders o ON o.id = od.order_id
     WHERE o.order_date = ANY($1)
       AND od.user_id = ANY($2)
-      and od.view_status = 10
-      and o.status = 10
-      and o.order_status != 50
-      and o.order_status != 60
-  
+      AND o.branch_id = $3
+      AND od.view_status = 10
+      AND o.status = 10
+      AND o.order_status != 50
+      AND o.order_status != 60
     `,
-      [date, artists],
+      [date, artists, branch_id],
     );
   }
   async getSlotsUnified(input: {
@@ -300,7 +317,18 @@ SELECT
   start_time,
   finish_time
 FROM availability_service_slots
-WHERE end_time is null and branch_id = $${i++}
+WHERE end_time is null
+  AND branch_id = $${i++}
+  AND NOT EXISTS (
+    SELECT 1 FROM artist_leaves al
+    WHERE al.artist_id = availability_service_slots.artist_id
+      AND al.date = availability_service_slots.date
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM branch_leaves bl
+    WHERE bl.branch_id = availability_service_slots.branch_id
+      AND bl.date = availability_service_slots.date
+  )
 `;
 
     params.push(branch_id);
@@ -318,6 +346,8 @@ WHERE end_time is null and branch_id = $${i++}
     if (date) {
       sql += ` AND date = $${i++}`;
       params.push(date);
+    } else {
+      sql += ` AND date >= CURRENT_DATE`;
     }
 
     if (time) {
@@ -328,7 +358,6 @@ WHERE end_time is null and branch_id = $${i++}
     sql += `
 GROUP BY date, start_time, artist_id, branch_id, finish_time
 HAVING MIN(available) > 0
-AND COUNT(*) FILTER (WHERE end_time IS NOT NULL) = 0
 `;
     if (!parallel && categories?.length && requireAllCategoriesForQueue) {
       sql += ` AND COUNT(DISTINCT category_id) = ${categories.length}`;

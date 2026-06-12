@@ -245,37 +245,38 @@ export class OrderService {
       isSameDay(date, dto.order_date)
     )
       this.orderError.cannotChooseHour;
+
   }
   public async getOrderLimit() {
     return await this.dao.getLimit();
   }
 
   public async getSlots(pg: PaginationDto) {
-    await this.reconcilePendingOrdersForSlots();
+    this.reconcilePendingOrdersForSlots();
 
     const { parallel, branch_id, services, date, time, multi_artist_queue } =
       pg;
-    let artists = [];
     let result: Slot[] = [];
 
     const p = parallel === 'true';
     const allowQueueMultiArtist =
       !p && (multi_artist_queue === true || multi_artist_queue === 'true');
     const service = services ? services.split(',') : [];
-    if (services) {
-      if (service.length > 0) {
-        const artists_res = await this.userService.getByServices({
-          services: service,
-          parallel: p || allowQueueMultiArtist,
-          branch_id,
-        });
-        artists = artists_res.map((r) => r.user_id);
-      }
-    }
-    const selected_services = await this.service.getBookingConfigs(
-      service,
-      branch_id,
-    );
+
+    const [artists_res, selected_services, artistServiceMap] = await Promise.all([
+      services && service.length > 0
+        ? this.userService.getByServices({
+            services: service,
+            parallel: p || allowQueueMultiArtist,
+            branch_id,
+          })
+        : Promise.resolve([]),
+      this.service.getBookingConfigs(service, branch_id),
+      allowQueueMultiArtist && service.length > 1
+        ? this.userService.getArtistServiceMap({ services: service, branch_id })
+        : Promise.resolve([]),
+    ]);
+    const artists = artists_res.map((r) => r.user_id);
 
     const categories = [
       ...new Set(
@@ -306,15 +307,12 @@ export class OrderService {
     const details = await this.dao.get_order_details({
       date: dates,
       artists: valid_artists,
+      branch_id,
     });
 
-    // 🔥 group by artist_id
     const ordersByArtist: Record<string, any[]> = {};
-
     for (const d of details) {
-      if (!ordersByArtist[d.user_id]) {
-        ordersByArtist[d.user_id] = [];
-      }
+      if (!ordersByArtist[d.user_id]) ordersByArtist[d.user_id] = [];
       ordersByArtist[d.user_id].push(d);
     }
 
@@ -324,16 +322,9 @@ export class OrderService {
       const finishBoundary = this.resolveEffectiveFinishTime(slot.finish_time);
       const artistOrders = ordersByArtist[slot.artist_id] || [];
 
-      const hasConflict = artistOrders.some((order) => {
-        const res = this.isOverlapping(
-          start,
-          end,
-          order.start_ts,
-          order.end_ts,
-        );
-        return res;
-      });
-
+      const hasConflict = artistOrders.some((order) =>
+        this.isOverlapping(start, end, order.start_ts, order.end_ts),
+      );
       const exceedsFinishBoundary =
         finishBoundary != null &&
         end > this.combineDateTime(slot.date, finishBoundary);
@@ -342,33 +333,112 @@ export class OrderService {
         validSlots.push(slot);
       }
     }
+
+    if (allowQueueMultiArtist && service.length > 1 && artistServiceMap.length > 0) {
+      return this.filterSequentiallyFeasibleSlots(
+        validSlots,
+        service,
+        selected_services,
+        artistServiceMap,
+        ordersByArtist,
+      );
+    }
+
     return validSlots;
   }
-  private async reconcilePendingOrdersForSlots() {
+
+  private filterSequentiallyFeasibleSlots(
+    validSlots: Slot[],
+    serviceIds: string[],
+    serviceConfigs: any[],
+    artistServiceMap: { user_id: string; service_id: string }[],
+    ordersByArtist: Record<string, any[]>,
+  ): Slot[] {
+    const artistServices = new Map<string, Set<string>>();
+    for (const row of artistServiceMap) {
+      if (!artistServices.has(row.user_id)) artistServices.set(row.user_id, new Set());
+      artistServices.get(row.user_id).add(row.service_id);
+    }
+
+    const durationByService = new Map<string, number>(
+      serviceConfigs.map((s) => [s.id, Number(s.duration) || 0]),
+    );
+
+    const slotsByTime = new Map<string, string[]>();
+    for (const slot of validSlots) {
+      const key = `${slot.date}|${slot.start_time}`;
+      if (!slotsByTime.has(key)) slotsByTime.set(key, []);
+      slotsByTime.get(key).push(slot.artist_id);
+    }
+
+    const feasible = new Set<string>();
+
+    for (const slot of validSlots) {
+      const timeKey = `${slot.date}|${slot.start_time}`;
+      if (feasible.has(timeKey)) continue;
+
+      const date = slot.date;
+      const assigned = new Set<string>();
+      let currentOffsetMs = 0;
+
+      const canAssign = (serviceIndex: number): boolean => {
+        if (serviceIndex >= serviceIds.length) return true;
+        const svcId = serviceIds[serviceIndex];
+        const dur = durationByService.get(svcId) ?? 0;
+        const slotStart = this.addMinutesToTimeString(
+          slot.start_time.toString(),
+          currentOffsetMs / 60000,
+        );
+        const key = `${date}|${slotStart}`;
+        const candidateArtists = slotsByTime.get(key) ?? [];
+
+        for (const artist of candidateArtists) {
+          if (assigned.has(artist)) continue;
+          if (!artistServices.get(artist)?.has(svcId)) continue;
+          const start = this.combineDateTime(date, slotStart);
+          const end = new Date(start.getTime() + dur * 60000);
+          const conflict = (ordersByArtist[artist] ?? []).some((o) =>
+            this.isOverlapping(start, end, o.start_ts, o.end_ts),
+          );
+          if (conflict) continue;
+
+          assigned.add(artist);
+          const prevOffset = currentOffsetMs;
+          currentOffsetMs += dur * 60000;
+          if (canAssign(serviceIndex + 1)) return true;
+          currentOffsetMs = prevOffset;
+          assigned.delete(artist);
+        }
+        return false;
+      };
+
+      if (canAssign(0)) feasible.add(timeKey);
+    }
+
+    return validSlots.filter((s) => feasible.has(`${s.date}|${s.start_time}`));
+  }
+
+  private addMinutesToTimeString(timeStr: string, minutes: number): string {
+    const [h, m, s] = timeStr.split(':').map(Number);
+    const totalMin = h * 60 + (m || 0) + Math.round(minutes);
+    const newH = Math.floor(totalMin / 60) % 24;
+    const newM = totalMin % 60;
+    return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}:${String(s || 0).padStart(2, '0')}`;
+  }
+
+  private reconcilePendingOrdersForSlots() {
     const now = Date.now();
-
-    if (this.pendingCleanupPromise) {
-      await this.pendingCleanupPromise;
-      return;
-    }
-
-    if (now - this.lastPendingCleanupAt < 30 * 1000) {
-      return;
-    }
+    if (this.pendingCleanupPromise) return;
+    if (now - this.lastPendingCleanupAt < 30 * 1000) return;
 
     this.pendingCleanupPromise = this.checkOrders()
       .catch((error) => {
-        console.error(
-          'Pending order reconciliation before slot lookup failed:',
-          error,
-        );
+        console.error('Pending order reconciliation failed:', error);
       })
       .finally(() => {
         this.lastPendingCleanupAt = Date.now();
         this.pendingCleanupPromise = undefined;
       });
-
-    await this.pendingCleanupPromise;
   }
   private isOverlapping(startA: Date, endA: Date, startB: Date, endB: Date) {
     return startA < endB && endA > startB;

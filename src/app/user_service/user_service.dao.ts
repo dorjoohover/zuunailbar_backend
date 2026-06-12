@@ -177,6 +177,21 @@ export class UserServiceDao {
     );
   }
 
+  async getArtistServiceMap(input: { services: string[]; branch_id: string }): Promise<{ user_id: string; service_id: string }[]> {
+    const { services, branch_id } = input;
+    return await this._db.select(
+      `SELECT us.user_id, us.service_id
+       FROM "${tableName}" us
+       JOIN users u ON u.id = us.user_id
+       WHERE us.status = $1
+         AND us.service_id = ANY($2)
+         AND us.branch_id = $3
+         AND u.user_status = $4
+         AND u.status = $4`,
+      [STATUS.Active, services, branch_id, UserStatus.Active],
+    );
+  }
+
   async getById(id: string) {
     return await this._db.selectOne(
       `SELECT id, user_id, service_id FROM "${tableName}" WHERE "id"=$1`,

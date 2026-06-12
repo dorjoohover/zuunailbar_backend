@@ -93,6 +93,10 @@ export class UserServiceService {
     }
   }
 
+  public async getArtistServiceMap(input: { services: string[]; branch_id: string }) {
+    return await this.dao.getArtistServiceMap(input);
+  }
+
   public async findAll(pg: PaginationDto, role: number) {
     const res = await this.dao.list(applyDefaultStatusFilter(pg, role));
 

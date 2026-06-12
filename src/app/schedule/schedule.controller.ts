@@ -80,7 +80,7 @@ export class ScheduleController {
 
   @Get('search')
   @PQ(ScheduleController.fields)
-  @Manager()
+  @Employee()
   search(@Pagination() pg: PaginationDto) {
     return this.scheduleService.search(pg);
   }
