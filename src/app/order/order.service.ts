@@ -181,6 +181,8 @@ export class OrderService {
   private pendingCleanupPromise?: Promise<void>;
   private lastPendingCleanupAt = 0;
   private readonly prePaymentInvoiceTtlMs = 10 * 60 * 1000;
+  private readonly slotsCache = new Map<string, { data: any[]; exp: number }>();
+  private readonly SLOTS_TTL_MS = 60_000;
   constructor(
     private readonly dao: OrdersDao,
     private readonly orderDetail: OrderDetailService,
@@ -251,11 +253,35 @@ export class OrderService {
     return await this.dao.getLimit();
   }
 
+  private buildSlotsCacheKey(pg: PaginationDto): string {
+    const { branch_id, services, date, parallel, multi_artist_queue } = pg as any;
+    return `${branch_id}|${services}|${date ?? ''}|${parallel ?? ''}|${multi_artist_queue ?? ''}`;
+  }
+
+  public invalidateSlotsCache(branch_id: string) {
+    for (const key of this.slotsCache.keys()) {
+      if (key.startsWith(branch_id)) this.slotsCache.delete(key);
+    }
+  }
+
   public async getSlots(pg: PaginationDto) {
     this.reconcilePendingOrdersForSlots();
 
-    const { parallel, branch_id, services, date, time, multi_artist_queue } =
-      pg;
+    const cacheKey = this.buildSlotsCacheKey(pg);
+    const cached = this.slotsCache.get(cacheKey);
+    if (cached && cached.exp > Date.now()) {
+      return cached.data;
+    }
+
+    const {
+      parallel,
+      branch_id,
+      services,
+      date,
+      time,
+      multi_artist_queue,
+    } = pg;
+    const preSelectedArtist: string | undefined = (pg as any).artist_id || undefined;
     let result: Slot[] = [];
 
     const p = parallel === 'true';
@@ -276,7 +302,10 @@ export class OrderService {
         ? this.userService.getArtistServiceMap({ services: service, branch_id })
         : Promise.resolve([]),
     ]);
-    const artists = artists_res.map((r) => r.user_id);
+
+    const artists = preSelectedArtist
+      ? [preSelectedArtist]
+      : artists_res.map((r) => r.user_id);
 
     const categories = [
       ...new Set(
@@ -291,12 +320,21 @@ export class OrderService {
         ? Math.max(0, ...durations)
         : durations.reduce((a, b) => a + b, 0);
 
+    const resolvedDate = date ? `${date}`.slice(0, 10) : undefined;
+    const today = new Date().toISOString().slice(0, 10);
+    const resolvedTime =
+      time
+        ? `${time}`
+        : resolvedDate === today
+          ? new Date().toTimeString().slice(0, 8)
+          : undefined;
+
     result = await this.dao.getSlotsUnified({
       branch_id,
       artists,
       categories,
-      date: date ? `${date}`.slice(0, 10) : undefined,
-      time: time ? `${time}` : undefined,
+      date: resolvedDate,
+      time: resolvedTime,
       parallel: p,
       requireAllCategoriesForQueue: !allowQueueMultiArtist,
     });
@@ -334,17 +372,24 @@ export class OrderService {
       }
     }
 
-    if (allowQueueMultiArtist && service.length > 1 && artistServiceMap.length > 0) {
-      return this.filterSequentiallyFeasibleSlots(
-        validSlots,
-        service,
-        selected_services,
-        artistServiceMap,
-        ordersByArtist,
-      );
-    }
+    const finalSlots =
+      allowQueueMultiArtist && service.length > 1 && artistServiceMap.length > 0
+        ? this.filterSequentiallyFeasibleSlots(
+            validSlots,
+            service,
+            selected_services,
+            artistServiceMap,
+            ordersByArtist,
+          )
+        : validSlots;
 
-    return validSlots;
+    const ttl = (pg as any).date ? 30_000 : this.SLOTS_TTL_MS;
+    this.slotsCache.set(this.buildSlotsCacheKey(pg), {
+      data: finalSlots,
+      exp: Date.now() + ttl,
+    });
+
+    return finalSlots;
   }
 
   private filterSequentiallyFeasibleSlots(
@@ -1303,6 +1348,7 @@ export class OrderService {
       }
 
       const order = await this.dao.create(payload, orderDetails);
+      this.invalidateSlotsCache(dto.branch_id);
       if (invoice) {
         await this.payment.create(
           {
@@ -1497,6 +1543,8 @@ export class OrderService {
       });
       await this.dao.updateOrderStatus(id, OrderStatus.Absent);
       await this.orderDetail.updateStatusByOrder(id, OrderStatus.Absent);
+      const cancelled = await this.findOne(id);
+      if (cancelled?.branch_id) this.invalidateSlotsCache(cancelled.branch_id);
       return true;
     } catch (error) {
       console.error('Order cancel failed:', error);

@@ -319,16 +319,6 @@ SELECT
 FROM availability_service_slots
 WHERE end_time is null
   AND branch_id = $${i++}
-  AND NOT EXISTS (
-    SELECT 1 FROM artist_leaves al
-    WHERE al.artist_id = availability_service_slots.artist_id
-      AND al.date = availability_service_slots.date
-  )
-  AND NOT EXISTS (
-    SELECT 1 FROM branch_leaves bl
-    WHERE bl.branch_id = availability_service_slots.branch_id
-      AND bl.date = availability_service_slots.date
-  )
 `;
 
     params.push(branch_id);
@@ -346,8 +336,6 @@ WHERE end_time is null
     if (date) {
       sql += ` AND date = $${i++}`;
       params.push(date);
-    } else {
-      sql += ` AND date >= CURRENT_DATE`;
     }
 
     if (time) {
