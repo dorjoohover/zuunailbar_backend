@@ -29,6 +29,9 @@ export class Order {
   transaction_type?: string;
   method?: PaymentMethod;
   pre_method?: PaymentMethod;
+  card_amount?: number;
+  bank_amount?: number;
+  cash_amount?: number;
 }
 
 export class Slot {

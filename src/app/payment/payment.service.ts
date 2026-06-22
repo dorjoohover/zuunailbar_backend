@@ -205,15 +205,16 @@ export class PaymentService {
     pre_method?: PaymentMethod;
     pre_amount?: number;
     paid_amount?: number;
+    // Per-method breakdown (optional; takes precedence over paid_amount + method)
+    card_amount?: number;
+    bank_amount?: number;
+    cash_amount?: number;
   }) {
     const payments = await this.dao.listByOrder(input.order_id);
     const manualPayments = payments.filter(
       (payment) => !payment.invoice_id && !payment.payment_id,
     );
     const existingPre = manualPayments.find((payment) => payment.is_pre_amount);
-    const existingPaid = manualPayments.find(
-      (payment) => payment.is_pre_amount === false,
-    );
 
     const prePayment = await this.syncManualPayment({
       ...input,
@@ -222,13 +223,49 @@ export class PaymentService {
       is_pre_amount: true,
       existing: existingPre,
     });
-    const paidPayment = await this.syncManualPayment({
-      ...input,
-      method: input.method,
-      amount: Number(input.paid_amount ?? 0),
-      is_pre_amount: false,
-      existing: existingPaid,
-    });
+
+    const hasPerMethod =
+      input.card_amount != null ||
+      input.bank_amount != null ||
+      input.cash_amount != null;
+
+    let paidPayment: any = null;
+
+    if (hasPerMethod) {
+      // Sync one payment record per method
+      const methodAmounts: { method: PaymentMethod; amount: number }[] = [
+        { method: PaymentMethod.CARD, amount: Number(input.card_amount ?? 0) },
+        { method: PaymentMethod.BANK, amount: Number(input.bank_amount ?? 0) },
+        { method: PaymentMethod.CASH, amount: Number(input.cash_amount ?? 0) },
+      ];
+      const existingByMethod = new Map<PaymentMethod, any>();
+      for (const p of manualPayments.filter((p) => !p.is_pre_amount)) {
+        existingByMethod.set(p.method, p);
+      }
+      for (const { method, amount } of methodAmounts) {
+        const result = await this.syncManualPayment({
+          ...input,
+          method,
+          amount,
+          is_pre_amount: false,
+          existing: existingByMethod.get(method),
+        });
+        if (result && (!paidPayment || result.paid_at > paidPayment.paid_at)) {
+          paidPayment = result;
+        }
+      }
+    } else {
+      const existingPaid = manualPayments.find(
+        (payment) => payment.is_pre_amount === false,
+      );
+      paidPayment = await this.syncManualPayment({
+        ...input,
+        method: input.method,
+        amount: Number(input.paid_amount ?? 0),
+        is_pre_amount: false,
+        existing: existingPaid,
+      });
+    }
 
     return {
       latestPaidAt: paidPayment?.paid_at,

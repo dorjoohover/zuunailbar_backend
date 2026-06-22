@@ -15,6 +15,7 @@ import {
 import { BadRequest } from 'src/common/error';
 import { UserService } from '../user/user.service';
 import { ScheduleListType } from './schedule.entity';
+import { OrderService } from '../order/order.service';
 
 @Injectable()
 export class ScheduleService {
@@ -22,6 +23,8 @@ export class ScheduleService {
     private readonly dao: ScheduleDao,
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
+    @Inject(forwardRef(() => OrderService))
+    private orderService: OrderService,
   ) {}
 
   private normalizeFinishTime(
@@ -91,6 +94,7 @@ export class ScheduleService {
       branch_id: artist.branch_id,
       meta,
     });
+    this.orderService.invalidateSlotsCache(artist.branch_id);
   }
 
   public async findAll(pg: PaginationDto, role: number) {
@@ -137,6 +141,9 @@ export class ScheduleService {
       payload,
       getDefinedKeys(payload, true),
     );
+    if (schedule.branch_id) {
+      this.orderService.invalidateSlotsCache(schedule.branch_id);
+    }
     return res;
   }
 
@@ -150,5 +157,9 @@ export class ScheduleService {
         await this.dao.deleteSchedule(schedule.id);
       }),
     );
+    const branchId = schedules.items?.[0]?.branch_id;
+    if (branchId) {
+      this.orderService.invalidateSlotsCache(branchId);
+    }
   }
 }

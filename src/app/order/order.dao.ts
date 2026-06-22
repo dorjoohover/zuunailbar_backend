@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   OrderStatus,
   PAYMENT_STATUS,
+  PaymentMethod,
   STATUS,
   ubDateAt00,
 } from 'src/base/constants';
@@ -186,7 +187,31 @@ export class OrdersDao {
             AND p."status" != ${PAYMENT_STATUS.Cancelled}
           ORDER BY p."created_at" DESC
           LIMIT 1
-        ) AS method
+        ) AS method,
+        COALESCE((
+          SELECT SUM(p.amount)
+          FROM "payments" p
+          WHERE p."order_id" = o."id"
+            AND p."method" = ${PaymentMethod.CARD}
+            AND COALESCE(p."is_pre_amount", false) = false
+            AND p."status" != ${PAYMENT_STATUS.Cancelled}
+        ), 0) AS card_amount,
+        COALESCE((
+          SELECT SUM(p.amount)
+          FROM "payments" p
+          WHERE p."order_id" = o."id"
+            AND p."method" = ${PaymentMethod.BANK}
+            AND COALESCE(p."is_pre_amount", false) = false
+            AND p."status" != ${PAYMENT_STATUS.Cancelled}
+        ), 0) AS bank_amount,
+        COALESCE((
+          SELECT SUM(p.amount)
+          FROM "payments" p
+          WHERE p."order_id" = o."id"
+            AND p."method" = ${PaymentMethod.CASH}
+            AND COALESCE(p."is_pre_amount", false) = false
+            AND p."status" != ${PAYMENT_STATUS.Cancelled}
+        ), 0) AS cash_amount
       FROM "${tableName}" o
       WHERE o."id"=$1`,
       [id],
@@ -489,7 +514,7 @@ HAVING MIN(available) > 0
     const criteria = builder.criteria();
     let sql = `SELECT * FROM "${tableName}" o inner join order_details od on od.order_id = o.id  ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
     if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
-    if (query.skip) ` offset ${+query.skip * +(query.limit ?? 0)}`;
+    if (query.skip) sql += ` offset ${+query.skip * +(query.limit ?? 0)}`;
 
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
     const count = await this._db.count(countSql, builder.values);
@@ -574,7 +599,7 @@ WHERE key = 'availability_days';`;
       // nemne
       .conditionIfNotEmpty('id', 'ILIKE', query.id)
       .conditionIfNotEmpty('customer_id', '=', query.customer_id)
-      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('o.status', '=', query.status)
       .conditionIfNotEmpty('start_time', '=', query.times)
       .conditionIfNotEmpty('branch_id', '=', query.branch_id)
       .conditionIfNotEmpty('salary_date', '=', query.salary_date);
@@ -616,33 +641,54 @@ WHERE key = 'availability_days';`;
       additional = ` AND customer_id = ANY($${index})`;
     }
     const criteria = builder.criteria();
-    const defaultColumns = `o.*,
-      (
-        SELECT b."name"
-        FROM "branches" b
-        WHERE b."id" = o."branch_id"
-        LIMIT 1
-      ) AS branch_name,
-      (
-        SELECT p.method
-        FROM "payments" p
-        WHERE p."order_id" = o."id"
-          AND p."is_pre_amount" = true
-          AND p."status" != ${PAYMENT_STATUS.Cancelled}
-        ORDER BY p."created_at" DESC
-        LIMIT 1
-      ) AS pre_method,
-      (
-        SELECT p.method
-        FROM "payments" p
-        WHERE p."order_id" = o."id"
-          AND COALESCE(p."is_pre_amount", false) = false
-          AND p."status" != ${PAYMENT_STATUS.Cancelled}
-        ORDER BY p."created_at" DESC
-        LIMIT 1
-      ) AS method`;
+    const defaultColumns = `o.*, b."name" AS branch_name, pre_pay.method AS pre_method, pay.method AS method, COALESCE(card_pay.amount, 0) AS card_amount, COALESCE(bank_pay.amount, 0) AS bank_amount, COALESCE(cash_pay.amount, 0) AS cash_amount`;
+    const lateralJoins = columns
+      ? ''
+      : `LEFT JOIN "branches" b ON b."id" = o."branch_id"
+         LEFT JOIN LATERAL (
+           SELECT p.method
+           FROM "payments" p
+           WHERE p."order_id" = o."id"
+             AND p."is_pre_amount" = true
+             AND p."status" != ${PAYMENT_STATUS.Cancelled}
+           ORDER BY p."created_at" DESC
+           LIMIT 1
+         ) pre_pay ON true
+         LEFT JOIN LATERAL (
+           SELECT p.method
+           FROM "payments" p
+           WHERE p."order_id" = o."id"
+             AND COALESCE(p."is_pre_amount", false) = false
+             AND p."status" != ${PAYMENT_STATUS.Cancelled}
+           ORDER BY p."created_at" DESC
+           LIMIT 1
+         ) pay ON true
+         LEFT JOIN LATERAL (
+           SELECT SUM(p.amount) AS amount
+           FROM "payments" p
+           WHERE p."order_id" = o."id"
+             AND p."method" = ${PaymentMethod.CARD}
+             AND COALESCE(p."is_pre_amount", false) = false
+             AND p."status" != ${PAYMENT_STATUS.Cancelled}
+         ) card_pay ON true
+         LEFT JOIN LATERAL (
+           SELECT SUM(p.amount) AS amount
+           FROM "payments" p
+           WHERE p."order_id" = o."id"
+             AND p."method" = ${PaymentMethod.BANK}
+             AND COALESCE(p."is_pre_amount", false) = false
+             AND p."status" != ${PAYMENT_STATUS.Cancelled}
+         ) bank_pay ON true
+         LEFT JOIN LATERAL (
+           SELECT SUM(p.amount) AS amount
+           FROM "payments" p
+           WHERE p."order_id" = o."id"
+             AND p."method" = ${PaymentMethod.CASH}
+             AND COALESCE(p."is_pre_amount", false) = false
+             AND p."status" != ${PAYMENT_STATUS.Cancelled}
+         ) cash_pay ON true`;
     const sql =
-      `SELECT ${columns ?? defaultColumns} FROM "${tableName}" o ${criteria} ${additional} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${columns ?? defaultColumns} FROM "${tableName}" o ${lateralJoins} ${criteria} ${additional} order by o.created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" o ${criteria} ${additional}`;
@@ -668,5 +714,50 @@ WHERE key = 'availability_days';`;
       `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}${nameCondition}`,
       builder.values,
     );
+  }
+
+  /**
+   * Нэг хэрэглэгч тухайн өдөр + цаг + артистуудад дараалласан (parallel=false, олон артист)
+   * захиалга аль хэдийн бүртгэсэн эсэхийг шалгана.
+   * start_time тохирохгүй бол (өөр цаг) — давхар захиалга гэж үзэхгүй.
+   */
+  async hasActiveQueueOrder(input: {
+    customer_id: string;
+    order_date: string;
+    artist_ids: string[];
+    start_time?: string;
+  }): Promise<boolean> {
+    const { customer_id, order_date, artist_ids, start_time } = input;
+    if (!artist_ids.length) return false;
+
+    const startTimeSql = start_time
+      ? `AND o.start_time = $8::time`
+      : '';
+    const params: any[] = [
+      customer_id,
+      order_date,
+      OrderStatus.Cancelled,
+      OrderStatus.Absent,
+      OrderStatus.Friend,
+      STATUS.Active,
+      artist_ids,
+    ];
+    if (start_time) params.push(start_time);
+
+    const rows = await this._db.select(
+      `SELECT 1
+       FROM "${tableName}" o
+       JOIN order_details od ON od.order_id = o.id
+       WHERE o.customer_id = $1
+         AND o.order_date = $2::date
+         AND o.parallel = false
+         AND o.order_status NOT IN ($3, $4, $5)
+         AND o.status = $6
+         AND od.user_id = ANY($7)
+         ${startTimeSql}
+       LIMIT 1`,
+      params,
+    );
+    return rows.length > 0;
   }
 }

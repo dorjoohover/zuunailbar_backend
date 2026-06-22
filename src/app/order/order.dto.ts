@@ -46,6 +46,15 @@ export class OrderDto {
   @ApiPropertyOptional({ enum: PaymentMethod })
   @IsOptional()
   pre_method?: PaymentMethod;
+  @ApiPropertyOptional()
+  @IsOptional()
+  card_amount?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  bank_amount?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  cash_amount?: number;
   @ApiProperty({ isArray: true })
   details: OrderDetailDto[];
   updated_at?: Date;

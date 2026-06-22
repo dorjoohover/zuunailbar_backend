@@ -31,6 +31,8 @@ import * as mime from 'mime-types';
 import { Response } from 'express';
 import { CLIENT, EMPLOYEE, MANAGER } from './base/constants';
 import axios from 'axios';
+import { Admin } from './auth/guards/role/role.decorator';
+import { Query } from '@nestjs/common';
 
 @Controller()
 export class AppController {
@@ -159,5 +161,17 @@ export class AppController {
 
     const stream = createReadStream(filePath);
     stream.pipe(res);
+  }
+
+  @Admin()
+  @Get('sms-logs')
+  async getSmsLogs(
+    @Query('page') page = '0',
+    @Query('limit') limit = '50',
+  ) {
+    return this.authService.getSmsLogs({
+      skip: +page,
+      limit: +limit,
+    });
   }
 }

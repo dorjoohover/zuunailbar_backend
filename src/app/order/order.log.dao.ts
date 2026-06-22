@@ -39,12 +39,18 @@ export class OrderLogDao {
     if (query.id) {
       query.id = `%${query.id}%`;
     }
+    if (query.order_id) {
+      query.order_id = `%${query.order_id}%`;
+    }
+    if (query.customer_mobile) {
+      query.customer_mobile = `%${query.customer_mobile}%`;
+    }
     query.friend = query.friend ? 0 : OrderStatus.Friend;
     const builder = new SqlBuilder(query);
     builder
-      // nemne
       .conditionIfNotEmpty('"oh"."id"', 'ILIKE', query.id)
-      .conditionIfNotEmpty('"oh"."order_id"', '=', query.customer_id)
+      .conditionIfNotEmpty('"oh"."order_id"', 'ILIKE', query.order_id)
+      .conditionIfNotEmpty('u."mobile"', 'ILIKE', query.customer_mobile)
       .conditionIfNotEmpty('"oh"."new_status"', '=', query.new_status)
       .conditionIfNotEmpty('"oh"."old_status"', '=', query.old_status)
       .conditionIfNotEmpty(
@@ -87,6 +93,7 @@ export class OrderLogDao {
           END,
           COALESCE(u.firstname, '')
         )), ''),
+        u.mobile,
         ''
       ) AS customer_name,
       o.branch_id,
@@ -120,6 +127,8 @@ export class OrderLogDao {
     const countSql = `
   SELECT COUNT(*)
   FROM "${tableName}" oh
+  LEFT JOIN orders o ON o.id = oh.order_id
+  LEFT JOIN users u ON u.id = o.customer_id
   ${criteria} ${date_sql}
 `;
     const count = await this._db.count(countSql, builder.values);

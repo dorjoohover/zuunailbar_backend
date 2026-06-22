@@ -14,6 +14,7 @@ import { AuthError, BadRequest } from 'src/common/error';
 import { MobileFormat } from 'src/common/formatter';
 import axios from 'axios';
 import { ResendService } from './resend.service';
+import { MessageLogDao } from './message.log.dao';
 type CancelWarningPayload = {
   order_date?: string;
   time?: string
@@ -25,6 +26,7 @@ export class AuthService {
     private userService: UserService,
     private jwtService: JwtService,
     private readonly mailer: ResendService,
+    private readonly messageLog: MessageLogDao,
   ) {}
   private authError = new AuthError();
   private otps: Record<string, string> = {};
@@ -210,6 +212,7 @@ export class AuthService {
 
 
 private async sendSms(mobile: string, text: string): Promise<boolean> {
+  let success = false;
   try {
     const res = await axios.get(process.env.TELCOCOM_URL!, {
       params: {
@@ -227,14 +230,23 @@ private async sendSms(mobile: string, text: string): Promise<boolean> {
 
     if (result !== true) {
       console.error('SMS илгээхэд API алдаа өглөө:', message);
-      return false;
+      success = false;
+    } else {
+      success = true;
     }
-
-    return true;
   } catch (error) {
     console.error('SMS илгээхэд exception гарлаа:', error);
-    return false;
+    success = false;
   }
+
+  // Мессежийн log бүртгэх
+  await this.messageLog.add({ mobile, message: text, success });
+
+  return success;
+}
+
+async getSmsLogs(query: { skip?: number; limit?: number } = {}) {
+  return this.messageLog.list(query);
 }
 
 async sendOtp(mobile: string): Promise<boolean> {

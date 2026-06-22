@@ -248,6 +248,31 @@ export class OrderService {
     )
       this.orderError.cannotChooseHour;
 
+    // Артист бүр тухайн өдөр+цагт хуваарьтай эсэхийг availability_slots-р шалгана.
+    // Энэ нь хуваарь устгасны дараа cache дуусгавар болохоос өмнөх цонхонд
+    // болон шууд API дуудлагаас ирсэн захиалгыг хааж тавина.
+    if (user.role == CLIENT) {
+      const dateStr = toYMD(dto.order_date);
+      const startTimeStr = dto.start_time.toString();
+      const unavailableArtists = await Promise.all(
+        details.map(async (d) => {
+          const available = await this.dao.isArtistAvailableOnDate({
+            artist_id: d.user_id,
+            date: dateStr,
+            start_time: startTimeStr,
+          });
+          return available ? null : d.user_id;
+        }),
+      );
+      const blocked = unavailableArtists.filter(Boolean);
+      if (blocked.length > 0) {
+        throw new HttpException(
+          'Сонгосон артист тухайн өдөр болон цагт боломжгүй байна. Дахин цаг сонгоно уу.',
+          400,
+        );
+      }
+
+    }
   }
   public async getOrderLimit() {
     return await this.dao.getLimit();
@@ -921,6 +946,20 @@ export class OrderService {
       errors,
     };
   }
+  /** If per-method amounts are present, return their sum; otherwise return fallback. */
+  private resolvePerMethodTotal(dto: any, fallback: number): number {
+    const hasPerMethod =
+      dto?.card_amount != null ||
+      dto?.bank_amount != null ||
+      dto?.cash_amount != null;
+    if (!hasPerMethod) return fallback;
+    return (
+      Number(dto.card_amount ?? 0) +
+      Number(dto.bank_amount ?? 0) +
+      Number(dto.cash_amount ?? 0)
+    );
+  }
+
   private normalizeTimeValue(time: Date | string) {
     if (time instanceof Date) {
       return time.toTimeString().slice(0, 8);
@@ -1179,6 +1218,28 @@ export class OrderService {
       }
       if (normalizedDetails.length <= 0) this.orderError.serviceNotSelected;
       const parallel = dto.parallel;
+
+      // Дараалласан (parallel=false) олон артистын захиалга давхар бүртгэх хориглолт
+      // Бүх role-д (CLIENT, EMPLOYEE, ADMIN) хамаарна
+      if (!parallel && normalizedDetails.length > 1) {
+        const orderDate = toYMD(new Date(dto.order_date));
+        const artistIds = normalizedDetails.map((d) => d.user_id).filter(Boolean);
+        const customerId = dto.customer_id ?? user.id;
+        const startTime = dto.start_time?.toString();
+        const hasDuplicate = await this.dao.hasActiveQueueOrder({
+          customer_id: customerId,
+          order_date: orderDate,
+          artist_ids: artistIds,
+          start_time: startTime,
+        });
+        if (hasDuplicate) {
+          throw new HttpException(
+            'Тухайн өдөр, цагт сонгосон артистуудад дараалласан захиалга аль хэдийн бүртгэгдсэн байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
       const serviceConfigs = await this.service.getBookingConfigs(
         normalizedDetails.map((detail) => detail.service_id),
         dto.branch_id,
@@ -1258,7 +1319,7 @@ export class OrderService {
         voucher_name: dto.voucher_name ?? null,
         voucher_value: dto.voucher_value ?? 0,
         total_amount: orderTotalAmount,
-        paid_amount: dto.paid_amount ?? 0,
+        paid_amount: this.resolvePerMethodTotal(dto, dto.paid_amount ?? 0),
         pre_amount: orderPreAmount,
         is_pre_amount_paid: orderPreAmount == 0,
         order_status,
@@ -1380,8 +1441,11 @@ export class OrderService {
           created_by: user.id,
           method: dto.method,
           pre_method: preMethod,
-          paid_amount: Number(dto.paid_amount ?? 0),
+          paid_amount: this.resolvePerMethodTotal(dto, Number(dto.paid_amount ?? 0)),
           pre_amount: orderPreAmount,
+          card_amount: dto.card_amount != null ? Number(dto.card_amount) : undefined,
+          bank_amount: dto.bank_amount != null ? Number(dto.bank_amount) : undefined,
+          cash_amount: dto.cash_amount != null ? Number(dto.cash_amount) : undefined,
         });
         if (paymentSync.latestPaidAt && paymentSync.latestMethod != null) {
           await this.syncOrderPaidMeta(
@@ -1545,6 +1609,25 @@ export class OrderService {
       await this.orderDetail.updateStatusByOrder(id, OrderStatus.Absent);
       const cancelled = await this.findOne(id);
       if (cancelled?.branch_id) this.invalidateSlotsCache(cancelled.branch_id);
+
+      // Цуцласан тухай SMS мессеж илгээх
+      if (cancelled?.customer_id) {
+        try {
+          const customer = await this.user.findOne(cancelled.customer_id);
+          if (customer?.mobile) {
+            const mobile = MobileParser(customer.mobile);
+            const date = cancelled.order_date ? mnDate(cancelled.order_date) : '';
+            const time = cancelled.start_time ? cancelled.start_time.slice(0, 5) : '';
+            await this.authService.sendCancelWarning(mobile, {
+              order_date: date,
+              time,
+            });
+          }
+        } catch (smsError) {
+          console.error('Cancel SMS failed:', smsError);
+        }
+      }
+
       return true;
     } catch (error) {
       console.error('Order cancel failed:', error);
@@ -1864,12 +1947,24 @@ export class OrderService {
       payload.discount = payload.discount ?? 0;
       payload.voucher_value = payload.voucher_value ?? 0;
       payload.total_amount = normalizedTotalAmount;
-      payload.paid_amount = payload.paid_amount ?? order.paid_amount ?? 0;
+      payload.paid_amount = this.resolvePerMethodTotal(dto, payload.paid_amount ?? order.paid_amount ?? 0);
       const existingDetails = await this.orderDetail.findByOrder(id);
       const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
 
+      // Task #8: Хаагдсан захиалгыг артист өөрчлөх боломжгүй — зөвхөн admin засна.
+      if (
+        order.order_status === OrderStatus.Finished &&
+        role >= EMPLOYEE
+      ) {
+        throw new HttpException(
+          'Хаагдсан захиалгыг өөрчлөх боломжгүй.',
+          403,
+        );
+      }
+
       // 💰 PAYMENT LOGIC
-      const canManagePreAmount = role < MANAGER;
+      // Task #7: Урьдчилгаа edit — зөвхөн артистаас хориглох (admin + manager зөвшөөрнө).
+      const canManagePreAmount = role <= MANAGER;
       const preservedPreAmount = +(order.pre_amount ?? 0);
       if (!canManagePreAmount) {
         payload.pre_amount = preservedPreAmount;
@@ -2111,6 +2206,9 @@ export class OrderService {
         pre_method: preMethod,
         paid_amount: paidAmount,
         pre_amount: preAmount,
+        card_amount: dto.card_amount != null ? Number(dto.card_amount) : undefined,
+        bank_amount: dto.bank_amount != null ? Number(dto.bank_amount) : undefined,
+        cash_amount: dto.cash_amount != null ? Number(dto.cash_amount) : undefined,
       });
       if (paymentSync.latestPaidAt && paymentSync.latestMethod != null) {
         await this.syncOrderPaidMeta(

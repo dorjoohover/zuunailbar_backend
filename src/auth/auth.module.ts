@@ -9,6 +9,8 @@ import { AuthService } from './auth.service';
 import { BranchModule } from 'src/app/branch/branch.module';
 import { UserModule } from 'src/app/user/user.module';
 import { ResendService } from './resend.service';
+import { MessageLogDao } from './message.log.dao';
+import { AppDbModule } from 'src/core/db/database.module';
 
 @Module({
   imports: [
@@ -17,13 +19,14 @@ import { ResendService } from './resend.service';
     PassportModule,
     BranchModule,
     UserModule,
+    AppDbModule,
 
     JwtModule.register({
       secret: jwtConstants.secret,
       signOptions: { expiresIn: '30d' },
     }),
   ],
-  providers: [AuthService, JwtStrategy, ResendService],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy, ResendService, MessageLogDao],
+  exports: [AuthService, MessageLogDao],
 })
 export class AuthModule {}
