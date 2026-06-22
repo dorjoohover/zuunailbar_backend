@@ -98,6 +98,19 @@ export class OrderLogDao {
       ) AS customer_name,
       o.branch_id,
       b.name AS branch_name,
+      cu.mobile AS changed_user_mobile,
+      COALESCE(
+        NULLIF(cu.nickname, ''),
+        NULLIF(TRIM(CONCAT(
+          CASE
+            WHEN cu.lastname IS NOT NULL AND cu.lastname <> '' THEN CONCAT(cu.lastname, '.')
+            ELSE ''
+          END,
+          COALESCE(cu.firstname, '')
+        )), ''),
+        cu.mobile,
+        ''
+      ) AS changed_user_name,
       COALESCE((
         SELECT STRING_AGG(DISTINCT COALESCE(
           NULLIF(artist.nickname, ''),
@@ -119,6 +132,7 @@ export class OrderLogDao {
    FROM "${tableName}" oh
    LEFT JOIN orders o ON o.id = oh.order_id
    LEFT JOIN users u ON u.id = o.customer_id
+   LEFT JOIN users cu ON cu.id = oh.changed_by
    LEFT JOIN branches b ON b.id = o.branch_id
    ${criteria} ${date_sql}
    ORDER BY oh.changed_at DESC
