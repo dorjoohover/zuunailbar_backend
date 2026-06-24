@@ -271,7 +271,6 @@ export class OrderService {
           400,
         );
       }
-
     }
   }
   public async getOrderLimit() {
@@ -279,7 +278,8 @@ export class OrderService {
   }
 
   private buildSlotsCacheKey(pg: PaginationDto): string {
-    const { branch_id, services, date, parallel, multi_artist_queue } = pg as any;
+    const { branch_id, services, date, parallel, multi_artist_queue } =
+      pg as any;
     return `${branch_id}|${services}|${date ?? ''}|${parallel ?? ''}|${multi_artist_queue ?? ''}`;
   }
 
@@ -298,15 +298,10 @@ export class OrderService {
       return cached.data;
     }
 
-    const {
-      parallel,
-      branch_id,
-      services,
-      date,
-      time,
-      multi_artist_queue,
-    } = pg;
-    const preSelectedArtist: string | undefined = (pg as any).artist_id || undefined;
+    const { parallel, branch_id, services, date, time, multi_artist_queue } =
+      pg;
+    const preSelectedArtist: string | undefined =
+      (pg as any).artist_id || undefined;
     let result: Slot[] = [];
 
     const p = parallel === 'true';
@@ -314,19 +309,23 @@ export class OrderService {
       !p && (multi_artist_queue === true || multi_artist_queue === 'true');
     const service = services ? services.split(',') : [];
 
-    const [artists_res, selected_services, artistServiceMap] = await Promise.all([
-      services && service.length > 0
-        ? this.userService.getByServices({
-            services: service,
-            parallel: p || allowQueueMultiArtist,
-            branch_id,
-          })
-        : Promise.resolve([]),
-      this.service.getBookingConfigs(service, branch_id),
-      allowQueueMultiArtist && service.length > 1
-        ? this.userService.getArtistServiceMap({ services: service, branch_id })
-        : Promise.resolve([]),
-    ]);
+    const [artists_res, selected_services, artistServiceMap] =
+      await Promise.all([
+        services && service.length > 0
+          ? this.userService.getByServices({
+              services: service,
+              parallel: p || allowQueueMultiArtist,
+              branch_id,
+            })
+          : Promise.resolve([]),
+        this.service.getBookingConfigs(service, branch_id),
+        allowQueueMultiArtist && service.length > 1
+          ? this.userService.getArtistServiceMap({
+              services: service,
+              branch_id,
+            })
+          : Promise.resolve([]),
+      ]);
 
     const artists = preSelectedArtist
       ? [preSelectedArtist]
@@ -347,12 +346,11 @@ export class OrderService {
 
     const resolvedDate = date ? `${date}`.slice(0, 10) : undefined;
     const today = new Date().toISOString().slice(0, 10);
-    const resolvedTime =
-      time
-        ? `${time}`
-        : resolvedDate === today
-          ? new Date().toTimeString().slice(0, 8)
-          : undefined;
+    const resolvedTime = time
+      ? `${time}`
+      : resolvedDate === today
+        ? new Date().toTimeString().slice(0, 8)
+        : undefined;
 
     result = await this.dao.getSlotsUnified({
       branch_id,
@@ -426,7 +424,8 @@ export class OrderService {
   ): Slot[] {
     const artistServices = new Map<string, Set<string>>();
     for (const row of artistServiceMap) {
-      if (!artistServices.has(row.user_id)) artistServices.set(row.user_id, new Set());
+      if (!artistServices.has(row.user_id))
+        artistServices.set(row.user_id, new Set());
       artistServices.get(row.user_id).add(row.service_id);
     }
 
@@ -1223,7 +1222,9 @@ export class OrderService {
       // Бүх role-д (CLIENT, EMPLOYEE, ADMIN) хамаарна
       if (!parallel && normalizedDetails.length > 1) {
         const orderDate = toYMD(new Date(dto.order_date));
-        const artistIds = normalizedDetails.map((d) => d.user_id).filter(Boolean);
+        const artistIds = normalizedDetails
+          .map((d) => d.user_id)
+          .filter(Boolean);
         const customerId = dto.customer_id ?? user.id;
         const startTime = dto.start_time?.toString();
         const hasDuplicate = await this.dao.hasActiveQueueOrder({
@@ -1441,11 +1442,17 @@ export class OrderService {
           created_by: user.id,
           method: dto.method,
           pre_method: preMethod,
-          paid_amount: this.resolvePerMethodTotal(dto, Number(dto.paid_amount ?? 0)),
+          paid_amount: this.resolvePerMethodTotal(
+            dto,
+            Number(dto.paid_amount ?? 0),
+          ),
           pre_amount: orderPreAmount,
-          card_amount: dto.card_amount != null ? Number(dto.card_amount) : undefined,
-          bank_amount: dto.bank_amount != null ? Number(dto.bank_amount) : undefined,
-          cash_amount: dto.cash_amount != null ? Number(dto.cash_amount) : undefined,
+          card_amount:
+            dto.card_amount != null ? Number(dto.card_amount) : undefined,
+          bank_amount:
+            dto.bank_amount != null ? Number(dto.bank_amount) : undefined,
+          cash_amount:
+            dto.cash_amount != null ? Number(dto.cash_amount) : undefined,
         });
         if (paymentSync.latestPaidAt && paymentSync.latestMethod != null) {
           await this.syncOrderPaidMeta(
@@ -1616,9 +1623,9 @@ export class OrderService {
           const customer = await this.user.findOne(cancelled.customer_id);
           if (customer?.mobile) {
             const mobile = MobileParser(customer.mobile);
-            const date = cancelled.order_date ? mnDate(cancelled.order_date) : '';
-            const time = cancelled.start_time ? cancelled.start_time.slice(0, 5) : '';
-            await this.authService.sendCancelWarning(mobile, {
+            const date = mnDate(cancelled.order_date);
+            const time = cancelled.start_time ? cancelled.start_time?.slice(0, 5) : '';
+            await this.authService.sendCustomerCancelSms(mobile, {
               order_date: date,
               time,
             });
@@ -1947,19 +1954,16 @@ export class OrderService {
       payload.discount = payload.discount ?? 0;
       payload.voucher_value = payload.voucher_value ?? 0;
       payload.total_amount = normalizedTotalAmount;
-      payload.paid_amount = this.resolvePerMethodTotal(dto, payload.paid_amount ?? order.paid_amount ?? 0);
+      payload.paid_amount = this.resolvePerMethodTotal(
+        dto,
+        payload.paid_amount ?? order.paid_amount ?? 0,
+      );
       const existingDetails = await this.orderDetail.findByOrder(id);
       const existingMap = new Map(existingDetails.map((d) => [d.id, d]));
 
       // Task #8: Хаагдсан захиалгыг артист өөрчлөх боломжгүй — зөвхөн admin засна.
-      if (
-        order.order_status === OrderStatus.Finished &&
-        role >= EMPLOYEE
-      ) {
-        throw new HttpException(
-          'Хаагдсан захиалгыг өөрчлөх боломжгүй.',
-          403,
-        );
+      if (order.order_status === OrderStatus.Finished && role >= EMPLOYEE) {
+        throw new HttpException('Хаагдсан захиалгыг өөрчлөх боломжгүй.', 403);
       }
 
       // 💰 PAYMENT LOGIC
@@ -2076,10 +2080,7 @@ export class OrderService {
         const prev = detail.id ? existingMap.get(detail.id) : null;
         const resolvedUserId = detail.user_id || prev?.user_id || null;
         if (!resolvedUserId) {
-          throw new HttpException(
-            'Артист сонгоно уу.',
-            HttpStatus.BAD_REQUEST,
-          );
+          throw new HttpException('Артист сонгоно уу.', HttpStatus.BAD_REQUEST);
         }
         detail.user_id = resolvedUserId;
         const service = await this.service.findOne(detail.service_id);
@@ -2206,9 +2207,12 @@ export class OrderService {
         pre_method: preMethod,
         paid_amount: paidAmount,
         pre_amount: preAmount,
-        card_amount: dto.card_amount != null ? Number(dto.card_amount) : undefined,
-        bank_amount: dto.bank_amount != null ? Number(dto.bank_amount) : undefined,
-        cash_amount: dto.cash_amount != null ? Number(dto.cash_amount) : undefined,
+        card_amount:
+          dto.card_amount != null ? Number(dto.card_amount) : undefined,
+        bank_amount:
+          dto.bank_amount != null ? Number(dto.bank_amount) : undefined,
+        cash_amount:
+          dto.cash_amount != null ? Number(dto.cash_amount) : undefined,
       });
       if (paymentSync.latestPaidAt && paymentSync.latestMethod != null) {
         await this.syncOrderPaidMeta(
@@ -2586,7 +2590,8 @@ export class OrderService {
     const orderStart =
       options?.start_date ?? (sortedDates.length ? sortedDates[0] : undefined);
     const orderEnd =
-      options?.end_date ?? (sortedDates.length ? sortedDates.at(-1)! : undefined);
+      options?.end_date ??
+      (sortedDates.length ? sortedDates.at(-1)! : undefined);
 
     // Costs in date range, grouped by (date, branch_id)
     const costExpense = new Map<string, number>();

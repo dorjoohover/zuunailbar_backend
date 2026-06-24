@@ -271,6 +271,13 @@ async sendCancelWarning(
  const text = `Tanii ${datePart} ${timePart} zahialga uridchilgaa tulbur tulj batalgaajuulaagui tul tsutslagdlaa. Bayarlalaa`;
   return this.sendSms(mobile, text);
 }
+
+async sendCustomerCancelSms(mobile: string, payload: CancelWarningPayload): Promise<boolean> {
+    const datePart = payload.order_date ? ` ${payload.order_date}` : '';
+  const timePart = payload.time ? ` ${payload.time}` : '';
+  const text = `Ta ${datePart} ${timePart} tsagiin zahialgaa online tsag zahialgiin systemiin minii tsag zahialga tsesnees tsutsallaa. Hervee sanamsargui tsutsalsan bol yaraltai 86080708 dugaart holbogdono uu`;
+  return this.sendSms(mobile, text);
+}
   async checkOtp(otp: string, mobile: string) {
     const keys = new Set(this.getOtpKeys(mobile));
     let user = null;
