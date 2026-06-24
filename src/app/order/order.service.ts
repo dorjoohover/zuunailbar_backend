@@ -254,12 +254,16 @@ export class OrderService {
     if (user.role == CLIENT) {
       const dateStr = toYMD(dto.order_date);
       const startTimeStr = dto.start_time.toString();
+      const endTimeStr = dto.end_time?.toString();
+      const branchId = dto.branch_id ?? undefined;
       const unavailableArtists = await Promise.all(
         details.map(async (d) => {
           const available = await this.dao.isArtistAvailableOnDate({
             artist_id: d.user_id,
             date: dateStr,
             start_time: startTimeStr,
+            end_time: endTimeStr,
+            branch_id: branchId,
           });
           return available ? null : d.user_id;
         }),

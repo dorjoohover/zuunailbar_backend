@@ -277,17 +277,29 @@ export class OrdersDao {
     artist_id: string;
     date: string;
     start_time: string;
+    end_time?: string;
+    branch_id?: string;
   }): Promise<boolean> {
+    const { artist_id, date, start_time, end_time, branch_id } = input;
     const rows = await this._db.select(
-      `SELECT 1
-       FROM availability_slots
+      `SELECT finish_time
+       FROM availability_service_slots
        WHERE artist_id = $1
          AND date = $2::date
          AND start_time = $3::time
+         AND end_time IS NULL
+         ${branch_id ? 'AND branch_id = $4' : ''}
        LIMIT 1`,
-      [input.artist_id, input.date, input.start_time],
+      branch_id
+        ? [artist_id, date, start_time, branch_id]
+        : [artist_id, date, start_time],
     );
-    return rows.length > 0;
+    if (rows.length === 0) return false;
+    if (end_time) {
+      const finish = rows[0]?.finish_time;
+      if (finish && end_time > finish) return false;
+    }
+    return true;
   }
 
   async get_order_details(input: { date: Date[]; artists: string[]; branch_id: string }) {

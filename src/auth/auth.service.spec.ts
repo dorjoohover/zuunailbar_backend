@@ -90,6 +90,10 @@ describe('AuthService', () => {
   let mailer: {
     sendMail: jest.Mock;
   };
+  let messageLog: {
+    add: jest.Mock;
+    list: jest.Mock;
+  };
 
   beforeEach(() => {
     adminUsersService = {
@@ -105,12 +109,17 @@ describe('AuthService', () => {
     mailer = {
       sendMail: jest.fn(),
     };
+    messageLog = {
+      add: jest.fn(),
+      list: jest.fn(),
+    };
 
     service = new AuthService(
       adminUsersService as any,
       userService as any,
       jwtService as any,
       mailer as any,
+      messageLog as any,
     );
   });
 
