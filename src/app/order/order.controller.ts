@@ -12,6 +12,7 @@ import {
   HttpStatus,
   UploadedFile,
   UseInterceptors,
+  HttpException,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
 import {
@@ -28,6 +29,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   AvailableTimeDto,
+  OrderByPhoneDto,
   OrderDto,
   PaymentReportQueryDto,
   ReportFormat,
@@ -41,6 +43,8 @@ import { Response } from 'express';
 import { CLIENT } from 'src/base/constants';
 import { BadRequest } from 'src/common/error';
 import { memoryStorage } from 'multer';
+import { UserService } from '../user/user.service';
+import { MobileFormat } from 'src/common/formatter';
 
 const COLS: any[] = [
   { header: 'Date', key: 'date', width: 14 },
@@ -56,11 +60,30 @@ const COLS: any[] = [
 })
 @Controller('order')
 export class OrderController {
-  constructor(private readonly orderService: OrderService) {}
+  constructor(
+    private readonly orderService: OrderService,
+    private readonly userService: UserService,
+  ) {}
 
   @Post()
   create(@Body() dto: OrderDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
+    dto.customer_id = user.user.id;
+    return this.orderService.create(dto, user.user, user.merchant.id);
+  }
+
+  @Employee()
+  @Post('by-phone')
+  async createByPhone(@Body() dto: OrderByPhoneDto, @Req() { user }) {
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
+    const customer = await this.userService.findMobileByMerchant(
+      MobileFormat(dto.mobile),
+      user.merchant.id,
+    );
+    if (!customer) {
+      throw new HttpException('Харилцагч олдсонгүй.', HttpStatus.NOT_FOUND);
+    }
+    dto.customer_id = customer.id;
     return this.orderService.create(dto, user.user, user.merchant.id);
   }
 

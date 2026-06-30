@@ -97,3 +97,8 @@ export class AvailableTimeDto {
   date?: Date;
   serviceArtist: Record<string, string | null>;
 }
+
+export class OrderByPhoneDto extends OrderDto {
+  @ApiProperty({ description: 'Харилцагчийн утасны дугаар' })
+  mobile: string;
+}
