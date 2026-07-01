@@ -68,7 +68,9 @@ export class OrderController {
   @Post()
   create(@Body() dto: OrderDto, @Req() { user }) {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
-    dto.customer_id = user.user.id;
+    if (user.user.role >= CLIENT) {
+      dto.customer_id = user.user.id;
+    }
     return this.orderService.create(dto, user.user, user.merchant.id);
   }
 
