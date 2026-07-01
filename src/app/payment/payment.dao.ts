@@ -83,86 +83,29 @@ export class PaymentDao {
       filter.to,
       STATUS.Active,
       OrderStatus.Finished,
-      PaymentMethod[PaymentMethod.CASH],
-      PaymentMethod[PaymentMethod.CARD],
+      PAYMENT_STATUS.Active,
+      PaymentMethod.CASH,
+      PaymentMethod.CARD,
     ];
     let sql = `
-      WITH detail_sales AS (
-        SELECT
-          o."id",
-          COALESCE(od."price", 0) AS detail_amount,
-          SUM(COALESCE(od."price", 0)) OVER (PARTITION BY o."id") AS detail_total,
-          CASE
-            WHEN COALESCE(o."is_pre_amount_paid", false) = true
-              THEN COALESCE(o."pre_amount", 0)
-            ELSE 0
-          END AS order_pre_amount,
-          UPPER(COALESCE(o."transaction_type", '')) AS transaction_type
-        FROM "orders" o
-        INNER JOIN "order_details" od
-          ON od."order_id" = o."id"
-         AND COALESCE(od."view_status", ${STATUS.Active}) = ${STATUS.Active}
-        INNER JOIN "branches" b ON b."id" = o."branch_id"
-        WHERE b."merchant_id" = $1
-          AND COALESCE(od."order_date", o."order_date") BETWEEN $2::date AND $3::date
-          AND o."status" = $4
-          AND o."order_status" = $5
+      SELECT
+        COALESCE(SUM(CASE WHEN p."is_pre_amount" = true  AND p."status" = $6 THEN p."amount" ELSE 0 END), 0) AS pre_amount,
+        COALESCE(SUM(CASE WHEN p."is_pre_amount" = false AND p."status" = $6 AND p."method" = $7 THEN p."amount" ELSE 0 END), 0) AS cash_amount,
+        COALESCE(SUM(CASE WHEN p."is_pre_amount" = false AND p."status" = $6 AND p."method" = $8 THEN p."amount" ELSE 0 END), 0) AS card_amount,
+        COALESCE(SUM(CASE WHEN p."is_pre_amount" = false AND p."status" = $6 AND p."method" != $7 AND p."method" != $8 THEN p."amount" ELSE 0 END), 0) AS bank_amount
+      FROM "payments" p
+      INNER JOIN "orders" o ON o."id" = p."order_id"
+      INNER JOIN "branches" b ON b."id" = o."branch_id"
+      WHERE b."merchant_id" = $1
+        AND o."order_date" BETWEEN $2::date AND $3::date
+        AND o."status" = $4
+        AND o."order_status" = $5
     `;
 
     if (filter.branch_id) {
       values.push(filter.branch_id);
       sql += ` AND o."branch_id" = $${values.length}`;
     }
-
-    sql += `
-      ),
-      allocated_sales AS (
-        SELECT
-          detail_amount,
-          CASE
-            WHEN order_pre_amount > 0 AND detail_total > 0
-              THEN LEAST(detail_amount, ROUND((detail_amount * order_pre_amount / detail_total)::numeric, 2))
-            ELSE 0
-          END AS pre_amount,
-          CASE
-            WHEN order_pre_amount > 0 AND detail_total > 0
-              THEN GREATEST(detail_amount - LEAST(detail_amount, ROUND((detail_amount * order_pre_amount / detail_total)::numeric, 2)), 0)
-            ELSE detail_amount
-          END AS paid_amount,
-          transaction_type
-        FROM detail_sales
-      )
-      SELECT
-        COALESCE(SUM(pre_amount), 0) AS pre_amount,
-        COALESCE(
-          SUM(
-            CASE
-              WHEN paid_amount > 0 AND transaction_type = $6 THEN paid_amount
-              ELSE 0
-            END
-          ),
-          0
-        ) AS cash_amount,
-        COALESCE(
-          SUM(
-            CASE
-              WHEN paid_amount > 0 AND transaction_type = $7 THEN paid_amount
-              ELSE 0
-            END
-          ),
-          0
-        ) AS card_amount,
-        COALESCE(
-          SUM(
-            CASE
-              WHEN paid_amount > 0 AND transaction_type != $6 AND transaction_type != $7 THEN paid_amount
-              ELSE 0
-            END
-          ),
-          0
-        ) AS bank_amount
-      FROM allocated_sales
-    `;
 
     return await this._db.selectOne(sql, values);
   }
@@ -179,9 +122,22 @@ export class PaymentDao {
       filter.to,
       STATUS.Active,
       OrderStatus.Finished,
+      PAYMENT_STATUS.Active,
+      PaymentMethod.CARD,
+      PaymentMethod.CASH,
     ];
     let sql = `
-      WITH detail_sales AS (
+      WITH order_payments AS (
+        SELECT
+          p."order_id",
+          COALESCE(SUM(CASE WHEN p."is_pre_amount" = true  AND p."status" = $6 THEN p."amount" ELSE 0 END), 0) AS pre_paid,
+          COALESCE(SUM(CASE WHEN p."is_pre_amount" = false AND p."status" = $6 AND p."method" = $7 THEN p."amount" ELSE 0 END), 0) AS card_paid,
+          COALESCE(SUM(CASE WHEN p."is_pre_amount" = false AND p."status" = $6 AND p."method" != $7 AND p."method" != $8 THEN p."amount" ELSE 0 END), 0) AS bank_paid,
+          COALESCE(SUM(CASE WHEN p."is_pre_amount" = false AND p."status" = $6 AND p."method" = $8 THEN p."amount" ELSE 0 END), 0) AS cash_paid
+        FROM "payments" p
+        GROUP BY p."order_id"
+      ),
+      detail_sales AS (
         SELECT
           od."id",
           o."id" AS order_id,
@@ -190,26 +146,25 @@ export class PaymentDao {
           SUM(COALESCE(od."price", 0)) OVER (PARTITION BY o."id") AS detail_total,
           COALESCE(o."discount", 0) AS order_discount,
           o."voucher_name",
-          CASE
-            WHEN COALESCE(o."is_pre_amount_paid", false) = true
-              THEN COALESCE(o."pre_amount", 0)
-            ELSE 0
-          END AS order_pre_amount,
-          o."transaction_type",
+          COALESCE(op."pre_paid",  0) AS pre_paid,
+          COALESCE(op."card_paid", 0) AS card_paid,
+          COALESCE(op."bank_paid", 0) AS bank_paid,
+          COALESCE(op."cash_paid", 0) AS cash_paid,
           o."branch_id",
           b."name" AS branch_name,
           COALESCE(NULLIF(u."nickname", ''), od."nickname") AS artist_names,
           od."service_name" AS service_names
-      FROM "orders" o
-      INNER JOIN "branches" b ON b."id" = o."branch_id"
-      INNER JOIN "order_details" od
-        ON od."order_id" = o."id"
-       AND COALESCE(od."view_status", ${STATUS.Active}) = ${STATUS.Active}
-      LEFT JOIN "users" u ON u."id" = od."user_id"
-      WHERE b."merchant_id" = $1
-        AND COALESCE(od."order_date", o."order_date") BETWEEN $2::date AND $3::date
-        AND o."status" = $4
-        AND o."order_status" = $5
+        FROM "orders" o
+        INNER JOIN "branches" b ON b."id" = o."branch_id"
+        INNER JOIN "order_details" od
+          ON od."order_id" = o."id"
+         AND COALESCE(od."view_status", ${STATUS.Active}) = ${STATUS.Active}
+        LEFT JOIN "users" u ON u."id" = od."user_id"
+        LEFT JOIN order_payments op ON op."order_id" = o."id"
+        WHERE b."merchant_id" = $1
+          AND COALESCE(od."order_date", o."order_date") BETWEEN $2::date AND $3::date
+          AND o."status" = $4
+          AND o."order_status" = $5
     `;
 
     if (filter.branch_id) {
@@ -223,23 +178,26 @@ export class PaymentDao {
         id,
         order_id,
         order_date,
-        CASE
-          WHEN order_pre_amount > 0 AND detail_total > 0
-            THEN LEAST(detail_amount, ROUND((detail_amount * order_pre_amount / detail_total)::numeric, 2))
-          ELSE 0
-        END AS pre_amount,
+        CASE WHEN detail_total > 0 THEN ROUND((pre_paid  * detail_amount / detail_total)::numeric, 0) ELSE 0 END AS pre_amount,
+        CASE WHEN detail_total > 0 THEN ROUND((card_paid * detail_amount / detail_total)::numeric, 0) ELSE 0 END AS card_amount,
+        CASE WHEN detail_total > 0 THEN ROUND((bank_paid * detail_amount / detail_total)::numeric, 0) ELSE 0 END AS bank_amount,
+        CASE WHEN detail_total > 0 THEN ROUND((cash_paid * detail_amount / detail_total)::numeric, 0) ELSE 0 END AS cash_amount,
         CASE
           WHEN order_discount > 0 AND detail_total > 0
-            THEN LEAST(detail_amount, ROUND((detail_amount * order_discount / detail_total)::numeric, 2))
+            THEN LEAST(detail_amount, ROUND((detail_amount * order_discount / detail_total)::numeric, 0))
           ELSE 0
         END AS discount_amount,
-        CASE
-          WHEN order_pre_amount > 0 AND detail_total > 0
-            THEN GREATEST(detail_amount - LEAST(detail_amount, ROUND((detail_amount * order_pre_amount / detail_total)::numeric, 2)), 0)
-          ELSE detail_amount
+        CASE WHEN detail_total > 0
+          THEN ROUND(((card_paid + bank_paid + cash_paid) * detail_amount / detail_total)::numeric, 0)
+          ELSE 0
         END AS paid_amount,
         detail_amount AS amount,
-        transaction_type,
+        CASE
+          WHEN card_paid > 0 AND bank_paid = 0 AND cash_paid = 0 THEN $7
+          WHEN bank_paid > 0 AND card_paid = 0 AND cash_paid = 0 THEN ${PaymentMethod.BANK}
+          WHEN cash_paid > 0 AND card_paid = 0 AND bank_paid = 0 THEN $8
+          ELSE NULL
+        END AS transaction_type,
         branch_id,
         branch_name,
         artist_names,

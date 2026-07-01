@@ -1621,8 +1621,9 @@ export class OrderService {
       const cancelled = await this.findOne(id);
       if (cancelled?.branch_id) this.invalidateSlotsCache(cancelled.branch_id);
 
-      // Цуцласан тухай SMS мессеж илгээх
-      if (cancelled?.customer_id) {
+      // SMS зөвхөн Active (баталгаажсан) захиалгыг цуцлах үед явуулна.
+      // Pending (урьдчилгаа төлөөгүй) захиалга цуцлагдахад SMS явуулахгүй.
+      if (order.order_status === OrderStatus.Active && cancelled?.customer_id) {
         try {
           const customer = await this.user.findOne(cancelled.customer_id);
           if (customer?.mobile) {
