@@ -284,7 +284,14 @@ export class OrderService {
   private buildSlotsCacheKey(pg: PaginationDto): string {
     const { branch_id, services, date, parallel, multi_artist_queue } =
       pg as any;
-    return `${branch_id}|${services}|${date ?? ''}|${parallel ?? ''}|${multi_artist_queue ?? ''}`;
+    // artist_id-г түлхүүрт заавал оруулна: "цагаар" (artist_id-гүй, олон
+    // артистын нэгдсэн жагсаалт) болон "артистаар" (artist_id-тэй, ганц
+    // артистад шүүсэн жагсаалт) захиалгын урсгалууд ижил
+    // branch/services/date/parallel утгатай үед адилхан кэш түлхүүр үүсгэж,
+    // нэг урсгалын кэш хариуг нөгөөд буруу буцаадаг байсан тул шинээр
+    // нэмэгдсэн ажилтны хуваарь зөвхөн нэг талд харагдах алдаа гарч байв.
+    const artist_id = (pg as any).artist_id ?? '';
+    return `${branch_id}|${services}|${date ?? ''}|${parallel ?? ''}|${multi_artist_queue ?? ''}|${artist_id}`;
   }
 
   public invalidateSlotsCache(branch_id: string) {
