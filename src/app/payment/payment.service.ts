@@ -214,7 +214,17 @@ export class PaymentService {
     const manualPayments = payments.filter(
       (payment) => !payment.invoice_id && !payment.payment_id,
     );
-    const existingPre = manualPayments.find((payment) => payment.is_pre_amount);
+    // Урьдчилгаа нь QPAY invoice-оор (invoice_id-тэй) төлөгдсөн байж болно.
+    // manualPayments нь invoice_id-тэй мөрүүдийг хасдаг тул тэдгээрийг энд
+    // харгалзахгүй бол давхар "урьдчилгаа" мөр үүсээд нийт дүн 2 дахин
+    // өссөн харагдах алдаа гардаг байсан (жишээ нь 20,000 → 40,000).
+    const existingPre =
+      manualPayments.find((payment) => payment.is_pre_amount) ??
+      payments.find(
+        (payment) =>
+          payment.is_pre_amount &&
+          payment.status === PAYMENT_STATUS.Active,
+      );
 
     const prePayment = await this.syncManualPayment({
       ...input,
