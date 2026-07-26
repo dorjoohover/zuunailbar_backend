@@ -55,6 +55,9 @@ export class OrderDto {
   @ApiPropertyOptional()
   @IsOptional()
   cash_amount?: number;
+  @ApiPropertyOptional({ description: 'Захиалга ямар суваг (channel)-аар үүссэн' })
+  @IsOptional()
+  channel?: string;
   @ApiProperty({ isArray: true })
   details: OrderDetailDto[];
   updated_at?: Date;

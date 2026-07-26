@@ -43,6 +43,7 @@ export class OrdersDao {
         'voucher_name',
         'voucher_value',
         'order_status',
+        'channel',
       ]);
     } catch (error) {
       console.error('Order insert failed:', error);
@@ -76,6 +77,7 @@ export class OrdersDao {
           'parallel',
 
           'order_status',
+          'channel',
         ]);
         for (const detail of details) {
           await this.details.create(client, { ...detail, order_id: orderId });
@@ -651,6 +653,15 @@ WHERE key = 'availability_days';`;
       builder.values.push(query.customers);
       const index = builder.values.length;
       additional = ` AND customer_id = ANY($${index})`;
+    }
+    if (query.channel) {
+      const channels = Array.isArray(query.channel)
+        ? query.channel
+        : String(query.channel)
+            .split(',')
+            .map((c) => c.trim())
+            .filter(Boolean);
+      builder.conditionIfArray('channel', channels);
     }
     const criteria = builder.criteria();
     const defaultColumns = `o.*, b."name" AS branch_name, pre_pay.method AS pre_method, pay.method AS method, COALESCE(card_pay.amount, 0) AS card_amount, COALESCE(bank_pay.amount, 0) AS bank_amount, COALESCE(cash_pay.amount, 0) AS cash_amount`;

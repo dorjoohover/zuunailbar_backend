@@ -32,6 +32,7 @@ export class Order {
   card_amount?: number;
   bank_amount?: number;
   cash_amount?: number;
+  channel?: string | null;
 }
 
 export class Slot {

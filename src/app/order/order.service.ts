@@ -1339,6 +1339,7 @@ export class OrderService {
         parallel,
         created_by: user.id,
         branch_id: dto.branch_id,
+        channel: dto.channel ?? null,
       } as const;
       if (requiresOnlinePrePayment && orderPreAmount <= 0) {
         throw new HttpException(
@@ -1731,6 +1732,15 @@ export class OrderService {
     } catch (error) {
       console.error('Order list lookup failed:', error);
     }
+  }
+
+  /**
+   * `channel`-ээр захиалга хайх тусдаа endpoint-д ашиглагдана.
+   * `find()`-той ижил логик ашиглана — `channel` query параметр байгаа тохиолдолд
+   * `dao.list()`-д аль хэдийн ANY($n) шүүлтүүр (олон утга дэмждэг) орсон байгаа.
+   */
+  public async findByChannel(pg: PaginationDto, role: number, id?: string) {
+    return this.find(pg, role, id);
   }
 
   public async getOrders(user: string, day: number) {

@@ -127,9 +127,31 @@ export class OrderController {
     'branch_id',
     'customer',
     'friend',
+    'channel',
   ])
   findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
     return this.orderService.find(pg, user.user.role, user.user.id);
+  }
+
+  @Get('channel')
+  @PQ([
+    'channel',
+    'date',
+    'end_date',
+    'order_status',
+    'user_id',
+    'branch_id',
+    'customer',
+    'friend',
+  ])
+  findByChannel(@Pagination() pg: PaginationDto, @Req() { user }) {
+    if (!pg.channel) {
+      throw new HttpException(
+        'channel параметр шаардлагатай.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return this.orderService.findByChannel(pg, user.user.role, user.user.id);
   }
   @Admin()
   @Get('logs')
@@ -181,6 +203,7 @@ export class OrderController {
     'branch_id',
     'customer',
     'friend',
+    'channel',
   ])
   async reports(
     @Pagination() pg: PaginationDto,
