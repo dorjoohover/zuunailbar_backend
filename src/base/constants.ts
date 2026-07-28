@@ -1,0 +1,385 @@
+import { User } from 'src/app/user/user.entity';
+
+export const DEFAULT_SKIP = 0;
+export const DEFAULT_LIMIT = 20;
+export const DEFAULT_SORT = false;
+export const ADMINUSERS = 10;
+export const ADMIN = 20;
+export const MANAGER = 30;
+export const EMPLOYEE = 40;
+export const E_M = 35;
+export const CLIENT = 50;
+export const STARTTIME = 7;
+export const ENDTIME = 22;
+
+export function getDefinedKeys(
+  obj: Record<string, any>,
+  isNull = false,
+): string[] {
+  let value = Object.entries(obj);
+  if (!isNull)
+    value = value.filter(([_, value]) => value !== undefined && value !== null);
+  const result = value.map(([key]) => key);
+  return result;
+}
+export const MN_TZ = 'Asia/Ulaanbaatar' as const;
+const cleanNamePart = (value?: string | null) => {
+  const text = `${value ?? ''}`.trim();
+  return text.toLowerCase() === 'null' ? '' : text;
+};
+export const usernameFormatter = (user: User) => {
+  const nickname = cleanNamePart(user.nickname);
+  if (nickname) return nickname;
+
+  const lastname = cleanNamePart(user.lastname);
+  const firstname = cleanNamePart(user.firstname);
+  const formattedLastname = lastname ? `${firstLetterUpper(lastname)}.` : '';
+  return `${formattedLastname}${firstname}`.trim();
+};
+
+export const saltOrRounds = 1;
+export function toTimeString(hour: number | string, half?: boolean): string {
+  const numericHour = Number(hour);
+  const normalizedHour = Number.isFinite(numericHour)
+    ? ((Math.floor(numericHour) % 24) + 24) % 24
+    : 0;
+  const h = String(normalizedHour).padStart(2, '0');
+  return half ? `${h}:30:00` : `${h}:00:00`;
+}
+
+export function slotTimeToDecimal(time: string): number {
+  let value = +time.slice(0, 2);
+  if (time.includes(':30')) value += 0.5;
+  return value;
+}
+
+export function slotRangeToTimes(times?: string[] | null) {
+  if (!times || times.length === 0) {
+    return {
+      times: null,
+      start_time: null,
+      end_time: null,
+    };
+  }
+
+  const values = times.map(slotTimeToDecimal);
+  const start = Math.min(...values);
+  const end = Math.max(...values);
+
+  return {
+    times: times.join('|'),
+    start_time: toTimeString(Math.floor(start), start % 1 !== 0),
+    end_time: toTimeString(Math.floor(end), end % 1 !== 0),
+  };
+}
+
+export const firstLetterUpper = (value: string) => {
+  if (value.length == 0) return value;
+  return `${value.substring(0, 1).toUpperCase()}${value.substring(1)}`;
+};
+export function toYMD(d: Date | string | number | null | undefined): string {
+  if (d == null) return '';
+  // String ирвэл ISO эсвэл "YYYY-MM-DD"-ийг шууд таних боломжтой, эс өгөвсөн Date руу хөрвүүлнэ.
+  if (typeof d === 'string') {
+    // Хэрэв "YYYY-MM-DD..." гэсэн форматаар эхэлж байвал шууд авна.
+    const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    const parsed = new Date(d);
+    if (!isNaN(parsed.getTime())) {
+      return toYMD(parsed);
+    }
+    return '';
+  }
+  const date = d instanceof Date ? d : new Date(d);
+  if (isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function timeToDecimal(time: string): number {
+  if (time.length <= 2) return +time;
+  const [h, m, s = '0'] = time.split(':');
+  return Number(h) + Number(m) / 60 + Number(s) / 3600;
+}
+
+function getUBOffsetMinutes(d: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ulaanbaatar',
+    timeZoneName: 'shortOffset',
+    hour: '2-digit',
+  }).formatToParts(d);
+  const name =
+    parts.find((p) => p.type === 'timeZoneName')?.value || 'UTC+08:00';
+  const m = name.match(/([+-]\d{1,2})(?::?(\d{2}))?/); // +8, +08:00, -09:30 гэх мэт
+  if (!m) return 8 * 60;
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2] || '0', 10);
+  return hh * 60 + Math.sign(hh) * mm;
+}
+export function mnDate(d: Date | string | number = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ulaanbaatar',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(d));
+}
+export function ubDateAt00(d: Date | string | number = new Date()): Date {
+  const ymd = mnDate(d);
+  const [Y, M, D] = ymd.split('-').map(Number);
+  // Тухайн өдрийн UB оффсет (DST тооцно)
+  const offsetMin = getUBOffsetMinutes(new Date(Date.UTC(Y, M - 1, D, 12)));
+  // UB 00:00 → UTC millis
+  const utcMs = Date.UTC(Y, M - 1, D, 0, 0, 0) - offsetMin * 60_000;
+  return new Date(utcMs);
+}
+export enum AdminUserStatus {
+  Active = 10,
+  Deleted = 20,
+}
+export enum UserStatus {
+  Active = 10,
+  Deleted = 20,
+  Banned = 30,
+}
+export enum CostStatus {
+  Paid = 10,
+  Remainder = 20,
+}
+
+export enum DISCOUNT {
+  Percent = 10,
+  Price = 20,
+}
+export enum VOUCHER {
+  Percent = 10,
+  Price = 20,
+  Service = 30,
+}
+export enum VoucherStatus {
+  Available = 10,
+  Used = 20,
+  Cancelled = 30,
+}
+export enum SCHEDULE_TYPE {
+  Employee = 10,
+  Branch = 20,
+}
+export enum SERVICE_TYPE {}
+export const round = (value: number, round = 1000) => {
+  return Math.floor(value / round) * round;
+};
+
+export const DiscountValue = {
+  [DISCOUNT.Percent]: 'Percent',
+  [DISCOUNT.Price]: 'Price',
+};
+export enum ScheduleStatus {
+  Active = 10,
+  Pending = 20,
+
+  Hidden = 60,
+}
+export enum ScheduleType {
+  Free = 10,
+  Vacation = 20,
+}
+
+export enum UserProductStatus {
+  Active = 10,
+  Returned = 20,
+  Lost = 30,
+  Damaged = 40,
+  Replaced = 50,
+}
+
+export enum STATUS {
+  Active = 10,
+  Pending = 20,
+  Hidden = 30,
+}
+
+export enum UserLevel {
+  BRONZE = 0,
+  SILVER = 10,
+  GOLD = 20,
+  JUNIOR = 100,
+  SENIOR = 110,
+}
+
+export enum OrderStatus {
+  // uridchilgaa toloogui
+  Pending = 10,
+  // uridchilgaa tolson
+  Active = 20,
+
+  // duussan
+  Finished = 40,
+  // tsutsalsan
+  Cancelled = 50,
+  // tsutsalsan
+  Absent = 60,
+  Friend = 70,
+}
+
+
+
+export enum PRODUCT_STATUS {
+  Active = 10,
+  Hidden = 20,
+}
+export enum PAYMENT_STATUS {
+  // uridchilgaa toloogui
+  Pending = 10,
+  // uridchilgaa tolson
+  Active = 20,
+
+  // duussan
+  Finished = 40,
+  // tsutsalsan
+  Cancelled = 50,
+  // tsutsalsan
+  Absent = 60,
+  Friend = 70,
+}
+
+export enum PaymentMethod {
+  QPAY = 1,
+  CASH = 2,
+  BANK = 3,
+  CARD = 4,
+}
+export enum SALARY_LOG_STATUS {
+  Pending = 10,
+  Approved = 20,
+  Completed = 30,
+}
+
+export const SalaryLogValue = {
+  [SALARY_LOG_STATUS.Pending]: 'Өгөөгүй',
+  [SALARY_LOG_STATUS.Approved]: 'Баталсан',
+  [SALARY_LOG_STATUS.Completed]: 'Дууссан',
+};
+export enum PRODUCT_TRANSACTION_STATUS {
+  Used = 10,
+  Sold = 20,
+  Damaged = 30,
+}
+export enum PRODUCT_LOG_STATUS {
+  Bought = 10,
+  Remainder = 20,
+  // Damaged = 30,
+}
+
+export enum SERVICE_VIEW {
+  SPECIAL = 10,
+  DEFAULT = 0,
+  FEATURED = 20,
+}
+
+export type SlotAction = 'ADD' | 'REMOVE';
+export enum EmployeeStatus {
+  ACTIVE = 10,
+  DEKIRIT = 20,
+  VACATION = 30,
+  FIRED = 40,
+  BANNED = 50,
+}
+export enum PaymentType {
+  SALARY = 10,
+  ADVANCE = 20,
+}
+export enum SalaryStatus {
+  ACTIVE = 10,
+  INACTIVE = 20,
+  BANNED = 50,
+}
+
+export function getDatesBetween(start: Date, end: Date): Date[] {
+  const dates: Date[] = [];
+  const current = new Date(start);
+
+  while (current <= end) {
+    dates.push(new Date(current)); // copy
+    current.setDate(current.getDate() + 1); // дараагийн өдөр
+  }
+
+  return dates;
+}
+export function intersectSlots(
+  scheduleSlots: string[],
+  bookingSlots: string[],
+): string[] {
+  return scheduleSlots?.filter((slot) => bookingSlots.includes(slot));
+}
+
+export interface OrderSlot {
+  [artist: string]: {
+    slots: Record<string, string[]>;
+  };
+}
+export interface ParallelOrderSlot {
+  [service: string]: {
+    [artist: string]: {
+      artists: string[];
+      slots: Record<string, string[]>;
+    };
+  };
+}
+
+// ://q?qPay_QRcode=
+export const QpayLinks = [
+  {
+    name: 'Khan bank',
+    description: 'Хаан банк',
+    link: 'khanbank',
+  },
+  {
+    name: 'State bank',
+    description: 'Төрийн банк',
+
+    link: 'statebank',
+  },
+  {
+    name: 'Xac bank',
+    description: 'Хас банк',
+    link: 'xacbank',
+  },
+  {
+    name: 'Trade and Development bank',
+    description: 'TDB online',
+    link: 'tdbbank',
+  },
+  {
+    name: 'Most money',
+    description: 'МОСТ мони',
+    link: 'most',
+  },
+  {
+    name: 'National investment bank',
+    description: 'Үндэсний хөрөнгө оруулалтын банк',
+    link: 'nibank',
+  },
+  {
+    name: 'Chinggis khaan bank',
+    description: 'Чингис Хаан банк',
+    link: 'ckbank',
+  },
+  {
+    name: 'Capitron bank',
+    description: 'Капитрон банк',
+    link: 'capitronbank',
+  },
+  {
+    name: 'Bogd bank',
+    description: 'Богд банк',
+    link: 'bogdbank',
+  },
+  {
+    name: 'Candy pay',
+    description: 'Мон Пэй',
+    link: 'candybank',
+  },
+];

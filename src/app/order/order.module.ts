@@ -1,0 +1,54 @@
+import { forwardRef, Module } from '@nestjs/common';
+import { OrderService } from './order.service';
+import { OrderController } from './order.controller';
+import { AppDbModule } from 'src/core/db/database.module';
+import { BaseModule } from 'src/base/base.module';
+import { OrdersDao } from './order.dao';
+import { OrderDetailModule } from '../order_detail/order_detail.module';
+import { ServiceModule } from '../service/service.module';
+import { QpayService } from './qpay.service';
+import { HttpModule } from '@nestjs/axios';
+import { ExcelService } from 'src/excel.service';
+import { UserModule } from '../user/user.module';
+import { AllExceptionsFilter } from 'src/core/utils/all-exceptions.filter';
+import { FileErrorLogService } from 'src/error-log.service';
+import { UserServiceModule } from '../user_service/user_service.module';
+import { IntegrationModule } from '../integrations/integrations.module';
+import { PaymentModule } from '../payment/payment.module';
+import { OrderLogDao } from './order.log.dao';
+import { AuthModule } from 'src/auth/auth.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
+import { CostModule } from '../cost/cost.module';
+import { ProductLogModule } from '../product_log/product_log.module';
+import { ProductTransactionModule } from '../product_transaction/product_transaction.module';
+
+@Module({
+  imports: [
+    AppDbModule,
+    BaseModule,
+    OrderDetailModule,
+    ServiceModule,
+    HttpModule,
+    UserModule,
+    IntegrationModule,
+    UserServiceModule,
+    forwardRef(() => PaymentModule),
+    AuthModule,
+    DashboardModule,
+    CostModule,
+    ProductLogModule,
+    ProductTransactionModule,
+  ],
+  controllers: [OrderController],
+  providers: [
+    OrderService,
+    OrdersDao,
+    QpayService,
+    ExcelService,
+    FileErrorLogService,
+    AllExceptionsFilter,
+    OrderLogDao,
+  ],
+  exports: [OrderService, QpayService],
+})
+export class OrderModule {}

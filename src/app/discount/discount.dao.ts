@@ -1,0 +1,170 @@
+import { Injectable } from '@nestjs/common';
+import { STATUS } from 'src/base/constants';
+import { AppDB } from 'src/core/db/pg/app.db';
+import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
+import { Discount } from './discount.entity';
+
+const tableName = 'discounts';
+
+@Injectable()
+export class DiscountDao {
+  constructor(private readonly _db: AppDB) {}
+
+  async add(data: Discount) {
+    return await this._db.insert(tableName, data, [
+      'id',
+      'service_id',
+      'branch_id',
+      'start_date',
+      'end_date',
+      'value',
+      'name',
+      'status',
+      'type',
+    ]);
+  }
+
+  async update(data: any, attr: string[]): Promise<number> {
+    return await this._db.update(tableName, data, attr, [
+      new SqlCondition('id', '=', data.id),
+    ]);
+  }
+
+  async updateTags(data: any): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "tags"=$1 WHERE "id"=$2`,
+      [data.tags, data.id],
+    );
+  }
+
+  async updateFee(id: string, fee: number) {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "fee"=$1 WHERE "id"=$2`,
+      [fee, id],
+    );
+  }
+
+  async updateStatus(id: string, status: number): Promise<number> {
+    return await this._db._update(
+      `UPDATE "${tableName}" SET "status"=$1 WHERE "id"=$2`,
+      [status, id],
+    );
+  }
+
+  async getByMobile(mobile: string) {
+    return await this._db.select(
+      `SELECT * FROM "${tableName}" WHERE "mobile"=$1`,
+      [mobile],
+    );
+  }
+
+  async getById(id: string) {
+    return await this._db.selectOne(
+      `SELECT * FROM "${tableName}" WHERE "id"=$1 and "status" = ${STATUS.Active}`,
+      [id],
+    );
+  }
+  async getByService(id: string) {
+    try {
+      return await this._db.selectOne(
+        `SELECT * FROM "${tableName}"
+         WHERE "service_id"=$1
+           AND "status" = $2
+           AND CURRENT_DATE BETWEEN "start_date"::date AND "end_date"::date
+         ORDER BY "created_at" DESC
+         LIMIT 1`,
+        [id, STATUS.Active],
+      );
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async list(query) {
+    if (query.id) {
+      query.id = `%${query.id}%`;
+    }
+    if (query.name) {
+      query.name = `%${query.name}%`;
+    }
+
+    const builder = new SqlBuilder(query);
+    const criteria = builder
+      .conditionIfNotEmpty('id', 'ILIKE', query.id)
+      .conditionIfNotEmpty('service_id', '=', query.service_id)
+      .conditionIfNotEmpty('branch_id', '=', query.branch_id)
+      .conditionIfNotEmpty('type', '=', query.type)
+      .conditionIfNotEmpty('status', '=', query.status)
+      .conditionIfNotEmpty('name', 'ILIKE', query.name)
+      .criteria();
+    let sql = `SELECT * FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} `;
+    if (query.limit) sql += ` ${query.limit ? `limit ${query.limit}` : ''}`;
+    if (query.skip) ` offset ${+query.skip * +(query.limit ?? 0)}`;
+
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
+    const count = await this._db.count(countSql, builder.values);
+    const items = await this._db.select(sql, builder.values);
+    return { count, items };
+  }
+
+  async search(filter: any): Promise<any[]> {
+    const term = ((filter.id ?? filter.name ?? '') + '').trim().toLowerCase();
+    const builder = new SqlBuilder(filter);
+    if (term) {
+      builder.conditionIfNotEmpty('LOWER("name")', 'ILIKE', `%${term}%`);
+    }
+    const criteria = builder.criteria();
+    return await this._db.select(
+      `SELECT "id", CONCAT("id", '-', "name") as "value" FROM "${tableName}" ${criteria}`,
+      builder.values,
+    );
+  }
+
+  async pairs(query) {
+    const items = await this._db.select(
+      `SELECT "id" as "key", CONCAT("id", '-', "name") as "value" FROM "${tableName}" order by "id" asc`,
+      {},
+    );
+    return items;
+  }
+
+  async getMerchantsByTag(value: string) {
+    return await this._db.select(
+      `SELECT * FROM "${tableName}" m 
+             WHERE $1 = ANY(m."tags")`,
+      [value],
+    );
+  }
+
+  async terminalList(merchantId: string) {
+    return this._db.select(
+      `SELECT "id", "udid", "name" FROM "TERMINALS" WHERE "merchantId"=$1 order by "id" asc`,
+      [merchantId],
+    );
+  }
+
+  async updateTerminalStatus(id: string, status: number) {
+    return await this._db._update(
+      `UPDATE "TERMINALS" SET "status"=$1 WHERE "id"=$2`,
+      [status, id],
+    );
+  }
+
+  async updateDeviceStatus(udid: string, status: number) {
+    return await this._db._update(
+      `UPDATE "DEVICES" SET "status"=$1 WHERE "udid"=$2`,
+      [status, udid],
+    );
+  }
+  async getTerminal(terminalId: string) {
+    return await this._db.selectOne(`SELECT * FROM "TERMINALS" WHERE "id"=$1`, [
+      terminalId,
+    ]);
+  }
+
+  async getDevice(udid: string) {
+    return await this._db.selectOne(`SELECT * FROM "DEVICES" WHERE "udid"=$1`, [
+      udid,
+    ]);
+  }
+}

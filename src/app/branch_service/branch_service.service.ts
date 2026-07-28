@@ -1,0 +1,154 @@
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { BranchServiceDao } from './branch_service.dao';
+import { BranchServiceDto } from './branch_service.dto';
+import { AppUtils } from 'src/core/utils/app.utils';
+import { CLIENT, getDefinedKeys, mnDate, STATUS } from 'src/base/constants';
+import { PaginationDto } from 'src/common/decorator/pagination.dto';
+import { applyDefaultStatusFilter } from 'src/utils/global.service';
+import { User } from '../user/user.entity';
+import { ServiceService } from '../service/service.service';
+import { BranchService } from '../branch/branch.service';
+import { BadRequest } from 'src/common/error';
+
+@Injectable()
+export class BranchServiceService {
+  constructor(
+    private readonly dao: BranchServiceDao,
+    @Inject(forwardRef(() => ServiceService))
+    private service: ServiceService,
+    @Inject(forwardRef(() => BranchService))
+    private branchService: BranchService,
+  ) {}
+  public async create(dto: BranchServiceDto, u: User) {
+    try {
+      const service = await this.service.findOne(dto.service_id);
+      if (!service) throw new BadRequest().notFound('Үйлчилгээ');
+      const branch = await this.branchService.findOne(dto.branch_id);
+      if (!branch) throw new BadRequest().notFound('Салбар');
+      const meta = dto.meta ?? {
+        serviceName: service.name ?? '',
+        branchName: branch.name ?? '',
+        description: service.description ?? '',
+        categoryName: service.meta?.name ?? '',
+      };
+      const res = await this.dao.add({
+        id: AppUtils.uuid4(),
+        ...dto,
+        meta,
+        index: service.index,
+        created_by: u.id,
+      });
+      await this.updateServiceCountById(res.id, dto.service_count);
+      return res;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  public async updateByService(branch: string, user: User) {
+    const { items } = await this.service.findAll({}, CLIENT);
+    await Promise.all(
+      items.map(async (service) => {
+        await this.create(
+          {
+            branch_id: branch,
+            duration: service.duration,
+            max_price: service.max_price,
+            min_price: service.min_price,
+            pre: service.pre,
+            service_id: service.id,
+          },
+          user,
+        );
+      }),
+    );
+  }
+
+  public async findAll(pg: PaginationDto) {
+    const { id, status, limit, sort, skip, branch_id, service_id, order_by } =
+      pg;
+    const res = await this.dao.list({
+      limit: limit == -1 ? 100 : limit,
+      sort,
+      skip: skip ?? 0,
+      status,
+      id,
+      branch_id,
+      order_by,
+      service_id,
+    });
+
+    return res;
+  }
+
+  public async findOne(id: string) {
+    return await this.dao.getById(id);
+  }
+
+  public async findByBranchAndService(branch_id: string, service_id: string) {
+    return await this.dao.getByBranchAndService(branch_id, service_id);
+  }
+
+  public async findByBranchAndServices(branch_id: string, service_ids: string[]) {
+    return await this.dao.getByBranchAndServices(branch_id, service_ids);
+  }
+
+  public async update(id: string, dto: BranchServiceDto) {
+    const body = {
+      ...dto,
+      service_count:
+        dto.service_count == 0 || !dto.service_count ? null : dto.service_count,
+    };
+    await this.updateServiceCountById(id, body.service_count);
+    return await this.dao.update({ ...body, id, updated_at: mnDate() }, [
+      ...getDefinedKeys(body, true),
+      'updated_at',
+    ]);
+  }
+
+  public async updateServiceCountById(service_id: string, count: number) {
+    const item = await this.dao.getServicesCategoryById(service_id);
+    for (const key in item) {
+      const id = item[key].id;
+      await this.dao.update(
+        { id, service_count: count, updated_at: mnDate() },
+        ['id', 'service_count', 'updated_at'],
+      );
+    }
+  }
+  public async updateByServiceAndBranch(dto: BranchServiceDto) {
+    try {
+      const items = await this.dao.list({
+        branch_id: dto.branch_id,
+        service_id: dto.service_id,
+        status: STATUS.Active,
+      });
+      await Promise.all(
+        items.items.map(async (item) => {
+          await this.dao.update(
+            {
+              duration: dto.duration,
+              max_price: dto.max_price,
+              min_price: dto.min_price,
+              pre: dto.pre,
+              id: item.id,
+              index: dto.index,
+              updated_at: mnDate(),
+            },
+            [...getDefinedKeys(dto), 'updated_at'],
+          );
+        }),
+      );
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  public async updateStatus(id: string, status: number) {
+    return await this.dao.update({ id, status, updated_at: mnDate() }, [
+      'id',
+      'status',
+      'updated_at',
+    ]);
+  }
+}

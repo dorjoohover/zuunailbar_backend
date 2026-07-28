@@ -1,0 +1,16 @@
+export class OrderDetail {
+  public id: string;
+  public order_id: string;
+  public service_id: string;
+  public service_name: string;
+  public duration?: number;
+  public user_id: string;
+  public nickname: string;
+  public description: string;
+  public start_time: string;
+  public end_time: string;
+  public price: number;
+  public status: number;
+  public view_status?: number;
+  public created_at?: Date;
+}

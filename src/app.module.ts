@@ -1,0 +1,128 @@
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { ConfigModule } from '@nestjs/config';
+import configuration from './config/configuration';
+import databaseConfig from './config/database.config';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { AdminUserModule } from './app/admin.user/admin.user.module';
+import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/guards/jwt/jwt-auth-guard';
+import { RolesGuard } from './auth/guards/role/role.guard';
+import { AllExceptionsFilter } from './core/utils/all-exceptions.filter';
+import { PostInterceptor } from './core/utils/post.interceptor';
+import { AppDbModule } from './core/db/database.module';
+import { BranchModule } from './app/branch/branch.module';
+import { UserModule } from './app/user/user.module';
+import { ServiceModule } from './app/service/service.module';
+import { DiscountModule } from './app/discount/discount.module';
+import { CategoryModule } from './app/category/category.module';
+import { CostCategoryModule } from './app/cost_category/cost_category.module';
+import { BrandModule } from './app/brand/brand.module';
+import { ScheduleModule } from './app/schedule/schedule.module';
+import { IntegrationModule } from './app/integrations/integrations.module';
+import { ProductModule } from './app/product/product.module';
+import { OrderModule } from './app/order/order.module';
+import { OrderDetailModule } from './app/order_detail/order_detail.module';
+import { UserServiceModule } from './app/user_service/user_service.module';
+import { UserProductModule } from './app/user_product/user_product.module';
+import { CostModule } from './app/cost/cost.module';
+import { FirebaseService } from './base/firebase.service';
+import { VoucherModule } from './app/voucher/voucher.module';
+import { FileService } from './file.service';
+import { ProductTransactionModule } from './app/product_transaction/product_transaction.module';
+import { ProductLogModule } from './app/product_log/product_log.module';
+import { BookingModule } from './app/booking/booking.module';
+import { WarehouseModule } from './app/warehouse/warehouse.module';
+import { ProductWarehouseModule } from './app/product_warehouse/product_warehouse.module';
+import { HomeModule } from './app/home/home.module';
+import { ScheduleModule as CronModule } from '@nestjs/schedule';
+import { TasksService } from './task.service';
+import { FileErrorLogService } from './error-log.service';
+import { ExcelService } from './excel.service';
+import { UserSalariesModule } from './app/user_salaries/user_salaries.module';
+import { BranchServiceModule } from './app/branch_service/branch_service.module';
+import { ServiceCategoryModule } from './app/service_category/service_category.module';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { SystemLogger } from './system-logger.service';
+import { BranchLeavesModule } from './app/branch_leaves/branch_leaves.module';
+import { ArtistLeavesModule } from './app/artist_leaves/artist_leaves.module';
+import { PaymentModule } from './app/payment/payment.module';
+import { IntegrationPaymentModule } from './app/integration_payments/integration_payment.module';
+import { ResendService } from './auth/resend.service';
+import { DashboardModule } from './app/dashboard/dashboard.module';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: `.env`,
+      load: [configuration, databaseConfig],
+    }),
+    CronModule.forRoot(),
+    AppDbModule,
+    AuthModule,
+    AdminUserModule,
+    BranchModule,
+    UserModule,
+    ServiceModule,
+    DiscountModule,
+    CategoryModule,
+    CostCategoryModule,
+    BrandModule,
+    ScheduleModule,
+    IntegrationModule,
+    ProductModule,
+    OrderModule,
+    OrderDetailModule,
+    ProductTransactionModule,
+    UserServiceModule,
+    ProductLogModule,
+    BookingModule,
+    WarehouseModule,
+    ProductWarehouseModule,
+    HomeModule,
+    // .conf
+    // timezone = 'Asia/Ulaanbaatar'
+    VoucherModule,
+    CostModule,
+    UserProductModule,
+    UserSalariesModule,
+    BranchServiceModule,
+    ServiceCategoryModule,
+    BranchLeavesModule,
+    ArtistLeavesModule,
+    PaymentModule,
+    IntegrationPaymentModule,
+    DashboardModule,
+  ],
+  controllers: [AppController],
+  providers: [
+    SystemLogger,
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+    FileService,
+    FirebaseService,
+    FileErrorLogService,
+    TasksService,
+    ExcelService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: PostInterceptor,
+    },
+  ],
+})
+export class AppModule {}

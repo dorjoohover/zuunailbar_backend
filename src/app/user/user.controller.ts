@@ -1,0 +1,135 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Req,
+  Res,
+} from '@nestjs/common';
+import { UserService } from './user.service';
+import { ApiBearerAuth, ApiHeader, ApiHeaders } from '@nestjs/swagger';
+import { UserDto } from './user.dto';
+import { Manager } from 'src/auth/guards/role/role.decorator';
+import { BadRequest } from 'src/common/error';
+import { PQ, SQ } from 'src/common/decorator/use-pagination-query.decorator';
+import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
+import { Filter, Pagination } from 'src/common/decorator/pagination.decorator';
+import { ADMIN, CLIENT, MANAGER } from 'src/base/constants';
+import { SAP, SAQ } from 'src/common/decorator/use-param.decorator';
+import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { RegisterDto } from 'src/auth/auth.dto';
+import { Response } from 'express';
+
+@ApiBearerAuth('access-token')
+@Controller('user')
+@ApiHeaders([
+  {
+    name: 'merchant-id',
+    description: 'Merchant ID',
+    required: false,
+  },
+  {
+    name: 'branch-id',
+    description: 'Branch ID',
+    required: false,
+  },
+])
+export class UserController {
+  constructor(private readonly userService: UserService) {}
+
+  @Post()
+  @Manager()
+  async create(@Body() dto: UserDto, @Req() { user }) {
+    BadRequest.merchantNotFound(user?.merchant, user.user.role);
+    if (dto.role >= MANAGER && dto.role < CLIENT)
+      BadRequest.branchNotFound(user?.branch, user.user.role);
+
+    return await this.userService.create(
+      dto,
+      user.merchant.id,
+      user.user,
+      user?.branch?.id,
+    );
+  }
+
+  @Get()
+  @PQ(['role', 'user_status', 'level', 'mobile', 'branch_id'])
+  findAll(@Pagination() pg: PaginationDto, @Req() { user }) {
+    return this.userService.findAll(pg, user.user.role);
+  }
+  @Get('report')
+  @PQ(['role', 'user_status', 'level', 'mobile', 'branch_id'])
+  report(
+    @Pagination() pg: PaginationDto,
+    @Req() { user },
+    @Res() res: Response,
+  ) {
+    return this.userService.report(pg, user.user.role, res);
+  }
+  @Public()
+  @Get('client')
+  @PQ(['role'])
+  findUser(@Pagination() pg: PaginationDto) {
+    return this.userService.findAll(
+      {
+        role: 35,
+        ...pg,
+      },
+      CLIENT,
+    );
+  }
+
+  @Get('search')
+  @SQ(['id', 'limit', 'page', 'services', 'value', 'branch_id'])
+  search(@Filter() sd: SearchDto, @Req() { user }) {
+    BadRequest.merchantNotFound(user.merchant, user.user.role);
+    return this.userService.search(sd, user.merchant.id);
+  }
+  @SAP()
+  @Get('get/:id')
+  findOne(@Param('id') id: string) {
+    return this.userService.findOne(id);
+  }
+  @Get('me')
+  async findMe(@Req() { user }) {
+    const id = user.user.id;
+
+    const res = await this.findOne(id);
+    return {
+      user: res,
+      merchant: user.merchant,
+      branch: user.branch,
+    };
+  }
+  @SAP(['device'])
+  @Get('device/:device')
+  findDevice(@Param('device') device: string) {
+    return this.userService.findDevice(device);
+  }
+
+  @SAP()
+  @Patch('one/:id')
+  update(@Param('id') id: string, @Body() dto: UserDto) {
+    return this.userService.update(id, dto);
+  }
+  @SAP()
+  @Patch('status/:id')
+  updateStatus(@Param('id') id: string, @Body() dto: UserDto) {
+    if (dto.user_status)
+      return this.userService.updateUserStatus(id, dto.user_status);
+  }
+  @SAP()
+  @Patch('level/:id')
+  updateLevel(@Param('id') id: string, @Body() dto: UserDto) {
+    if (dto.level) return this.userService.updateLevel(id, dto.level);
+  }
+
+  @Delete(':id')
+  @SAP()
+  remove(@Param('id') id: string) {
+    return this.userService.updateStatus(id);
+  }
+}
