@@ -1438,6 +1438,31 @@ export class OrderService {
           },
           merchant,
         );
+        // Урьдчилгааг Qpay-ээр нэхэмжилсэн ч, карт/данс/бэлэн (үлдэгдэл)
+        // хэлбэрээр орсон дүн байвал үүнийг мөн хадгална — эс бөгөөс энэ
+        // мэдээлэл алдагдаж, дараа нь захиалга дээр 0 гэж харагддаг байсан.
+        const hasRemainingPayment =
+          dto.card_amount != null ||
+          dto.bank_amount != null ||
+          dto.cash_amount != null;
+        if (hasRemainingPayment) {
+          await this.payment.syncManualPayments({
+            merchant,
+            order_id: order,
+            created_by: user.id,
+            method: dto.method,
+            paid_amount: this.resolvePerMethodTotal(
+              dto,
+              Number(dto.paid_amount ?? 0),
+            ),
+            card_amount:
+              dto.card_amount != null ? Number(dto.card_amount) : undefined,
+            bank_amount:
+              dto.bank_amount != null ? Number(dto.bank_amount) : undefined,
+            cash_amount:
+              dto.cash_amount != null ? Number(dto.cash_amount) : undefined,
+          });
+        }
         return {
           id: order,
           invoice: {

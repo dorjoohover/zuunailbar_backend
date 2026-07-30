@@ -347,7 +347,7 @@ export class OrderController {
 
     return res;
   }
-  @Employee()
+  // @Employee()
   @Patch('status/:id/:status')
   updateStatus(
     @Param('id') id: string,
