@@ -110,6 +110,7 @@ export class ScheduleDao {
         AND "schedule_status" = $2
         AND "date" < $3::date
         AND "date" >= $3::date - ($4 * 7)
+        AND "index" = ((EXTRACT(DOW FROM $3::date)::int + 6) % 7)
       ORDER BY "date" DESC
       LIMIT 1
       `,
