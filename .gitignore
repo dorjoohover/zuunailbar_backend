@@ -4,7 +4,6 @@
 /test
 /db
 docker-compose.yml
-package-lock.json
 /dist
 /node_modules
 /build
