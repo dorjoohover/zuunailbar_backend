@@ -1275,6 +1275,8 @@ export class OrderService {
         }
         const service = serviceMap.get(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
+        console.log(detail.user_id, detail.service_id, dto.branch_id)
+        // 16d9800abcf84ffabc2e90ffde711c8e 4063e7f1f16e41c8bacf094ac38ab557 799defb4cfe7412baab0605d7146e634
         const isAssignedToBranch = await this.userService.hasActiveAssignment({
           user_id: detail.user_id,
           service_id: detail.service_id,
@@ -2679,8 +2681,8 @@ export class OrderService {
         const productTx = productTxExpense.get(k) ?? 0;
         // Зардал = costs (хэрэглээний зардал) + product_transactions (бүтээгдэхүүний хэрэглээ)
         const expense = cost + productTx;
-        // Profit-аас зардлыг (cost + productTx) ХАСАХГҮЙ — зөвхөн цалинг хасна.
-        const profit = b.revenue - b.salary;
+        // Ашиг = орлого - цалин - зардал (cost + productTx хоёуланг нь хасна).
+        const profit = b.revenue - b.salary - expense;
         await this.dashboardService.upsertSnapshot({
           date,
           branch_id: branchId,

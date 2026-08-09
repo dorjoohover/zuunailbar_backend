@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ScheduleService } from './schedule.service';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
-import { ScheduleDto, ScheduleWeekDto } from './schedule.dto';
+import { ScheduleDto, ScheduleWeekDto, SetLeaveDto } from './schedule.dto';
 import { Admin, Employee, Manager } from 'src/auth/guards/role/role.decorator';
 import { BadRequest } from 'src/common/error';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
@@ -98,10 +98,7 @@ export class ScheduleController {
 
   @Employee()
   @Get('week/:user/:weekStart')
-  getWeek(
-    @Param('user') user: string,
-    @Param('weekStart') weekStart: string,
-  ) {
+  getWeek(@Param('user') user: string, @Param('weekStart') weekStart: string) {
     return this.scheduleService.getWeek(user, weekStart);
   }
 
@@ -130,5 +127,37 @@ export class ScheduleController {
   @Delete('date/:user/:date')
   deleteByDate(@Param('user') user: string, @Param('date') date: string) {
     return this.scheduleService.removeByDate(user, date);
+  }
+
+  /**
+   * Тусдаа "Ажилтны амралт" хуудасны зориулалттай жагсаалт (хуучин `GET
+   * /artist_leaves`-ийн оронд).
+   */
+  @Admin()
+  @Get('leave')
+  @PQ(['user_id', 'date', 'date_from', 'date_to'])
+  findLeaves(@Pagination() pg: PaginationDto) {
+    return this.scheduleService.findLeaves(pg);
+  }
+
+  /**
+   * Артистад нэг эсвэл хэд хэдэн өдөр амралт тавина (хуучин `POST
+   * /artist_leaves`-ийн оронд). Хадгалсан даруйд availability window шууд
+   * дахин тооцоологдоно — тусад нь "generate" дуудах шаардлагагүй.
+   */
+  @Employee()
+  @Post('leave')
+  setLeave(@Body() dto: SetLeaveDto, @Req() { user }) {
+    return this.scheduleService.setLeave(dto, user.user.id);
+  }
+
+  @SAP()
+  @Delete('leave/:user/:date')
+  clearLeave(
+    @Param('user') user: string,
+    @Param('date') date: string,
+    @Req() { user: reqUser },
+  ) {
+    return this.scheduleService.clearLeave(user, [date], reqUser.user.id);
   }
 }

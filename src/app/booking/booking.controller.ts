@@ -10,14 +10,13 @@ import {
 } from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
-import { BookingDto } from './booking.dto';
+import { BookingDto, BookingWeekDto, SetBranchLeaveDto } from './booking.dto';
 import { Admin } from 'src/auth/guards/role/role.decorator';
 import { BadRequest } from 'src/common/error';
-import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { PQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
-import { ADMIN, ADMINUSERS, CLIENT, ScheduleStatus } from 'src/base/constants';
+import { ADMIN, ADMINUSERS } from 'src/base/constants';
 import { SAP } from 'src/common/decorator/use-param.decorator';
 @ApiBearerAuth('access-token')
 @ApiHeader({
@@ -35,6 +34,7 @@ export class BookingController {
   private static clientFields = [
     'branch_id',
     'index',
+    'date',
     'start_time',
     'end_time',
     'users',
@@ -43,9 +43,11 @@ export class BookingController {
     'user_id',
     'end_time',
     'index',
+    'date',
     'start_time',
     'booking_status',
     'status',
+    'is_generated',
   ];
   @Admin()
   @Post()
@@ -67,6 +69,68 @@ export class BookingController {
     return this.bookingService.findOne(id);
   }
 
+  /**
+   * Салбарт бүтэн долоо хоногийн (эсвэл дурын хэдэн өдрийн) цагийг нэг дор
+   * тавина. Хоосон үлдсэн ирээдүйн долоо хоногууд автоматаар өмнөх долоо
+   * хоногоос хуулагдана (ensureAvailabilityWindow).
+   */
+  @Admin()
+  @Post('week')
+  setWeek(@Body() dto: BookingWeekDto, @Req() { user }) {
+    return this.bookingService.setWeek(dto, user.user.id, user.merchant?.id);
+  }
+
+  @Admin()
+  @Get('week/:branch/:weekStart')
+  getWeek(
+    @Param('branch') branch: string,
+    @Param('weekStart') weekStart: string,
+  ) {
+    return this.bookingService.getWeek(branch, weekStart);
+  }
+
+  /**
+   * app_config.availability_days цонхыг гар аргаар шинэчлэх. Үгүй бол шөнө
+   * дундын cron (TasksService) үүнийг өдөр бүр автоматаар хийнэ.
+   */
+  @Admin()
+  @Post('generate')
+  generate() {
+    return this.bookingService.ensureAvailabilityWindow();
+  }
+
+  /**
+   * Тусдаа "Салбарын амралт" хуудасны зориулалттай жагсаалт (хуучин `GET
+   * /branch_leaves`-ийн оронд).
+   */
+  @Admin()
+  @Get('leave')
+  @PQ(['branch_id', 'date', 'date_from', 'date_to'])
+  findLeaves(@Pagination() pg: PaginationDto) {
+    return this.bookingService.findLeaves(pg);
+  }
+
+  /**
+   * Салбарт нэг эсвэл хэд хэдэн өдөр амралт (хаалттай өдөр) тавина (хуучин
+   * `POST /branch_leaves`-ийн оронд). Хадгалсан даруйд availability window
+   * шууд дахин тооцоологдоно.
+   */
+  @Admin()
+  @Post('leave')
+  setLeave(@Body() dto: SetBranchLeaveDto, @Req() { user }) {
+    return this.bookingService.setLeave(dto, user.user.id);
+  }
+
+  @Admin()
+  @Delete('leave/:branch/:date')
+  clearLeave(
+    @Param('branch') branch: string,
+    @Param('date') date: string,
+    @Req() { user },
+  ) {
+    return this.bookingService.clearLeave(branch, [date], user.user.id);
+  }
+
   @SAP()
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: BookingDto, @Req() { user }) {
@@ -78,6 +142,7 @@ export class BookingController {
     });
   }
 
+  /** Legacy: индекс (0-6) дээр суурилсан бүх мөрийг устгана. */
   @SAP()
   @Delete('index/:branch/:index')
   deleteByIndex(
@@ -85,5 +150,11 @@ export class BookingController {
     @Param('index') index: number,
   ) {
     return this.bookingService.removeByIndex(branch, index);
+  }
+
+  @SAP()
+  @Delete('date/:branch/:date')
+  deleteByDate(@Param('branch') branch: string, @Param('date') date: string) {
+    return this.bookingService.removeByDate(branch, date);
   }
 }

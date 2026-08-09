@@ -18,7 +18,7 @@ import {
 } from 'src/base/constants';
 import { BadRequest, NoPermissionException } from 'src/common/error';
 import { User } from './user.entity';
-import { MobileFormat, MobileParser } from 'src/common/formatter';
+import { MobileFormat, MobileParser, sanitizeName } from 'src/common/formatter';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import * as bcrypt from 'bcrypt';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
@@ -78,12 +78,12 @@ export class UserService {
       level: dto.level ?? null,
       mail: dto.mail ?? null,
       percent: dto.percent,
-      firstname: dto.firstname ?? '',
+      firstname: sanitizeName(dto.firstname) ?? '',
       device: dto.device ?? null,
       description: dto.description ?? null,
       experience: dto.experience ?? null,
-      lastname: dto.lastname ?? '',
-      nickname: dto.nickname ?? '',
+      lastname: sanitizeName(dto.lastname) ?? '',
+      nickname: sanitizeName(dto.nickname) ?? '',
       profile_img: dto.profile_img ?? '',
       role: dto.role ?? CLIENT,
     });
@@ -297,6 +297,15 @@ export class UserService {
       body.id = id;
       if (typeof body.password === 'string') {
         body.password = body.password.trim();
+      }
+      if (typeof body.nickname === 'string') {
+        body.nickname = sanitizeName(body.nickname);
+      }
+      if (typeof body.firstname === 'string') {
+        body.firstname = sanitizeName(body.firstname);
+      }
+      if (typeof body.lastname === 'string') {
+        body.lastname = sanitizeName(body.lastname);
       }
       if (body.password) {
         body.password = await bcrypt.hash(body.password, saltOrRounds);

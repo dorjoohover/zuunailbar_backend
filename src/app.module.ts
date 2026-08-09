@@ -44,8 +44,6 @@ import { BranchServiceModule } from './app/branch_service/branch_service.module'
 import { ServiceCategoryModule } from './app/service_category/service_category.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { SystemLogger } from './system-logger.service';
-import { BranchLeavesModule } from './app/branch_leaves/branch_leaves.module';
-import { ArtistLeavesModule } from './app/artist_leaves/artist_leaves.module';
 import { PaymentModule } from './app/payment/payment.module';
 import { IntegrationPaymentModule } from './app/integration_payments/integration_payment.module';
 import { ResendService } from './auth/resend.service';
@@ -89,8 +87,6 @@ import { DashboardModule } from './app/dashboard/dashboard.module';
     UserSalariesModule,
     BranchServiceModule,
     ServiceCategoryModule,
-    BranchLeavesModule,
-    ArtistLeavesModule,
     PaymentModule,
     IntegrationPaymentModule,
     DashboardModule,

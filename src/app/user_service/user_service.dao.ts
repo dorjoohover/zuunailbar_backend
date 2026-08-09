@@ -95,8 +95,17 @@ export class UserServiceDao {
     service_id: string;
     branch_id: string;
   }) {
-    const { user_id, service_id, branch_id } = input;
+    const { user_id, service_id } = input;
 
+    // ЗОРИУДААР us.branch_id-аар ШҮҮХГҮЙ: user_service.branch_id хуучирдаг
+    // (дээрх getByServices/getByServicesAll/getArtistServiceMap-д тайлбарласантай
+    // ижил шалтгаан). Захиалга үүсгэх үед энэ функц "артист энэ салбарт энэ
+    // үйлчилгээг үзүүлж чадах уу" гэдгийг эцсийн шатанд шалгадаг тул
+    // branch_id-аар шүүвэл артист өөр салбар руу шилжсэн ч захиалга
+    // баталгаажуулах үед "боломжгүй" гэсэн буруу алдаа өгдөг байсан —
+    // артист захиалгын жагсаалтад гарч ирсэн ч захиалга үүсгэхэд амжилтгүй
+    // болдог шалтгаан нь энэ байв. Салбарын бодит хязгаарлалтыг тухайн
+    // үед аль хэдийн getSlots()/availability_service_slots шалгасан байдаг.
     const item = await this._db.selectOne(
       `
     SELECT 1
@@ -104,12 +113,11 @@ export class UserServiceDao {
     INNER JOIN users u ON u.id = us.user_id
     WHERE us.user_id = $1
       AND us.service_id = $2
-      AND us.branch_id = $3
-      AND us.status = $4
-      AND u.user_status = $5
+      AND us.status = $3
+      AND u.user_status = $4
     LIMIT 1
     `,
-      [user_id, service_id, branch_id, STATUS.Active, UserStatus.Active],
+      [user_id, service_id, STATUS.Active, UserStatus.Active],
     );
 
     return !!item;
@@ -142,19 +150,32 @@ export class UserServiceDao {
   //   );
   // }
 
+  // ЗОРИУДААР us.branch_id-аар ШҮҮХГҮЙ (доорх 3 функц): user_service.branch_id
+  // нь артистыг үйлчилгээнд холбосон үеийн "нүүр" салбарыг л хадгалдаг
+  // тогтмол (stale) утга — schedules-ийн өдөр тутмын Салбар override-той
+  // sync хийгддэггүй. Эдгээр функцууд order.service.ts-ийн getSlots()
+  // (боломжит цаг харуулах "цагаар захиалах" урсгал)-д "энэ салбар/
+  // үйлчилгээнд ямар артистуудыг шалгах вэ" гэдгийг тодорхойлдог pre-filter
+  // тул branch_id-аар энд шүүвэл тухайн өдөр өөр салбар руу шилжсэн
+  // артистыг слот тооцооллоос бүр мөсөн хасчихдаг байсан (getServiceArtists()
+  // дэх ижил төстэй алдааг өмнө нь зассан ч эдгээр 3 функц мартагдсан байв).
+  // Салбар/огнооны бодит хязгаарлалтыг getSlotsUnified() → availability_
+  // service_slots view (schedules.branch_id-г COALESCE-ээр зөв тооцдог) аль
+  // хэдийн хийдэг тул энд зөвхөн "энэ артист энэ үйлчилгээг хийдэг эсэх"-ийг
+  // шалгахад хангалттай.
   async getByServices(input: { services: string[]; u?: string; branch_id }) {
-    const { services, branch_id, u } = input;
+    const { services, u } = input;
     const user = u || '';
     return await this._db.select(
       `
     SELECT user_id
     FROM "${tableName}" us
-    inner join users u on u.id = us.user_id 
-    WHERE us.status = $1 
-      AND service_id = ANY($2) and us.branch_id = $3 and u.user_status = $4
+    inner join users u on u.id = us.user_id
+    WHERE us.status = $1
+      AND service_id = ANY($2) and u.user_status = $3
       group by user_id
     `,
-      [STATUS.Active, services, branch_id, UserStatus.Active],
+      [STATUS.Active, services, UserStatus.Active],
     );
   }
   async getByServicesAll(input: {
@@ -162,33 +183,32 @@ export class UserServiceDao {
     u?: string;
     branch_id: string;
   }) {
-    const { services, u, branch_id } = input;
+    const { services, u } = input;
     return await this._db.select(
       `
     SELECT user_id
     FROM "${tableName}" us
-        inner join users u on u.id = us.user_id 
+        inner join users u on u.id = us.user_id
     WHERE us.status = $1
-      AND service_id = ANY($2) and us.branch_id = $3 and u.user_status = $4
+      AND service_id = ANY($2) and u.user_status = $3
     GROUP BY user_id
-    HAVING COUNT(DISTINCT service_id) = $5
+    HAVING COUNT(DISTINCT service_id) = $4
     `,
-      [STATUS.Active, services, branch_id, UserStatus.Active, services.length],
+      [STATUS.Active, services, UserStatus.Active, services.length],
     );
   }
 
   async getArtistServiceMap(input: { services: string[]; branch_id: string }): Promise<{ user_id: string; service_id: string }[]> {
-    const { services, branch_id } = input;
+    const { services } = input;
     return await this._db.select(
       `SELECT us.user_id, us.service_id
        FROM "${tableName}" us
        JOIN users u ON u.id = us.user_id
        WHERE us.status = $1
          AND us.service_id = ANY($2)
-         AND us.branch_id = $3
-         AND u.user_status = $4
-         AND u.status = $4`,
-      [STATUS.Active, services, branch_id, UserStatus.Active],
+         AND u.user_status = $3
+         AND u.status = $3`,
+      [STATUS.Active, services, UserStatus.Active],
     );
   }
 

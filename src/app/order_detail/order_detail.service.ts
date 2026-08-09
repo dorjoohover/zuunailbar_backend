@@ -11,12 +11,21 @@ import {
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { UserService } from '../user/user.service';
+import { ExcelService } from 'src/excel.service';
+import { Response } from 'express';
+
+const PAYMENT_TYPE_LABELS: Record<string, string> = {
+  BANK: 'Дансаар',
+  CARD: 'Карт',
+  CASH: 'Бэлэн',
+};
 
 @Injectable()
 export class OrderDetailService {
   constructor(
     private readonly dao: OrderDetailDao,
     private user: UserService,
+    private readonly excel: ExcelService,
   ) {}
   public async create(dto: OrderDetailDto) {
     return await this.dao.add({
@@ -82,5 +91,67 @@ export class OrderDetailService {
   }
   public async deleteTx(client: any, id: string) {
     return await this.dao.deleteTx(client, id);
+  }
+
+  // Артистын цалингийн "Нэгтгэлийн захиалгын задрал" popup дотор шууд Excel
+  // татах боломж хэрэгтэй байсан (өмнө нь зөвхөн нэгтгэлийн жагсаалт
+  // түвшинд export байсан). Энэ endpoint нь admin-ий тухайн popup-той яг
+  // ижил шүүлтүүрээр (user_id, from, to) захиалгын мөр бүрийг татаж, adnin
+  // frontend дэх "Нэгтгэлийн захиалгын задрал" хүснэгттэй тохирсон
+  // баганатай xlsx үүсгэнэ.
+  public async report(
+    filter: { user_id?: string; from?: string; to?: string },
+    res: Response,
+  ) {
+    const { items } = await this.dao.list({
+      user_id: filter.user_id,
+      from: filter.from,
+      to: filter.to,
+      limit: 5000,
+      skip: 0,
+      sort: false,
+    });
+
+    const rows = (items ?? []).map((item: any) => {
+      const parts = [
+        item.service_name,
+        item.start_time && item.end_time
+          ? `${String(item.start_time).slice(0, 5)} - ${String(item.end_time).slice(0, 5)}`
+          : undefined,
+        item.description,
+      ].filter(Boolean);
+
+      return {
+        artist_name: item.artist_names ?? '',
+        order_date: item.order_date ? new Date(item.order_date) : '',
+        detail_info: parts.join(' / '),
+        pre_amount: Number(item.pre_amount ?? 0),
+        paid_label:
+          PAYMENT_TYPE_LABELS[String(item.transaction_type ?? '').toUpperCase()] ??
+          'Дансаар',
+        paid_amount: Number(item.paid_amount ?? 0),
+        total_amount: Number(item.order_total_amount ?? item.price ?? 0),
+      };
+    });
+
+    return this.excel.xlsxFromIterable(
+      res,
+      'salary_order_breakdown',
+      [
+        { header: 'Артист', key: 'artist_name', width: 22 },
+        { header: 'Огноо', key: 'order_date', width: 14 },
+        { header: 'Захиалгын мэдээлэл', key: 'detail_info', width: 44 },
+        { header: 'Урьдчилгаа', key: 'pre_amount', width: 16 },
+        { header: 'Төлбөрийн хэлбэр', key: 'paid_label', width: 18 },
+        { header: 'Үлдэгдэл төлбөр', key: 'paid_amount', width: 16 },
+        { header: 'Дүн', key: 'total_amount', width: 16 },
+      ] as any,
+      rows as any,
+      {
+        sheetName: 'Задаргаа',
+        dateKeys: ['order_date'],
+        moneyKeys: ['pre_amount', 'paid_amount', 'total_amount'],
+      },
+    );
   }
 }

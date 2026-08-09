@@ -1,6 +1,12 @@
-import { forwardRef, HttpException, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  forwardRef,
+  HttpException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ScheduleDao } from './schedule.dao';
-import { ScheduleDto, ScheduleWeekDto } from './schedule.dto';
+import { ScheduleDto, ScheduleWeekDto, SetLeaveDto } from './schedule.dto';
 import { AppUtils } from 'src/core/utils/app.utils';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
@@ -54,7 +60,7 @@ export class ScheduleService {
 
     if (finish <= lastStart) {
       throw new HttpException(
-        'Тарах цаг нь сүүлийн авах цагаас хойш байх ёстой.',
+        'Дуусах цаг нь сүүлийн авах цагаас хойш байх ёстой.',
         400,
       );
     }
@@ -68,7 +74,13 @@ export class ScheduleService {
    * гараар өөрчилсөн) эх сурвалж мөр.
    */
   private async upsertDay(
-    artist: { id: string; branch_id: string; mobile: string; nickname: string; color: number },
+    artist: {
+      id: string;
+      branch_id: string;
+      mobile: string;
+      nickname: string;
+      color: number;
+    },
     input: {
       date: string;
       times: string[];
@@ -87,7 +99,10 @@ export class ScheduleService {
     }
 
     const { times, start_time, end_time } = slotRangeToTimes(input.times);
-    const finish_time = this.normalizeFinishTime(input.times, input.finish_time);
+    const finish_time = this.normalizeFinishTime(
+      input.times,
+      input.finish_time,
+    );
     const meta = {
       mobile: artist.mobile,
       nickname: artist.nickname,
@@ -255,6 +270,10 @@ export class ScheduleService {
   public async findAll(pg: PaginationDto, role: number) {
     return await this.dao.list(applyDefaultStatusFilter(pg, role));
   }
+  /** Тусдаа "Ажилтны амралт" хуудасны зориулалттай жагсаалт. */
+  public async findLeaves(pg: PaginationDto) {
+    return await this.dao.listLeaves(pg as any);
+  }
   public async list(filter: ScheduleListType) {
     return await this.dao.list(filter);
   }
@@ -316,25 +335,171 @@ export class ScheduleService {
     // Энэ мөрийг гараар өөрчилсөн тул цаашдын автомат үргэлжлэлийг цэвэрлээд
     // дахин generate хийлгэнэ.
     if (schedule.date) {
-      await this.dao.deleteGeneratedFrom(schedule.user_id, toYMD(schedule.date));
+      await this.dao.deleteGeneratedFrom(
+        schedule.user_id,
+        toYMD(schedule.date),
+      );
       await this.ensureAvailabilityWindow();
     }
     return res;
   }
 
+  /**
+   * Тухайн өдрийн хуваарийг цэвэрлэнэ ("амарна" гэсэн санаатай тул мөрийг
+   * бүрмөсөн УСТГАХГҮЙ, харин цагийг нь хоослоно).
+   *
+   * Шалтгаан: ensureAvailabilityWindow() нь `today..targetEnd` цонхонд огноо
+   * бүрд идэвхтэй мөр байгаа эсэхийг л шалгадаг (listDatesInRange) — мөр
+   * байхгүй бол өмнөх ижил гарагийн сүүлийн хуваарийг (хүртэл 8 долоо хоног
+   * хойш) автоматаар хуулж, is_generated=true болгож дахин үүсгэдэг. Хэрэв
+   * энд мөрийг бүр мөсөн устгачихвал энэ огноо дахин "тохируулаагүй" мэт
+   * харагдаж, дараагийн generation (шөнө дундын cron, эсвэл өөр өдөр
+   * засварлахад дуудагддаг ensureAvailabilityWindow()) үүнийг өмнөх түүхэн
+   * гарагаас дахин AUTO-FILL хийчихдэг байсан — ингэснээр admin санаатай
+   * "амарна" гэж цэвэрлэсэн өдөр цаг хугацааны дараа дахин захиалгад
+   * боломжтой болж (phantom slot) гардаг байсан нь энэ функцын жинхэнэ bug.
+   *
+   * Одоо: мөрийг хадгалж, зөвхөн цагийг нь null болгоно (`is_generated=false`,
+   * `times=null`) — ингэснээр listDatesInRange энэ огноог "аль хэдийн
+   * тохируулсан" гэж тооцож, ensureAvailabilityWindow цаашид дахин хэзээ ч
+   * үүнийг дарж бичихгүй. `availability_slots` VIEW нь `times`-г
+   * `string_to_array` + `unnest`-ээр задалдаг тул NULL/хоосон утга үед 0 мөр
+   * буцаана — өөрөөр хэлбэл захиалгад боломжгүй хэвээр байна.
+   */
   public async removeByDate(user_id: string, date: string) {
     const schedules = await this.dao.list({
       date,
       user_id,
     });
-    await Promise.all(
-      (schedules?.items ?? []).map(async (schedule) => {
-        await this.dao.deleteSchedule(schedule.id);
-      }),
-    );
-    const branchId = schedules?.items?.[0]?.branch_id;
+    const existing = schedules?.items?.[0];
+    let branchId = existing?.branch_id;
+
+    if (existing) {
+      await this.dao.update(
+        {
+          id: existing.id,
+          times: null,
+          start_time: null,
+          end_time: null,
+          finish_time: null,
+          is_generated: false,
+          source_schedule_id: null,
+        },
+        [
+          'times',
+          'start_time',
+          'end_time',
+          'finish_time',
+          'is_generated',
+          'source_schedule_id',
+        ],
+      );
+    } else {
+      // Локал admin state дээр мөр байгаа мэт харагдсан ч сервер дээр
+      // (жишээ нь өөр таб/хэрэглэгч аль хэдийн устгасан) байхгүй байж
+      // болзошгүй тул ижил "амарна" tombstone-г шинээр үүсгэнэ.
+      const artist = await this.userService.findOne(user_id);
+      if (artist) {
+        branchId = (artist as any).branch_id;
+        await this.dao.add({
+          id: AppUtils.uuid4(),
+          user_id,
+          approved_by: user_id,
+          schedule_status: ScheduleStatus.Active,
+          date,
+          index: weekdayIndex(date),
+          times: null,
+          start_time: null,
+          end_time: null,
+          finish_time: null,
+          branch_id: (artist as any).branch_id,
+          is_generated: false,
+          source_schedule_id: null,
+          meta: {
+            mobile: (artist as any).mobile,
+            nickname: (artist as any).nickname,
+            color: (artist as any).color,
+          },
+        } as any);
+      }
+    }
+
     if (branchId) {
       this.orderService.invalidateSlotsCache(branchId);
     }
+  }
+
+  /**
+   * Артистад нэг эсвэл хэд хэдэн өдөр амралт тавина (хуучин `artist_leaves`
+   * POST /artist_leaves-ийн оронд). Аль хэдийн `times`-тэй мөр байвал цагийг
+   * нь хэвээр үлдээгээд зөвхөн leave талбаруудыг бичнэ — `availability_slots`
+   * view `leave_status IS NULL`-аар шүүдэг тул амралтыг цуцлахад цаг
+   * дахин тохируулах шаардлагагүй болно. Мөр огт байхгүй бол цаггүй
+   * ("tombstone") мөр шинээр үүсгэнэ.
+   */
+  public async setLeave(dto: SetLeaveDto, approvedBy: string) {
+    if (!dto.dates?.length) {
+      throw new HttpException('Дор хаяж нэг огноо өгнө үү.', 400);
+    }
+    const artist = await this.userService.findOne(dto.user_id);
+    if (!artist) {
+      throw new HttpException('Артист олдсонгүй.', 400);
+    }
+
+    const results: string[] = [];
+    for (const date of dto.dates) {
+      const existing = await this.dao.findOne(dto.user_id, date);
+      if (existing) {
+        await this.dao.update(
+          {
+            id: existing.id,
+            leave_status: dto.leave_status ?? null,
+            leave_description: dto.description ?? null,
+          },
+          ['leave_status', 'leave_description'],
+        );
+        results.push(existing.id);
+      } else {
+        const id = AppUtils.uuid4();
+        await this.dao.add({
+          id,
+          user_id: dto.user_id,
+          approved_by: approvedBy,
+          schedule_status: ScheduleStatus.Active,
+          date,
+          index: weekdayIndex(date),
+          times: null,
+          branch_id: (artist as any).branch_id,
+          is_generated: false,
+          source_schedule_id: null,
+          leave_status: dto.leave_status ?? null,
+          leave_description: dto.description ?? null,
+          meta: {
+            mobile: (artist as any).mobile,
+            nickname: (artist as any).nickname,
+            color: (artist as any).color,
+          },
+        } as any);
+        results.push(id);
+      }
+    }
+
+    const branchId = (artist as any).branch_id;
+    if (branchId) {
+      this.orderService.invalidateSlotsCache(branchId);
+    }
+    // Амралт тавьсан/цуцалсан даруйд шууд effect авахуулна — тусад нь
+    // "Автоматаар үргэлжлүүлэх" товч дарах шаардлагагүй.
+    await this.ensureAvailabilityWindow();
+    return results;
+  }
+
+  /** Тавьсан амралтыг цуцална (leave талбаруудыг NULL болгоно). */
+  public async clearLeave(
+    user_id: string,
+    dates: string[],
+    approvedBy: string,
+  ) {
+    return this.setLeave({ user_id, dates, leave_status: null }, approvedBy);
   }
 }

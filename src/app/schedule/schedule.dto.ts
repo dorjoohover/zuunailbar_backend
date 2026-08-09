@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsDateString, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ScheduleType } from 'src/base/constants';
 
@@ -72,4 +78,30 @@ export class ScheduleWeekDto {
   @ValidateNested({ each: true })
   @Type(() => ScheduleDayInputDto)
   days: ScheduleDayInputDto[];
+}
+
+/**
+ * Артистад нэг эсвэл хэд хэдэн өдөр амралт тавих/цуцлах (хуучин
+ * `artist_leaves` API-ийн оронд). `leave_status`-г өгөхгүй (null) бол
+ * тухайн өдрүүдийн амралтыг цуцална.
+ */
+export class SetLeaveDto {
+  @ApiProperty()
+  user_id: string;
+
+  @ApiProperty({ isArray: true, example: ['2026-08-10', '2026-08-11'] })
+  @IsArray()
+  dates: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'EmployeeStatus enum утга (жишээ 20=DEKIRIT, 30=VACATION). Өгөхгүй/null бол амралт цуцлагдана.',
+  })
+  @IsOptional()
+  leave_status?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string | null;
 }

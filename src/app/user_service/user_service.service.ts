@@ -148,8 +148,22 @@ export class UserServiceService {
   }
 
   private async getServiceArtists(input: any) {
-    const { services, branch_id } = input;
+    const { services } = input;
 
+    // ЗОРИУДААР branch_id-аар ШҮҮХГҮЙ: user_service.branch_id нь артистыг
+    // үйлчилгээнд холбосон үеийн "нүүр" салбарыг л хадгалдаг, суурин утга.
+    // Одоо schedule нь өдөр тутам өөр салбар руу шилжиж болдог болсон
+    // (schedule.table.column.tsx-ийн "Салбар" сонголт, ScheduleService
+    // upsertDay() дэх branch_id override) — тэгэхэд user_service.branch_id
+    // шинэчлэгддэггүй тул артист шинэ салбартаа боломжит цагтай байсан ч
+    // энд хуучин салбараар шүүгдээд алга болдог байсан (жишээ: "цагаар"
+    // захиалахад артист жагсаалтад гарахгүй байх алдаа).
+    //
+    // Салбар + огнооны бодит хязгаарлалтыг дуудагч тал (web/admin-ий
+    // getArtists()/getSuitableArtists()) аль хэдийн availability slots-оор
+    // (schedules.branch_id-аас шууд гарган авсан, үргэлж шинэ) давхар
+    // шүүдэг тул энд зөвхөн "энэ артист энэ үйлчилгээг хийдэг эсэх"-ийг
+    // (branch-аас үл хамааран) шалгахад хангалттай.
     const mapping: Record<string, string[]> = {};
     const uniqueServices: string[] = Array.from(
       new Set((services ?? []).filter((service): service is string => !!service)),
@@ -157,7 +171,6 @@ export class UserServiceService {
 
     for (const serviceId of uniqueServices) {
       const { items } = await this.dao.list({
-        branch_id,
         service_id: serviceId,
         status: STATUS.Active,
         limit: -1,

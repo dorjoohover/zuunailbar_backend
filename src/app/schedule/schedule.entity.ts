@@ -24,6 +24,13 @@ export class Schedule {
   public is_generated?: boolean;
   /** is_generated=true үед хуулбарласан эх мөрийн id (lineage/дебаг). */
   public source_schedule_id?: string | null;
+  /**
+   * NULL = амралтгүй. Утгатай бол EmployeeStatus enum-тэй ижил (жишээ нь
+   * VACATION/DEKIRIT) — тухайн (user_id, date) өдөр артист амарна гэсэн үг.
+   * `availability_slots` view энэ талбар NULL биш мөрийг хасдаг.
+   */
+  public leave_status?: number | null;
+  public leave_description?: string | null;
   public created_at?: Date;
   public updated_at?: Date;
   public meta?: ScheduleUserMeta;

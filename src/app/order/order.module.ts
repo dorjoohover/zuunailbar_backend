@@ -21,6 +21,7 @@ import { DashboardModule } from '../dashboard/dashboard.module';
 import { CostModule } from '../cost/cost.module';
 import { ProductLogModule } from '../product_log/product_log.module';
 import { ProductTransactionModule } from '../product_transaction/product_transaction.module';
+import { BranchModule } from '../branch/branch.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ProductTransactionModule } from '../product_transaction/product_transac
     CostModule,
     ProductLogModule,
     ProductTransactionModule,
+    forwardRef(() => BranchModule),
   ],
   controllers: [OrderController],
   providers: [

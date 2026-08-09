@@ -48,6 +48,8 @@ export class ScheduleDao {
         'schedule_status',
         'is_generated',
         'source_schedule_id',
+        'leave_status',
+        'leave_description',
       ]);
     } catch (error) {
       this.rethrowSchemaError(error);
@@ -95,13 +97,12 @@ export class ScheduleDao {
 
   /**
    * `date`-с өмнөх хамгийн сүүлийн идэвхтэй мөрийг олно — 7 хоногийн залгаа
-   * олдохгүй бол цааш (`maxLookbackWeeks` хүртэл) хайна.
+   * олдохгүй бол цааш (`maxLookbackWeeks` хүртэл) хайна. Амарсан
+   * (`leave_status IS NOT NULL`) мөрийг эх сурвалж болгож авахгүй — амралт
+   * тухайн долоо хоногт л хамаарах нэг удаагийн үйл явдал тул дараагийн
+   * долоо хоногт автоматаар давтагдах ёсгүй.
    */
-  async findSourceForDate(
-    user_id: string,
-    date: string,
-    maxLookbackWeeks = 8,
-  ) {
+  async findSourceForDate(user_id: string, date: string, maxLookbackWeeks = 8) {
     return await this._db.selectOne(
       `
       SELECT *
@@ -111,6 +112,7 @@ export class ScheduleDao {
         AND "date" < $3::date
         AND "date" >= $3::date - ($4 * 7)
         AND "index" = ((EXTRACT(DOW FROM $3::date)::int + 6) % 7)
+        AND "leave_status" IS NULL
       ORDER BY "date" DESC
       LIMIT 1
       `,
@@ -127,9 +129,7 @@ export class ScheduleDao {
       [user_id, ScheduleStatus.Active, from, to],
     );
     return new Set(
-      (rows ?? []).map((r: any) =>
-        new Date(r.date).toISOString().slice(0, 10),
-      ),
+      (rows ?? []).map((r: any) => new Date(r.date).toISOString().slice(0, 10)),
     );
   }
 
@@ -250,5 +250,50 @@ export class ScheduleDao {
     );
     const value = Number(row?.value);
     return Number.isFinite(value) && value > 0 ? value : 30;
+  }
+
+  /**
+   * Амралттай (`leave_status IS NOT NULL`) мөрүүдийг жагсаана — тусдаа
+   * "Ажилтны амралт" хуудасны зориулалттай (хуучин `artist_leaves`-ийн
+   * оронд). Тавьсан хэрэглэгчийн нэрийг `users`-с join хийж авна.
+   */
+  async listLeaves(query: {
+    user_id?: string;
+    date?: string;
+    date_from?: string;
+    date_to?: string;
+    limit?: number;
+    skip?: number;
+    sort?: string;
+  }) {
+    const builder = new SqlBuilder(query);
+    const criteria = builder
+      .conditionIsNotNull('s.leave_status')
+      .conditionIfNotEmpty('s.user_id', '=', query.user_id)
+      .conditionIfNotEmpty('s.date', '=', query.date);
+    if (query.date_from || query.date_to) {
+      builder.conditionIfDateBetweenValues(
+        query.date_from,
+        query.date_to,
+        's.date',
+      );
+    }
+    const finalCriteria = criteria.criteria();
+    const sql = `
+      SELECT s.*,
+        creator.nickname AS creator_nickname,
+        creator.firstname AS creator_firstname,
+        creator.lastname AS creator_lastname
+      FROM "${tableName}" s
+      LEFT JOIN "users" creator ON creator.id::text = s.approved_by::text
+      ${finalCriteria}
+      ORDER BY s.date ${query.sort === 'false' ? 'asc' : 'desc'}
+      ${query.limit ? `LIMIT ${+query.limit}` : ''}
+      OFFSET ${+(query.skip ?? 0) * +(query.limit ?? 0)}
+    `;
+    const countSql = `SELECT COUNT(*) FROM "${tableName}" s ${finalCriteria}`;
+    const count = await this._db.count(countSql, builder.values);
+    const items = await this._db.select(sql, builder.values);
+    return { count, items };
   }
 }

@@ -12,6 +12,7 @@ import {
   HttpStatus,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
   HttpException,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
@@ -25,6 +26,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiProduces,
+  ApiSecurity,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -39,11 +41,13 @@ import { Pagination } from 'src/common/decorator/pagination.decorator';
 import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { Admin, Employee } from 'src/auth/guards/role/role.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { ChatbotAuthGuard } from 'src/auth/guards/chatbot/chatbot-auth.guard';
 import { Response } from 'express';
 import { CLIENT } from 'src/base/constants';
 import { BadRequest } from 'src/common/error';
 import { memoryStorage } from 'multer';
 import { UserService } from '../user/user.service';
+import { BranchService } from '../branch/branch.service';
 import { MobileFormat } from 'src/common/formatter';
 
 const COLS: any[] = [
@@ -63,6 +67,7 @@ export class OrderController {
   constructor(
     private readonly orderService: OrderService,
     private readonly userService: UserService,
+    private readonly branchService: BranchService,
   ) {}
 
   @Post()
@@ -87,6 +92,76 @@ export class OrderController {
     }
     dto.customer_id = customer.id;
     return this.orderService.create(dto, user.user, user.merchant.id);
+  }
+
+  // Chatbot-д зориулсан, JWT token шаардахгүй захиалга үүсгэх endpoint.
+  // Зөвхөн ChatbotAuthGuard-аар (x-bot-key header) баталгаажина. Хэрэглэгчийг
+  // зөвхөн утасны дугаараар олж/шинээр үүсгэж, тухайн хэрэглэгчийг захиалга
+  // үүсгэгч (CLIENT) болгож ашиглана — энэ нь client өөрөө шууд захиалга
+  // үүсгэх үеийн (@Post() create()) логиктой ижил.
+  @ApiOperation({
+    summary: 'Chatbot-с (JWT token шаардахгүй) утасны дугаараар захиалга үүсгэх',
+    description:
+      'Зөвхөн x-bot-key (эсвэл x-chatbot-key) header дэх нууц түлхүүрээр баталгаажина. Хэрэглэгчийг утасны дугаараар олж/шинээр бүртгэнэ.',
+  })
+  @ApiSecurity('bot-key')
+  @ApiHeader({
+    name: 'x-bot-key',
+    description:
+      'Chatbot API key (.env-ийн CHATBOT_API_KEY-тэй тохирох ёстой). x-chatbot-key нэрээр мөн дамжуулж болно.',
+    required: true,
+  })
+  @Public()
+  @UseGuards(ChatbotAuthGuard)
+  @Post('chatbot')
+  async createFromChatbot(@Body() dto: OrderByPhoneDto) {
+    if (!dto.mobile) {
+      throw new HttpException(
+        'Утасны дугаар шаардлагатай.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (!dto.branch_id) {
+      throw new HttpException('Салбар сонгоно уу.', HttpStatus.BAD_REQUEST);
+    }
+
+    const branch = await this.branchService.findOne(dto.branch_id);
+    if (!branch) {
+      throw new HttpException('Салбар олдсонгүй.', HttpStatus.NOT_FOUND);
+    }
+    const merchantId = branch.merchant_id;
+    const mobile = MobileFormat(dto.mobile);
+
+    let customer = await this.userService.findMobileByMerchant(
+      mobile,
+      merchantId,
+    );
+    if (!customer) {
+      await this.userService.register(
+        {
+          mobile,
+          password: mobile,
+        } as any,
+        merchantId,
+      );
+      customer = await this.userService.findMobileByMerchant(
+        mobile,
+        merchantId,
+      );
+    }
+    if (!customer) {
+      throw new HttpException(
+        'Хэрэглэгч үүсгэхэд алдаа гарлаа.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    dto.customer_id = customer.id;
+    return this.orderService.create(
+      dto,
+      { ...customer, role: CLIENT } as any,
+      merchantId,
+    );
   }
 
   @Admin()

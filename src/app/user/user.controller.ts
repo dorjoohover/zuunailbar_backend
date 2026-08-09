@@ -17,7 +17,7 @@ import { BadRequest } from 'src/common/error';
 import { PQ, SQ } from 'src/common/decorator/use-pagination-query.decorator';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import { Filter, Pagination } from 'src/common/decorator/pagination.decorator';
-import { ADMIN, CLIENT, MANAGER } from 'src/base/constants';
+import { ADMIN, CLIENT, MANAGER, UserStatus } from 'src/base/constants';
 import { SAP, SAQ } from 'src/common/decorator/use-param.decorator';
 import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
 import { RegisterDto } from 'src/auth/auth.dto';
@@ -73,10 +73,14 @@ export class UserController {
   @Get('client')
   @PQ(['role'])
   findUser(@Pagination() pg: PaginationDto) {
+    // Идэвхгүй (устгасан/хориглосон) ажилтныг захиалгын хуудсанд харуулахгүй
+    // байхаар backend талд шүүнэ — өмнө нь web талдаа user_status === 10-р
+    // client-side шүүдэг байсныг эндээ шилжүүлэв.
     return this.userService.findAll(
       {
         role: 35,
         ...pg,
+        user_status: UserStatus.Active,
       },
       CLIENT,
     );

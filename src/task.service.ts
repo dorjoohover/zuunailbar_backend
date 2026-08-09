@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { mnDate } from './base/constants';
 import { OrderService } from './app/order/order.service';
 import { ScheduleService } from './app/schedule/schedule.service';
+import { BookingService } from './app/booking/booking.service';
 
 @Injectable()
 export class TasksService {
@@ -10,6 +11,7 @@ export class TasksService {
   constructor(
     private readonly order: OrderService,
     private readonly schedule: ScheduleService,
+    private readonly booking: BookingService,
   ) {}
   @Cron(CronExpression.EVERY_MINUTE)
   public async checkPendingOrders() {
@@ -39,6 +41,22 @@ export class TasksService {
       );
     } catch (error) {
       this.logger.error('Schedule window generation failed', error as Error);
+    }
+  }
+
+  /**
+   * Салбарын нээлттэй цагийн (bookings) хуваарийг app_config.availability_days
+   * цонхонд байнга бөглөгдсөн байлгана — schedule-тэй ижил зарчим.
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  public async generateBookingWindow() {
+    try {
+      const res = await this.booking.ensureAvailabilityWindow();
+      this.logger.log(
+        `Booking window generated: ${res.created} row(s) for ${res.branches} branch(es)`,
+      );
+    } catch (error) {
+      this.logger.error('Booking window generation failed', error as Error);
     }
   }
 }

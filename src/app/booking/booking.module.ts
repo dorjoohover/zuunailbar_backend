@@ -4,9 +4,10 @@ import { BookingController } from './booking.controller';
 import { AppDbModule } from 'src/core/db/database.module';
 import { BaseModule } from 'src/base/base.module';
 import { BookingDao } from './booking.dao';
+import { BranchModule } from '../branch/branch.module';
 
 @Module({
-  imports: [AppDbModule, BaseModule],
+  imports: [AppDbModule, BaseModule, forwardRef(() => BranchModule)],
   controllers: [BookingController],
   providers: [BookingService, BookingDao],
   exports: [BookingService],
