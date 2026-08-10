@@ -26,6 +26,7 @@ import { PaginationDto } from 'src/common/decorator/pagination.dto';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
 import { BadRequest } from 'src/common/error';
 import { BranchService } from '../branch/branch.service';
+import { OrderService } from '../order/order.service';
 
 /** Долоо хоногийн өдрийн индекс: 0=Даваа ... 6=Ням (schedule модультой ижил томьёо). */
 function weekdayIndex(date: string | Date): number {
@@ -47,6 +48,8 @@ export class BookingService {
     private readonly dao: BookingDao,
     @Inject(forwardRef(() => BranchService))
     private readonly branchService: BranchService,
+    @Inject(forwardRef(() => OrderService))
+    private readonly orderService: OrderService,
   ) {}
 
   /** Тухайн салбарын merchant_id-г олно (bookings.merchant_id NOT NULL тул). */
@@ -147,6 +150,7 @@ export class BookingService {
     );
 
     await this.dao.deleteGeneratedFrom(dto.branch_id, dto.date);
+    this.orderService.invalidateSlotsCache(dto.branch_id);
     await this.ensureAvailabilityWindow();
   }
 
@@ -168,6 +172,7 @@ export class BookingService {
     const lastDate = sortedDates[sortedDates.length - 1];
     await this.dao.deleteGeneratedFrom(dto.branch_id, lastDate);
 
+    this.orderService.invalidateSlotsCache(dto.branch_id);
     return this.ensureAvailabilityWindow();
   }
 
@@ -297,6 +302,7 @@ export class BookingService {
         booking.branch_id,
         toYMD(booking.date),
       );
+      this.orderService.invalidateSlotsCache(booking.branch_id);
       await this.ensureAvailabilityWindow();
     }
     return res;
@@ -357,6 +363,8 @@ export class BookingService {
         leave_description: null,
       } as any);
     }
+
+    this.orderService.invalidateSlotsCache(branch_id);
   }
 
   /**
@@ -403,6 +411,7 @@ export class BookingService {
       }
     }
 
+    this.orderService.invalidateSlotsCache(dto.branch_id);
     await this.ensureAvailabilityWindow();
     return results;
   }
