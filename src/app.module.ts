@@ -95,7 +95,13 @@ import { DashboardModule } from './app/dashboard/dashboard.module';
   providers: [
     SystemLogger,
     {
-      provide: APP_FILTER,
+      // GlobalExceptionFilter нь бодитоор ExceptionFilter биш, харин
+      // интерсептор (amжилттай/алдаатай хүсэлт бүрийг файл руу log хийдэг)
+      // тул APP_INTERCEPTOR-ээр бүртгэнэ. Өмнө нь APP_FILTER-ээр
+      // бүртгэгдсэн байсан нь доорх AllExceptionsFilter (жинхэнэ error
+      // logging + friendly message хийдэг филтер) -ийг Nest-ийн алдааны
+      // сувгаас хааж, алдааны логийг бүрмөсөн зогсоож байсан гол шалтгаан.
+      provide: APP_INTERCEPTOR,
       useClass: GlobalExceptionFilter,
     },
     FileService,

@@ -2,6 +2,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { AvailableTimeDto, OrderDto } from './order.dto';
@@ -164,6 +165,11 @@ type ImportedCalendarOrderRow = {
 
 @Injectable()
 export class OrderService {
+  // Захиалгын (create/update) урсгал бол хамгийн чухал (money-critical) урсгал
+  // тул алдаа гарвал docker/production log-оос захиалгын id, оролцсон
+  // артист/огноо/цагаар нь шууд хайж олох боломжтой байх ёстой (өмнө нь
+  // зөвхөн console.error(...) — контекстгүй, файлд ч бичигддэггүй байсан).
+  private readonly logger = new Logger(OrderService.name);
   private orderError = new OrderError();
   public orderLimit = 7;
   private bronze = 10;
@@ -1480,7 +1486,15 @@ export class OrderService {
         return { id: order };
       }
     } catch (error) {
-      console.error('Order create failed:', error);
+      const artistIds = (dto.details ?? [])
+        .map((d) => d.user_id)
+        .filter(Boolean)
+        .join(',');
+      this.logger.error(
+        `Order create failed: customer=${dto.customer_id ?? user.id} branch=${dto.branch_id} ` +
+          `artists=[${artistIds}] date=${dto.order_date} start=${dto.start_time} — ${error?.message}`,
+        error?.stack,
+      );
       throw error;
     }
   }
@@ -2252,7 +2266,15 @@ export class OrderService {
         preAmount == 0 ? true : !!paymentSync.hasPrePayment,
       );
     } catch (error) {
-      console.error('Order update failed:', error);
+      const artistIds = (normalizedDetails ?? [])
+        .map((d) => d.user_id)
+        .filter(Boolean)
+        .join(',');
+      this.logger.error(
+        `Order update failed: order_id=${id} by=${user} role=${role} ` +
+          `artists=[${artistIds}] date=${dto.order_date ?? ''} start=${dto.start_time ?? ''} — ${error?.message}`,
+        error?.stack,
+      );
       throw error;
     }
   }

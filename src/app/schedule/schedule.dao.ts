@@ -1,5 +1,5 @@
 import { HttpException, Injectable } from '@nestjs/common';
-import { ScheduleStatus } from 'src/base/constants';
+import { EmployeeStatus, ScheduleStatus, STATUS } from 'src/base/constants';
 import { AppDB } from 'src/core/db/pg/app.db';
 import { SqlCondition, SqlBuilder } from 'src/core/db/pg/sql.builder';
 import { Schedule } from './schedule.entity';
@@ -133,11 +133,27 @@ export class ScheduleDao {
     );
   }
 
-  /** Идэвхтэй хуваарьтай бүх (өвөрмөц) артистуудын id-г буцаана. */
+  /**
+   * Идэвхтэй хуваарьтай бүх (өвөрмөц) артистуудын id-г буцаана —
+   * `ensureAvailabilityWindow()`-ийн ирээдүйн өдрүүдийг автоматаар
+   * бөглөх эх сурвалж. `users`-тэй join хийж зөвхөн идэвхтэй ажилтныг
+   * (EmployeeStatus.ACTIVE, `status`=Active) авна: үгүй бол
+   * "ажлаас гарсан" (FIRED/BANNED) төлөвт шилжүүлсэн ч, хуучин
+   * хуваарь нь эх сурвалж хэвээр байсаар (жинхэнэ захиалгад
+   * `availability_slots` view нь `u.user_status = 10`-оор аль хэдийн
+   * шүүдэг тул захиалахад нөлөөгүй ч) ирээдүйн өдрүүдэд шинэ мөр
+   * үргэлжлүүлэн үүсгэгдэж, admin-ийн хуваарийн дэлгэц дээр тухайн
+   * ажилтан "идэвхтэй" мэт харагдсаар байх алдаа гарч байсан.
+   */
   async listDistinctArtists(): Promise<string[]> {
     const rows = await this._db.select(
-      `SELECT DISTINCT "user_id" FROM "${tableName}" WHERE "schedule_status" = $1`,
-      [ScheduleStatus.Active],
+      `SELECT DISTINCT s."user_id"
+       FROM "${tableName}" s
+       JOIN "users" u ON u."id" = s."user_id"
+       WHERE s."schedule_status" = $1
+         AND u."user_status" = $2
+         AND u."status" = $3`,
+      [ScheduleStatus.Active, EmployeeStatus.ACTIVE, STATUS.Active],
     );
     return (rows ?? []).map((r: any) => r.user_id);
   }

@@ -88,12 +88,39 @@ export class ScheduleService {
       branch_id?: string;
     },
     approvedBy: string,
+    opts: { skipIfOnLeave?: boolean } = {},
   ) {
     if (!input.times || input.times.length === 0) {
       throw new BadRequest().notFound('Цаг');
     }
 
     const existing = await this.dao.findOne(artist.id, input.date);
+
+    // Тухайн өдөр аль хэдийн амралт (leave_status IS NOT NULL) гэж
+    // тэмдэглэгдсэн бол хөндөхгүй. Bug-ийн шалтгаан: 7 хоногийн grid дээр
+    // ганц өдрийг (жишээ Даваа) засаад хадгалахад frontend бүтэн долоо
+    // хоногийн (Мягмар, Лхагва г.м.) өгөгдлийг дахин илгээдэг байсан ба
+    // тэр өдрүүд аль хэдийн амралттай байсан ч upsertDay нь мөрийг бүр
+    // мөсөн УСТГААД (deleteSchedule) шинэ, амралтгүй мөр (зөвхөн `times`)
+    // үүсгэдэг байсан тул амралт "алга" болдог байсан. Одоо: амралттай
+    // өдрийг зөвхөн ТУХАЙН тохиргоо цэвэрхэн зорилготойгоор дуудагдсан үед
+    // л (create()) тодорхой алдаа өгч зогсооно; setWeek()-ийн бөөнөөр
+    // хадгалах урсгал дээр (skipIfOnLeave=true) харин чимээгүй алгасна —
+    // ингэснээр Даваагийн засвар хадгалагдаад, Мягмар/Лхагвагийн амралт
+    // хэвээр үлдэнэ.
+    if (existing?.leave_status != null) {
+      if (opts.skipIfOnLeave) {
+        this.logger.warn(
+          `upsertDay: ${artist.id} ${input.date} нь амралттай тул алгаслаа (leave_status=${existing.leave_status}).`,
+        );
+        return existing.id;
+      }
+      throw new HttpException(
+        'Энэ өдөр амралт/чөлөө гэж тэмдэглэгдсэн байна. Эхлээд амралтыг цуцалж, дараа нь цаг тохируулна уу.',
+        400,
+      );
+    }
+
     if (existing) {
       await this.dao.deleteSchedule(existing.id);
     }
@@ -186,7 +213,11 @@ export class ScheduleService {
 
     const sortedDates = [...dto.days].map((d) => d.date).sort();
     for (const day of dto.days) {
-      await this.upsertDay(artist as any, day, approvedBy);
+      // Бөөнөөр (бүтэн долоо хоногоор) хадгалах үед амралттай өдрүүдийг
+      // чимээгүй алгасна (дээрх upsertDay-ийн тайлбарыг үзнэ үү).
+      await this.upsertDay(artist as any, day, approvedBy, {
+        skipIfOnLeave: true,
+      });
     }
 
     // Тавьсан өдрүүдийн хамгийн сүүлчийнхээс хойших автомат мөрүүдийг
