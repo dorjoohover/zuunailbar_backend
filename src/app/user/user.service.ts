@@ -372,7 +372,14 @@ export class UserService {
   }
 
   public async updateStatus(id: string) {
-    const res = await this.dao.updateStatus(id, STATUS.Hidden);
+    // Хэрэглэгчийг устгах = зөвхөн "устгасан" (UserStatus.Deleted) төлөвт
+    // шилжүүлнэ, ерөнхий STATUS.Hidden биш. Учир нь энэ хүснэгтийн бусад
+    // query-үүд (getById, getByMail, getByMobile, getByMobileAndMerchant)
+    // бүгд "status != UserStatus.Deleted" гэж шалгадаг тул STATUS.Hidden (30)
+    // ашиглавал тэдгээртэй таарахгүй (30 нь UserStatus.Banned-тай давхцдаг тул
+    // устгасан хэрэглэгч "хориглосон" мэт харагдаж, мөн утасны дугаар нь
+    // "бүртгэлтэй" хэвээр гарч ирдэг байсан).
+    const res = await this.dao.updateStatus(id, UserStatus.Deleted);
 
     return res;
   }

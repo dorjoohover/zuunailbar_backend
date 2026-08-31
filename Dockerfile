@@ -22,6 +22,11 @@ RUN addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app/node_modules ./node_modules
 COPY --from=build --chown=app:app /app/dist ./dist
 COPY --from=build --chown=app:app /app/package.json ./package.json
+# Алдааны лог (/app/logs) болон файл upload (/app/uploads) volume-үүдийг
+# app хэрэглэгч бичиж чадахаар урьдчилан үүсгэж эзэмшүүлнэ — эс тэгвэл
+# root-ын өмчилдөг /app дотор non-root app хэрэглэгч mkdir хийж чадахгүй
+# (EACCES: permission denied, mkdir '/app/logs').
+RUN mkdir -p /app/logs /app/uploads && chown -R app:app /app/logs /app/uploads
 USER app
 EXPOSE 5000
 CMD ["node", "dist/main"]
