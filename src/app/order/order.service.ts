@@ -1217,8 +1217,14 @@ export class OrderService {
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
       const admin = user.role <= ADMIN;
-      const requiresOnlinePrePayment = !admin;
-      const canManagePreAmount = user.role < MANAGER;
+      // Дотоод ажилтан (SYSTEM/ADMIN/MANAGER/EMPLOYEE) vs үйлчлүүлэгч (CLIENT).
+      // Онлайн урьдчилгаа (үйлчилгээний `pre` дүн + QPay) зөвхөн үйлчлүүлэгчийн
+      // вебээс өөрөө захиалга үүсгэхэд хамаарна. Артист/менежер салбар дээрээ
+      // захиалга бүртгэхэд урьдчилгаа автоматаар тавигдах ёсгүй (артистын
+      // дэлгэцэн дээр урьдчилгааны талбар disabled, үргэлж 0 илгээдэг).
+      const staff = user.role < CLIENT;
+      const requiresOnlinePrePayment = !staff;
+      const canManagePreAmount = staff;
       const preMethod = dto.pre_method ?? dto.method;
       const normalizedDetails = normalizeOrderDetailPrices(
         dto.details ?? [],
@@ -1309,8 +1315,11 @@ export class OrderService {
       if (admin && dto.pre_amount) {
         pre = +dto.pre_amount;
       }
+      // Ажилтан урьдчилгаа заагаагүй бол 0 болно (admin-ий хувьд өмнөх зан
+      // төлөв хэвээр — үйлчилгээнд тохируулсан өгөгдмөл урьдчилгаа руу шилжинэ).
+      const staffDefaultPreAmount = admin ? pre : 0;
       const orderPreAmount = canManagePreAmount
-        ? +(dto.pre_amount ?? pre ?? 0)
+        ? +(dto.pre_amount ?? staffDefaultPreAmount ?? 0)
         : +(pre ?? 0);
       const orderTotalAmount = Math.max(
         normalizedTotalAmount,
@@ -2395,6 +2404,13 @@ export class OrderService {
       const items = await Promise.all(
         orders.items.map(async (order) => {
           if (order.order_status !== OrderStatus.Finished) {
+            return undefined;
+          }
+          // Аль хэдийн цалин бодогдсон (salary_date-тэй) захиалгыг дахин
+          // тооцохгүй. `integrationService.updateSalaryLog()` нь тухайн
+          // (артист, олгох огноо) мөр байвал дүнг ДЭЭР НЬ НЭМДЭГ тул давхар
+          // бодуулахад цалин 2, 3 дахин өсөж, тайлан буруу гардаг байсан.
+          if (order.salary_date) {
             return undefined;
           }
           await this.dao.updateSalaryProcessStatus(order.id, new Date());
