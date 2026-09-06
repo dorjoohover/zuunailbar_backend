@@ -2413,7 +2413,15 @@ export class OrderService {
           if (order.salary_date) {
             return undefined;
           }
-          await this.dao.updateSalaryProcessStatus(order.id, new Date());
+          // Атомик "эзэмших": зөвхөн salary_date хоосон байхад бичигдэнэ.
+          // Товчийг давхар дарж зэрэг хоёр хүсэлт ирсэн ч нэг л нь боднo.
+          const claimed = await this.dao.claimSalaryProcessing(
+            order.id,
+            new Date(),
+          );
+          if (claimed !== 1) {
+            return undefined;
+          }
           return order;
         }),
       );

@@ -118,6 +118,18 @@ export class OrdersDao {
   async clearPaidMeta(id: string) {
     return await this.updatePaidDate(id, null, null);
   }
+  /**
+   * Цалин бодоход захиалгыг "эзэмшиж" авна: зөвхөн `salary_date` хоосон үед
+   * бичдэг тул зэрэг ирсэн хоёр хүсэлт (жишээ нь товчийг давхар дарах) нэг
+   * захиалгыг хоёр удаа бодохгүй. Буцах утга 1 бол энэ дуудалт эзэмшсэн.
+   */
+  async claimSalaryProcessing(id: string, date: Date): Promise<number> {
+    return this._db._update(
+      `UPDATE "${tableName}" SET "salary_date" = $1 WHERE "id" = $2 AND "salary_date" IS NULL`,
+      [date, id],
+    );
+  }
+
   async updateSalaryProcessStatus(id: string, date?: Date): Promise<number> {
     const query = `
     UPDATE "${tableName}"
