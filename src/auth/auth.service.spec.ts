@@ -160,8 +160,6 @@ describe('AuthService', () => {
         mobile: 'user@example.com',
         otp: '0000',
         password: 'secret',
-        firstname: 'Test',
-        lastname: 'User',
       }),
     ).rejects.toThrow('Нэг удаагийн нууц үг буруу байна');
 
@@ -177,8 +175,6 @@ describe('AuthService', () => {
         mobile: 'user@example.com',
         otp: '1234',
         password: 'secret',
-        firstname: 'Test',
-        lastname: 'User',
       }),
     ).rejects.toThrow('Бүртгэлгүй хэрэглэгч байна');
   });
@@ -196,16 +192,13 @@ describe('AuthService', () => {
         mobile: '99001122',
         otp: '1234',
         password: 'secret',
-        firstname: 'Test',
-        lastname: 'User',
       }),
     ).resolves.toBe(1);
 
+    // Нууц үг сэргээхэд зөвхөн нууц үг солигдоно (овог/нэр дамжуулахгүй).
     expect(userService.resetPassword).toHaveBeenCalledWith(
       '99001122',
       'secret',
-      'User',
-      'Test',
     );
   });
 
@@ -222,8 +215,6 @@ describe('AuthService', () => {
         mobile: '99001122',
         otp: '4321',
         password: 'secret',
-        firstname: 'Test',
-        lastname: 'User',
       }),
     ).resolves.toBe(1);
   });

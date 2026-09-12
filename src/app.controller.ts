@@ -137,12 +137,14 @@ export class AppController {
       user = await this.authService.checkMobile(dto.mobile);
     } catch (error) {}
     if (!user) throw new BadRequest().unregistered;
-    if (user?.mail) {
-      await this.authService.sentOtpMail(user.mail);
-      return 'mail';
+    // Нууц үг сэргээх кодыг ҮРГЭЛЖ бүртгэлтэй утасны дугаар руу мессежээр
+    // илгээнэ (өмнө нь mail-тай хэрэглэгчид имэйл рүү явдаг байсан).
+    // Хэрэглэгч майлаараа хайлт хийсэн ч код нь түүний утас руу очно.
+    const mobile = user?.mobile ?? dto.mobile;
+    if (!mobile) {
+      throw new BadRequest().notFound('Утасны дугаар');
     }
-
-    await this.authService.sendOtp(dto.mobile);
+    await this.authService.sendOtp(mobile);
     return 'phone';
   }
   @Public()

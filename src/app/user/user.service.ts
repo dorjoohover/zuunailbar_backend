@@ -280,14 +280,18 @@ export class UserService {
   public async resetPassword(
     mobile: string,
     password: string,
-    lastname: string,
-    firstname: string,
+    lastname?: string,
+    firstname?: string,
   ) {
     let user = await this.dao.getByMobile(mobile);
     if (!user) user = await this.dao.getByMail(mobile);
     if (!user) return 0;
     const pass = await this.hash(password);
-    const body = { id: user.id, password: pass, lastname, firstname };
+    // Нууц үг сэргээхэд зөвхөн нууц үгийг солино. Овог/нэрийг зөвхөн
+    // тусгайлан дамжуулсан үед л шинэчилнэ (хоосон утгаар дарж бичихгүй).
+    const body: Record<string, any> = { id: user.id, password: pass };
+    if (lastname?.trim()) body.lastname = lastname.trim();
+    if (firstname?.trim()) body.firstname = firstname.trim();
     return await this.dao.update(body, getDefinedKeys(body));
   }
   public async update(id: string, dto: UserDto) {

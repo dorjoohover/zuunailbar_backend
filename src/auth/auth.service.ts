@@ -299,11 +299,10 @@ async sendCustomerCancelSms(mobile: string, payload: CancelWarningPayload): Prom
       throw new BadRequest().OTP_INVALID;
     }
 
+    // Нууц үг сэргээх урсгалд овог/нэр асуухаа больсон — зөвхөн нууц үг солино.
     const updated = await this.userService.resetPassword(
       dto.mobile,
       dto.password,
-      dto.lastname,
-      dto.firstname,
     );
 
     if (!updated) {
