@@ -213,6 +213,12 @@ export class AuthService {
 
 private async sendSms(mobile: string, text: string): Promise<boolean> {
   let success = false;
+  // Telcocom нь илгээгч дугаар (fromNumber) тус бүрд мессежийн ТӨРЛӨӨР
+  // тохиргоо шаарддаг. Төрлийг дамжуулаагүй үед "UNKNOWN" гэж ангилаад
+  // "<дугаар> дээр UNKNOWN SMS тохиргоо олдсонгүй" гэж буцаадаг.
+  // Параметрийн нэр/утгыг env-ээр өгнө (өгөөгүй бол өмнөх зан төлөв хэвээр).
+  const smsTypeKey = process.env.TELCOCOM_SMS_TYPE_KEY ?? 'smsType';
+  const smsType = process.env.TELCOCOM_SMS_TYPE;
   try {
     const res = await axios.get(process.env.TELCOCOM_URL!, {
       params: {
@@ -220,6 +226,7 @@ private async sendSms(mobile: string, text: string): Promise<boolean> {
         fromNumber: process.env.FROM_NUMBER,
         toNumber: mobile,
         sms: text,
+        ...(smsType ? { [smsTypeKey]: smsType } : {}),
       },
       headers: {
         'telco-auth-token': process.env.TELCOCOM_TOKEN,
@@ -229,13 +236,23 @@ private async sendSms(mobile: string, text: string): Promise<boolean> {
     const { result, message } = res.data ?? {};
 
     if (result !== true) {
-      console.error('SMS илгээхэд API алдаа өглөө:', message);
+      // Бүтэн хариуг логлоно — зөвхөн `message` нь шалтгааныг ялгахад хүрэлцдэггүй.
+      console.error('SMS илгээхэд API алдаа өглөө:', {
+        to: mobile,
+        from: process.env.FROM_NUMBER,
+        smsType: smsType ?? '(тохируулаагүй)',
+        response: res.data,
+      });
       success = false;
     } else {
       success = true;
     }
   } catch (error) {
-    console.error('SMS илгээхэд exception гарлаа:', error);
+    console.error('SMS илгээхэд exception гарлаа:', {
+      to: mobile,
+      status: error?.response?.status,
+      response: error?.response?.data ?? error?.message,
+    });
     success = false;
   }
 
