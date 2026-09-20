@@ -326,6 +326,9 @@ export class IntegrationService {
       to: string;
       income_amount: number;
       salary_amount: number;
+      /** Цалингийн логийн дүн — логийн `date` нь ОЛГОХ огноо тул шүүсэн
+       *  хугацааны орлоготой тэнцэхгүй, зөвхөн лавлагаа. */
+      log_salary_amount: number;
       order_count: number;
     };
 
@@ -345,12 +348,13 @@ export class IntegrationService {
             query.from ??
             '',
           income_amount: Number(reconciliationItem?.income_amount ?? 0),
-          salary_amount: Number(
-            reconciliationItem?.salary_amount ?? salary?.salary_amount ?? 0,
-          ),
-          order_count: Number(
-            reconciliationItem?.order_count ?? salary?.order_count ?? 0,
-          ),
+          // Цалин/захиалгын тоо ЗӨВХӨН тухайн хугацааны бодолтоос. Өмнө нь
+          // мөр байхгүй үед цалингийн логоос татдаг байсан нь өөр мөчлөгийн
+          // (олгох огноогоор шүүгдсэн) дүнг орлого 0 мөрөнд нэмж, тайланг
+          // гажуудуулдаг байсан.
+          salary_amount: Number(reconciliationItem?.salary_amount ?? 0),
+          log_salary_amount: Number(salary?.salary_amount ?? 0),
+          order_count: Number(reconciliationItem?.order_count ?? 0),
         };
       })
       .sort((a, b) => a.artist.localeCompare(b.artist));
@@ -364,12 +368,13 @@ export class IntegrationService {
         { header: 'Дуусах огноо', key: 'to', width: 14 },
         { header: 'Нийт орлого', key: 'income_amount', width: 16 },
         { header: 'Цалин', key: 'salary_amount', width: 16 },
+        { header: 'Логийн цалин', key: 'log_salary_amount', width: 16 },
         { header: 'Захиалгын тоо', key: 'order_count', width: 14 },
       ] as any,
       rows as any,
       {
         sheetName: 'Salary Summary',
-        moneyKeys: ['income_amount', 'salary_amount'],
+        moneyKeys: ['income_amount', 'salary_amount', 'log_salary_amount'],
       },
     );
   }

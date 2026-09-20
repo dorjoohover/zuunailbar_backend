@@ -82,9 +82,13 @@ export class UserDao {
   }
 
   async getByMobile(mobile: string) {
+    // Устгасан (UserStatus.Deleted) хэрэглэгчийг "бүртгэлтэй" гэж тооцохгүй,
+    // тухайн утасны дугаараар шинээр (ажилтан/артист гэх мэт) бүртгүүлж болно.
     return await this._db.selectOne(
-      `SELECT * FROM "${tableName}" WHERE "mobile"=$1 or "mobile" = $2 or lower("mail") = lower($3)`,
-      [mobile, MobileFormat(mobile), mobile],
+      `SELECT * FROM "${tableName}"
+       WHERE ("mobile"=$1 or "mobile" = $2 or lower("mail") = lower($3))
+         AND "status" != $4`,
+      [mobile, MobileFormat(mobile), mobile, UserStatus.Deleted],
     );
   }
   async getByMobileAndMerchant(mobile: string, merchantId: string) {

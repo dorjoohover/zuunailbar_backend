@@ -36,6 +36,16 @@ const config = new DocumentBuilder()
     },
     'branch-id', // ← reference name
   )
+  .addApiKey(
+    {
+      type: 'apiKey',
+      in: 'header',
+      name: 'x-bot-key',
+      description:
+        'Chatbot endpoint-уудад (жишээ нь POST /order/chatbot) зориулсан нууц түлхүүр. .env-ийн CHATBOT_API_KEY-тэй тохирох ёстой. x-chatbot-key нэрээр мөн дамжуулж болно.',
+    },
+    'bot-key', // ← reference name
+  )
   .build();
 const options: SwaggerDocumentOptions = {
   operationIdFactory: (_controllerKey: string, methodKey: string) => methodKey,

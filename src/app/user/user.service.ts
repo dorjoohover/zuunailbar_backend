@@ -18,7 +18,7 @@ import {
 } from 'src/base/constants';
 import { BadRequest, NoPermissionException } from 'src/common/error';
 import { User } from './user.entity';
-import { MobileFormat, MobileParser } from 'src/common/formatter';
+import { MobileFormat, MobileParser, sanitizeName } from 'src/common/formatter';
 import { PaginationDto, SearchDto } from 'src/common/decorator/pagination.dto';
 import * as bcrypt from 'bcrypt';
 import { applyDefaultStatusFilter } from 'src/utils/global.service';
@@ -78,12 +78,12 @@ export class UserService {
       level: dto.level ?? null,
       mail: dto.mail ?? null,
       percent: dto.percent,
-      firstname: dto.firstname ?? '',
+      firstname: sanitizeName(dto.firstname) ?? '',
       device: dto.device ?? null,
       description: dto.description ?? null,
       experience: dto.experience ?? null,
-      lastname: dto.lastname ?? '',
-      nickname: dto.nickname ?? '',
+      lastname: sanitizeName(dto.lastname) ?? '',
+      nickname: sanitizeName(dto.nickname) ?? '',
       profile_img: dto.profile_img ?? '',
       role: dto.role ?? CLIENT,
     });
@@ -280,14 +280,18 @@ export class UserService {
   public async resetPassword(
     mobile: string,
     password: string,
-    lastname: string,
-    firstname: string,
+    lastname?: string,
+    firstname?: string,
   ) {
     let user = await this.dao.getByMobile(mobile);
     if (!user) user = await this.dao.getByMail(mobile);
     if (!user) return 0;
     const pass = await this.hash(password);
-    const body = { id: user.id, password: pass, lastname, firstname };
+    // Нууц үг сэргээхэд зөвхөн нууц үгийг солино. Овог/нэрийг зөвхөн
+    // тусгайлан дамжуулсан үед л шинэчилнэ (хоосон утгаар дарж бичихгүй).
+    const body: Record<string, any> = { id: user.id, password: pass };
+    if (lastname?.trim()) body.lastname = lastname.trim();
+    if (firstname?.trim()) body.firstname = firstname.trim();
     return await this.dao.update(body, getDefinedKeys(body));
   }
   public async update(id: string, dto: UserDto) {
@@ -297,6 +301,15 @@ export class UserService {
       body.id = id;
       if (typeof body.password === 'string') {
         body.password = body.password.trim();
+      }
+      if (typeof body.nickname === 'string') {
+        body.nickname = sanitizeName(body.nickname);
+      }
+      if (typeof body.firstname === 'string') {
+        body.firstname = sanitizeName(body.firstname);
+      }
+      if (typeof body.lastname === 'string') {
+        body.lastname = sanitizeName(body.lastname);
       }
       if (body.password) {
         body.password = await bcrypt.hash(body.password, saltOrRounds);
@@ -363,7 +376,14 @@ export class UserService {
   }
 
   public async updateStatus(id: string) {
-    const res = await this.dao.updateStatus(id, STATUS.Hidden);
+    // Хэрэглэгчийг устгах = зөвхөн "устгасан" (UserStatus.Deleted) төлөвт
+    // шилжүүлнэ, ерөнхий STATUS.Hidden биш. Учир нь энэ хүснэгтийн бусад
+    // query-үүд (getById, getByMail, getByMobile, getByMobileAndMerchant)
+    // бүгд "status != UserStatus.Deleted" гэж шалгадаг тул STATUS.Hidden (30)
+    // ашиглавал тэдгээртэй таарахгүй (30 нь UserStatus.Banned-тай давхцдаг тул
+    // устгасан хэрэглэгч "хориглосон" мэт харагдаж, мөн утасны дугаар нь
+    // "бүртгэлтэй" хэвээр гарч ирдэг байсан).
+    const res = await this.dao.updateStatus(id, UserStatus.Deleted);
 
     return res;
   }

@@ -11,13 +11,13 @@ import {
 import { UserService } from 'src/app/user/user.service';
 import { ADMIN, CLIENT } from 'src/base/constants';
 import { AuthError, BadRequest } from 'src/common/error';
-import { MobileFormat } from 'src/common/formatter';
+import { MobileFormat, MobileParser } from 'src/common/formatter';
 import axios from 'axios';
 import { ResendService } from './resend.service';
 import { MessageLogDao } from './message.log.dao';
 type CancelWarningPayload = {
   order_date?: string;
-  time?: string
+  time?: string;
 };
 @Injectable()
 export class AuthService {
@@ -210,74 +210,91 @@ export class AuthService {
     }
   }
 
+  private async sendSms(mobile: string, text: string): Promise<boolean> {
+    let success = false;
+    // Telcocom нь илгээгч дугаар (fromNumber) тус бүрд мессежийн ТӨРЛӨӨР
+    // тохиргоо шаарддаг. Төрлийг дамжуулаагүй үед "UNKNOWN" гэж ангилаад
+    // "<дугаар> дээр UNKNOWN SMS тохиргоо олдсонгүй" гэж буцаадаг.
+    // Параметрийн нэр/утгыг env-ээр өгнө (өгөөгүй бол өмнөх зан төлөв хэвээр).
+    const smsTypeKey = process.env.TELCOCOM_SMS_TYPE_KEY ?? 'smsType';
+    const smsType = process.env.TELCOCOM_SMS_TYPE;
+    try {
+    
+      const res = await axios.get(process.env.TELCOCOM_URL!, {
+        params: {
+          tenantId: process.env.TELCOCOM,
+          fromNumber: process.env.FROM_NUMBER,
+          toNumber: MobileParser(mobile),
+          sms: `${text}`,
+          ...(smsType ? { [smsTypeKey]: smsType } : {}),
+        },
+        headers: {
+          'telco-auth-token': process.env.TELCOCOM_TOKEN,
+        },
+      });
 
-private async sendSms(mobile: string, text: string): Promise<boolean> {
-  let success = false;
-  try {
-    const res = await axios.get(process.env.TELCOCOM_URL!, {
-      params: {
-        tenantId: process.env.TELCOCOM,
-        fromNumber: process.env.FROM_NUMBER,
-        toNumber: mobile,
-        sms: text,
-      },
-      headers: {
-        'telco-auth-token': process.env.TELCOCOM_TOKEN,
-      },
-    });
+      const { result, message } = res.data ?? {};
 
-    const { result, message } = res.data ?? {};
-
-    if (result !== true) {
-      console.error('SMS илгээхэд API алдаа өглөө:', message);
+      if (result !== true) {
+        // Бүтэн хариуг логлоно — зөвхөн `message` нь шалтгааныг ялгахад хүрэлцдэггүй.
+        console.error('SMS илгээхэд API алдаа өглөө:', {
+          to: mobile,
+          from: process.env.FROM_NUMBER,
+          smsType: smsType ?? '(тохируулаагүй)',
+          response: res.data,
+        });
+        success = false;
+      } else {
+        success = true;
+      }
+    } catch (error) {
+      console.error('SMS илгээхэд exception гарлаа:', {
+        to: mobile,
+        status: error?.response?.status,
+        response: error?.response?.data ?? error?.message,
+      });
       success = false;
-    } else {
-      success = true;
     }
-  } catch (error) {
-    console.error('SMS илгээхэд exception гарлаа:', error);
-    success = false;
+
+    // Мессежийн log бүртгэх
+    await this.messageLog.add({ mobile, message: text, success });
+
+    return success;
   }
 
-  // Мессежийн log бүртгэх
-  await this.messageLog.add({ mobile, message: text, success });
+  async getSmsLogs(query: { skip?: number; limit?: number } = {}) {
+    return this.messageLog.list(query);
+  }
 
-  return success;
-}
+  async sendOtp(mobile: string): Promise<boolean> {
+    const otp = this.generateOtp();
+    this.saveOtp(mobile, otp);
 
-async getSmsLogs(query: { skip?: number; limit?: number } = {}) {
-  return this.messageLog.list(query);
-}
+    const text = [`Tanii neg udaagiin kod: ${otp}`, 'Bayarlalaa.'].join('\n');
 
-async sendOtp(mobile: string): Promise<boolean> {
-  const otp = this.generateOtp();
-  this.saveOtp(mobile, otp);
+    return this.sendSms(mobile, text);
+  }
 
-  const text = [
-    `Your OTP code is: ${otp}`,
-    'Thanks.',
-  ].join('\n');
-
-  return this.sendSms(mobile, text);
-}
-
-async sendCancelWarning(
-  mobile: string,
-  payload: CancelWarningPayload,
-): Promise<boolean> {
-  const datePart = payload.order_date ? ` ${payload.order_date}` : '';
-  const timePart = payload.time ? ` ${payload.time}` : '';
-
- const text = `Tanii ${datePart} ${timePart} zahialga uridchilgaa tulbur tulj batalgaajuulaagui tul tsutslagdlaa. Bayarlalaa`;
-  return this.sendSms(mobile, text);
-}
-
-async sendCustomerCancelSms(mobile: string, payload: CancelWarningPayload): Promise<boolean> {
+  async sendCancelWarning(
+    mobile: string,
+    payload: CancelWarningPayload,
+  ): Promise<boolean> {
     const datePart = payload.order_date ? ` ${payload.order_date}` : '';
-  const timePart = payload.time ? ` ${payload.time}` : '';
-  const text = `Ta ${datePart} ${timePart} tsagiin zahialgaa online tsag zahialgiin systemiin minii tsag zahialga tsesnees tsutsallaa. Hervee sanamsargui tsutsalsan bol yaraltai 86080708 dugaart holbogdono uu`;
-  return this.sendSms(mobile, text);
-}
+    const timePart = payload.time ? ` ${payload.time}` : '';
+
+    const text = `Tanii ${datePart} ${timePart} zahialga uridchilgaa tulbur tulj batalgaajuulaagui tul tsutslagdlaa. Bayarlalaa`;
+    return this.sendSms(mobile, text);
+  }
+
+  async sendCustomerCancelSms(
+    mobile: string,
+    payload: CancelWarningPayload,
+  ): Promise<boolean> {
+    const datePart = payload.order_date ? ` ${payload.order_date}` : '';
+    const timePart = payload.time ? ` ${payload.time}` : '';
+    const text = `Ta ${datePart} ${timePart} tsagiin zahialgaa online tsag zahialgiin systemiin minii tsag zahialga tsesnees tsutsallaa. Hervee sanamsargui tsutsalsan bol yaraltai 86080708 dugaart holbogdono uu`;
+    return this.sendSms(mobile, text);
+  }
   async checkOtp(otp: string, mobile: string) {
     const keys = new Set(this.getOtpKeys(mobile));
     let user = null;
@@ -299,11 +316,10 @@ async sendCustomerCancelSms(mobile: string, payload: CancelWarningPayload): Prom
       throw new BadRequest().OTP_INVALID;
     }
 
+    // Нууц үг сэргээх урсгалд овог/нэр асуухаа больсон — зөвхөн нууц үг солино.
     const updated = await this.userService.resetPassword(
       dto.mobile,
       dto.password,
-      dto.lastname,
-      dto.firstname,
     );
 
     if (!updated) {

@@ -32,3 +32,12 @@ Migrations-ыг ажиллуулсны дараа Nest backend (port 5050)-ыг 
 ## Manual backfill
 
 `dashboard_snapshots`-ыг хуучин өгөгдлөөс дахин үүсгэхийг хүсвэл admin > Dashboard хуудаснаас **"Snapshot шинэчлэх"** товч дар. Огнооны хязгаар нь `Эхлэх огноо`/`Дуусах огноо`-той тааруулагдана. Захиалга байхгүй өдөрт ч costs/product_transactions-ийн дагуу snapshot бичигдэнэ.
+
+## 2026-08-05 — Амралт (leave) schedules/bookings руу шилжих
+
+| Файл | Үйлчлэл |
+|---|---|
+| `2026_08_05_leaves_into_schedules_bookings.sql` | `schedules.leave_status/leave_description` нэмэх; `bookings`-ийг `2026_07_26_schedules_date_based.sql`-тай ижил pattern-аар date-based болгож `is_leave`/`leave_description` нэмэх; хуучин `artist_leaves`/`branch_leaves` өгөгдлийг backfill; `availability_slots`/`availability_service_slots` view дахин тодорхойлох. |
+| `2026_08_05_drop_leave_tables.sql` | `artist_leaves`/`branch_leaves` хүснэгтийг устгана. **Дээрхийг ажиллуулж, availability_slots-ийн гаралтыг баталгаажуулсны дараа л ГАРААР ажиллуул.** Автоматаар/CI-аар бүү ажиллуул. |
+
+Дараалал: эхлээд `2026_08_05_leaves_into_schedules_bookings.sql`, staging/prod дээр хэдэн өдөр ажиглаад дараа нь `2026_08_05_drop_leave_tables.sql`. Дэлгэрэнгүй: `zu-platform/LEAVE_REFACTOR_PLAN.md`.

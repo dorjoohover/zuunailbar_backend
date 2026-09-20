@@ -61,15 +61,35 @@ export class OrderDetailDao {
     }
   }
   async update(data: any, attr: string[]): Promise<number> {
-    return await this._db.update(tableName, data, attr, [
-      new SqlCondition('id', '=', data.id),
-    ]);
+    try {
+      return await this._db.update(tableName, data, attr, [
+        new SqlCondition('id', '=', data.id),
+      ]);
+    } catch (error) {
+      // create()-тэй ижил: артистын цаг давхцах (exclusion constraint)
+      // алдааг хэрэглэгчид ойлгомжтой мессеж болгож хөрвүүлнэ. Өмнө нь
+      // энд try/catch байгаагүй тул захиалга ЗАСАХ (update) үед энэ
+      // алдаа хэрэглэгчийн мессеж рүү хөрвөхгүйгээр, түүхий Postgres
+      // алдаа хэлбэрээр цааш шидэгддэг байсан (create()-д л энэ хамгаалалт
+      // байсан, update()-д байгаагүй нь энэ bug-ийн нэг шалтгаан).
+      if (error?.message?.includes('no_artist_time_overlap')) {
+        throw new OrderError().artistTimeUnavailable;
+      }
+      throw error;
+    }
   }
 
   async updateTx(client: any, data: any, attr: string[]): Promise<number> {
-    return await this._db.updateTx(client, tableName, data, attr, [
-      new SqlCondition('id', '=', data.id),
-    ]);
+    try {
+      return await this._db.updateTx(client, tableName, data, attr, [
+        new SqlCondition('id', '=', data.id),
+      ]);
+    } catch (error) {
+      if (error?.message?.includes('no_artist_time_overlap')) {
+        throw new OrderError().artistTimeUnavailable;
+      }
+      throw error;
+    }
   }
 
   async updateTags(data: any): Promise<number> {

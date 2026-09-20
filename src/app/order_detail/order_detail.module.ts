@@ -5,11 +5,12 @@ import { AppDbModule } from 'src/core/db/database.module';
 import { BaseModule } from 'src/base/base.module';
 import { OrderDetailDao } from './order_detail.dao';
 import { UserModule } from '../user/user.module';
+import { ExcelService } from 'src/excel.service';
 
 @Module({
   imports: [AppDbModule, BaseModule, UserModule],
   controllers: [OrderDetailController],
-  providers: [OrderDetailService, OrderDetailDao],
+  providers: [OrderDetailService, OrderDetailDao, ExcelService],
   exports: [OrderDetailService, OrderDetailDao],
 })
 export class OrderDetailModule {}

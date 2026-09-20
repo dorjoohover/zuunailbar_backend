@@ -118,6 +118,18 @@ export class OrdersDao {
   async clearPaidMeta(id: string) {
     return await this.updatePaidDate(id, null, null);
   }
+  /**
+   * Цалин бодоход захиалгыг "эзэмшиж" авна: зөвхөн `salary_date` хоосон үед
+   * бичдэг тул зэрэг ирсэн хоёр хүсэлт (жишээ нь товчийг давхар дарах) нэг
+   * захиалгыг хоёр удаа бодохгүй. Буцах утга 1 бол энэ дуудалт эзэмшсэн.
+   */
+  async claimSalaryProcessing(id: string, date: Date): Promise<number> {
+    return this._db._update(
+      `UPDATE "${tableName}" SET "salary_date" = $1 WHERE "id" = $2 AND "salary_date" IS NULL`,
+      [date, id],
+    );
+  }
+
   async updateSalaryProcessStatus(id: string, date?: Date): Promise<number> {
     const query = `
     UPDATE "${tableName}"
@@ -304,7 +316,11 @@ export class OrdersDao {
     return true;
   }
 
-  async get_order_details(input: { date: Date[]; artists: string[]; branch_id: string }) {
+  async get_order_details(input: {
+    date: Date[];
+    artists: string[];
+    branch_id: string;
+  }) {
     const { date, artists, branch_id } = input;
 
     return await this._db.select(
@@ -402,6 +418,10 @@ HAVING MIN(available) > 0
     const { branch_id, artists, date } = input;
     if (!artists.length) return [];
 
+    // 2026-07-26: schedules нь одоо огноон дээр суурилсан (per-date) тул
+    // s.date = $3::date-ээр шууд join хийнэ (index/weekday_index-ээр биш).
+    // bookings (салбарын ажиллах цаг) нь долоо хоног тутам давтагддаг хэвээр
+    // тул weekday_index-ээр join хийсээр байна.
     const sql = `
     WITH target AS (
       SELECT (((EXTRACT(dow FROM $3::date) + 6)::numeric % 7)::integer) AS weekday_index
@@ -412,7 +432,7 @@ HAVING MIN(available) > 0
       b.finish_time AS booking_finish_time
     FROM target t
     JOIN schedules s
-      ON s.index = t.weekday_index::numeric
+      ON s.date = $3::date
      AND s.schedule_status = 10
      AND s.user_id = ANY($2::text[])
     LEFT JOIN bookings b
@@ -753,9 +773,7 @@ WHERE key = 'availability_days';`;
     const { customer_id, order_date, artist_ids, start_time } = input;
     if (!artist_ids.length) return false;
 
-    const startTimeSql = start_time
-      ? `AND o.start_time = $8::time`
-      : '';
+    const startTimeSql = start_time ? `AND o.start_time = $8::time` : '';
     const params: any[] = [
       customer_id,
       order_date,

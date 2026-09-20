@@ -44,8 +44,6 @@ import { BranchServiceModule } from './app/branch_service/branch_service.module'
 import { ServiceCategoryModule } from './app/service_category/service_category.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { SystemLogger } from './system-logger.service';
-import { BranchLeavesModule } from './app/branch_leaves/branch_leaves.module';
-import { ArtistLeavesModule } from './app/artist_leaves/artist_leaves.module';
 import { PaymentModule } from './app/payment/payment.module';
 import { IntegrationPaymentModule } from './app/integration_payments/integration_payment.module';
 import { ResendService } from './auth/resend.service';
@@ -89,8 +87,6 @@ import { DashboardModule } from './app/dashboard/dashboard.module';
     UserSalariesModule,
     BranchServiceModule,
     ServiceCategoryModule,
-    BranchLeavesModule,
-    ArtistLeavesModule,
     PaymentModule,
     IntegrationPaymentModule,
     DashboardModule,
@@ -99,7 +95,13 @@ import { DashboardModule } from './app/dashboard/dashboard.module';
   providers: [
     SystemLogger,
     {
-      provide: APP_FILTER,
+      // GlobalExceptionFilter нь бодитоор ExceptionFilter биш, харин
+      // интерсептор (amжилттай/алдаатай хүсэлт бүрийг файл руу log хийдэг)
+      // тул APP_INTERCEPTOR-ээр бүртгэнэ. Өмнө нь APP_FILTER-ээр
+      // бүртгэгдсэн байсан нь доорх AllExceptionsFilter (жинхэнэ error
+      // logging + friendly message хийдэг филтер) -ийг Nest-ийн алдааны
+      // сувгаас хааж, алдааны логийг бүрмөсөн зогсоож байсан гол шалтгаан.
+      provide: APP_INTERCEPTOR,
       useClass: GlobalExceptionFilter,
     },
     FileService,

@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PaymentDto } from './payment.dto';
 import { PaymentDao } from './payment.dao';
 import { OrderService } from '../order/order.service';
@@ -186,18 +186,7 @@ export class PaymentService {
       };
     }
 
-    if (!merchant) {
-      // Merchant тодорхойгүй үед төлбөрийг чимээгүй алгасвал (return null)
-      // админ карт/данс/бэлэн мөнгөөр орсон дүнг бичсэн ч БАЙХГҮЙ шиг DB-д
-      // хадгалагдахгүй өнгөрч, дараа нь захиалга дээр 0 гэж харагддаг байсан
-      // (харин order.pre_amount шууд order мөр рүү бичигддэг тул урьдчилгаа
-      // хэвээр зөв харагддаг байсан). Иймд чимээгүй алгасахын оронд алдаа
-      // шидэж, UI дээр тодорхой харагдуулна.
-      throw new HttpException(
-        'Мерчант тодорхойгүй тул төлбөр бүртгэх боломжгүй байна.',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+    if (!merchant) return null;
 
     await this.create(payload, merchant);
     const payments = await this.dao.listByOrder(order_id);

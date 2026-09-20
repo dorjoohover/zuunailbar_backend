@@ -2,6 +2,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { AvailableTimeDto, OrderDto } from './order.dto';
@@ -164,6 +165,11 @@ type ImportedCalendarOrderRow = {
 
 @Injectable()
 export class OrderService {
+  // Захиалгын (create/update) урсгал бол хамгийн чухал (money-critical) урсгал
+  // тул алдаа гарвал docker/production log-оос захиалгын id, оролцсон
+  // артист/огноо/цагаар нь шууд хайж олох боломжтой байх ёстой (өмнө нь
+  // зөвхөн console.error(...) — контекстгүй, файлд ч бичигддэггүй байсан).
+  private readonly logger = new Logger(OrderService.name);
   private orderError = new OrderError();
   public orderLimit = 7;
   private bronze = 10;
@@ -1211,8 +1217,14 @@ export class OrderService {
   public async create(dto: OrderDto, user: User, merchant: string) {
     try {
       const admin = user.role <= ADMIN;
-      const requiresOnlinePrePayment = !admin;
-      const canManagePreAmount = user.role < MANAGER;
+      // Дотоод ажилтан (SYSTEM/ADMIN/MANAGER/EMPLOYEE) vs үйлчлүүлэгч (CLIENT).
+      // Онлайн урьдчилгаа (үйлчилгээний `pre` дүн + QPay) зөвхөн үйлчлүүлэгчийн
+      // вебээс өөрөө захиалга үүсгэхэд хамаарна. Артист/менежер салбар дээрээ
+      // захиалга бүртгэхэд урьдчилгаа автоматаар тавигдах ёсгүй (артистын
+      // дэлгэцэн дээр урьдчилгааны талбар disabled, үргэлж 0 илгээдэг).
+      const staff = user.role < CLIENT;
+      const requiresOnlinePrePayment = !staff;
+      const canManagePreAmount = staff;
       const preMethod = dto.pre_method ?? dto.method;
       const normalizedDetails = normalizeOrderDetailPrices(
         dto.details ?? [],
@@ -1275,6 +1287,8 @@ export class OrderService {
         }
         const service = serviceMap.get(detail.service_id);
         if (!service) throw new BadRequest().notFound('Үйлчилгээ');
+        console.log(detail.user_id, detail.service_id, dto.branch_id)
+        // 16d9800abcf84ffabc2e90ffde711c8e 4063e7f1f16e41c8bacf094ac38ab557 799defb4cfe7412baab0605d7146e634
         const isAssignedToBranch = await this.userService.hasActiveAssignment({
           user_id: detail.user_id,
           service_id: detail.service_id,
@@ -1301,8 +1315,11 @@ export class OrderService {
       if (admin && dto.pre_amount) {
         pre = +dto.pre_amount;
       }
+      // Ажилтан урьдчилгаа заагаагүй бол 0 болно (admin-ий хувьд өмнөх зан
+      // төлөв хэвээр — үйлчилгээнд тохируулсан өгөгдмөл урьдчилгаа руу шилжинэ).
+      const staffDefaultPreAmount = admin ? pre : 0;
       const orderPreAmount = canManagePreAmount
-        ? +(dto.pre_amount ?? pre ?? 0)
+        ? +(dto.pre_amount ?? staffDefaultPreAmount ?? 0)
         : +(pre ?? 0);
       const orderTotalAmount = Math.max(
         normalizedTotalAmount,
@@ -1438,31 +1455,6 @@ export class OrderService {
           },
           merchant,
         );
-        // Урьдчилгааг Qpay-ээр нэхэмжилсэн ч, карт/данс/бэлэн (үлдэгдэл)
-        // хэлбэрээр орсон дүн байвал үүнийг мөн хадгална — эс бөгөөс энэ
-        // мэдээлэл алдагдаж, дараа нь захиалга дээр 0 гэж харагддаг байсан.
-        const hasRemainingPayment =
-          dto.card_amount != null ||
-          dto.bank_amount != null ||
-          dto.cash_amount != null;
-        if (hasRemainingPayment) {
-          await this.payment.syncManualPayments({
-            merchant,
-            order_id: order,
-            created_by: user.id,
-            method: dto.method,
-            paid_amount: this.resolvePerMethodTotal(
-              dto,
-              Number(dto.paid_amount ?? 0),
-            ),
-            card_amount:
-              dto.card_amount != null ? Number(dto.card_amount) : undefined,
-            bank_amount:
-              dto.bank_amount != null ? Number(dto.bank_amount) : undefined,
-            cash_amount:
-              dto.cash_amount != null ? Number(dto.cash_amount) : undefined,
-          });
-        }
         return {
           id: order,
           invoice: {
@@ -1503,7 +1495,15 @@ export class OrderService {
         return { id: order };
       }
     } catch (error) {
-      console.error('Order create failed:', error);
+      const artistIds = (dto.details ?? [])
+        .map((d) => d.user_id)
+        .filter(Boolean)
+        .join(',');
+      this.logger.error(
+        `Order create failed: customer=${dto.customer_id ?? user.id} branch=${dto.branch_id} ` +
+          `artists=[${artistIds}] date=${dto.order_date} start=${dto.start_time} — ${error?.message}`,
+        error?.stack,
+      );
       throw error;
     }
   }
@@ -2275,7 +2275,15 @@ export class OrderService {
         preAmount == 0 ? true : !!paymentSync.hasPrePayment,
       );
     } catch (error) {
-      console.error('Order update failed:', error);
+      const artistIds = (normalizedDetails ?? [])
+        .map((d) => d.user_id)
+        .filter(Boolean)
+        .join(',');
+      this.logger.error(
+        `Order update failed: order_id=${id} by=${user} role=${role} ` +
+          `artists=[${artistIds}] date=${dto.order_date ?? ''} start=${dto.start_time ?? ''} — ${error?.message}`,
+        error?.stack,
+      );
       throw error;
     }
   }
@@ -2398,7 +2406,22 @@ export class OrderService {
           if (order.order_status !== OrderStatus.Finished) {
             return undefined;
           }
-          await this.dao.updateSalaryProcessStatus(order.id, new Date());
+          // Аль хэдийн цалин бодогдсон (salary_date-тэй) захиалгыг дахин
+          // тооцохгүй. `integrationService.updateSalaryLog()` нь тухайн
+          // (артист, олгох огноо) мөр байвал дүнг ДЭЭР НЬ НЭМДЭГ тул давхар
+          // бодуулахад цалин 2, 3 дахин өсөж, тайлан буруу гардаг байсан.
+          if (order.salary_date) {
+            return undefined;
+          }
+          // Атомик "эзэмших": зөвхөн salary_date хоосон байхад бичигдэнэ.
+          // Товчийг давхар дарж зэрэг хоёр хүсэлт ирсэн ч нэг л нь боднo.
+          const claimed = await this.dao.claimSalaryProcessing(
+            order.id,
+            new Date(),
+          );
+          if (claimed !== 1) {
+            return undefined;
+          }
           return order;
         }),
       );
@@ -2704,8 +2727,8 @@ export class OrderService {
         const productTx = productTxExpense.get(k) ?? 0;
         // Зардал = costs (хэрэглээний зардал) + product_transactions (бүтээгдэхүүний хэрэглээ)
         const expense = cost + productTx;
-        // Profit-аас зардлыг (cost + productTx) ХАСАХГҮЙ — зөвхөн цалинг хасна.
-        const profit = b.revenue - b.salary;
+        // Ашиг = орлого - цалин - зардал (cost + productTx хоёуланг нь хасна).
+        const profit = b.revenue - b.salary - expense;
         await this.dashboardService.upsertSnapshot({
           date,
           branch_id: branchId,
