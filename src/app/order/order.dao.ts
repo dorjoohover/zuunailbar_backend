@@ -316,7 +316,11 @@ export class OrdersDao {
     return true;
   }
 
-  async get_order_details(input: { date: Date[]; artists: string[]; branch_id: string }) {
+  async get_order_details(input: {
+    date: Date[];
+    artists: string[];
+    branch_id: string;
+  }) {
     const { date, artists, branch_id } = input;
 
     return await this._db.select(
@@ -769,9 +773,7 @@ WHERE key = 'availability_days';`;
     const { customer_id, order_date, artist_ids, start_time } = input;
     if (!artist_ids.length) return false;
 
-    const startTimeSql = start_time
-      ? `AND o.start_time = $8::time`
-      : '';
+    const startTimeSql = start_time ? `AND o.start_time = $8::time` : '';
     const params: any[] = [
       customer_id,
       order_date,

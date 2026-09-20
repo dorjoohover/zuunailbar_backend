@@ -86,7 +86,8 @@ export class ProductDao {
       .conditionIfNotEmpty('status', '=', query.status)
       .criteria();
     const sql =
-      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by GREATEST("quantity", 0) DESC NULLS LAST, LOWER("name") ASC,   created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
+      // `SELECT ${cols ?? '*'} FROM "${tableName}" ${criteria} order by GREATEST("quantity", 0) DESC NULLS LAST, LOWER("name") ASC,   created_at ${query.sort === 'false' ? 'asc' : 'desc'} ` +
       `${query.limit ? `limit ${query.limit}` : ''}` +
       ` offset ${+query.skip * +(query.limit ?? 0)}`;
     const countSql = `SELECT COUNT(*) FROM "${tableName}" ${criteria}`;
@@ -129,7 +130,7 @@ export class ProductDao {
       .conditionIfNotEmpty('status', '=', filter.status)
       .orConditions(orConditions);
     const criteria = builder.criteria();
-console.log(` ${criteria}${nameCondition}`, builder.values)
+    console.log(` ${criteria}${nameCondition}`, builder.values);
     return await this._db.select(
       `SELECT "id", 
      CONCAT(
