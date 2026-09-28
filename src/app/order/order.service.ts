@@ -1844,6 +1844,24 @@ export class OrderService {
       customersArr?.filter(Boolean).map((c: any) => [c.id, c]),
     );
 
+    // order_date (DATE) нь pg-ээс UB-ийн шөнө дундын Date болж ирдэг тул
+    // Excel рүү Date-ээр бичвэл UTC руу шилжиж өмнөх өдөр болно/формат алдагдана.
+    // Тиймээс UB цагаар YYYY-MM-DD текст болгож бичнэ.
+    const formatUbDate = (value: unknown): string => {
+      if (!value) return '';
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+        return value.slice(0, 10);
+      }
+      const d = value instanceof Date ? value : new Date(value as any);
+      if (Number.isNaN(d.getTime())) return '';
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ulaanbaatar',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+    };
+
     // 3) мөрүүдээ бэлдэх
     type Row = {
       artist: string;
@@ -1883,7 +1901,7 @@ export class OrderService {
         artist: artists,
         customer: c?.mobile ? MobileParser(c.mobile) : '',
         customerName: c ? usernameFormatter(c) : '',
-        order: it.order_date ? new Date(it.order_date) : '',
+        order: formatUbDate(it.order_date),
         time: it.start_time ?? '',
         timeEnd: it.end_time ?? '',
         services,
@@ -1895,10 +1913,10 @@ export class OrderService {
 
     // 4) Excel баганууд
     const cols = [
+      { header: 'Огноо', key: 'order', width: 14 }, // date (YYYY-MM-DD)
       { header: 'Artist', key: 'artist', width: 24 },
       { header: 'Customer', key: 'customer', width: 18 },
       { header: 'Customer name', key: 'customerName', width: 18 },
-      { header: 'Order', key: 'order', width: 14 }, // date
       { header: 'Time', key: 'time', width: 10 },
       { header: 'Time end', key: 'timeEnd', width: 10 },
       { header: 'Services', key: 'services', width: 28 },
@@ -1911,7 +1929,6 @@ export class OrderService {
     return this.excel.xlsxFromIterable(res, 'order', cols as any, rows as any, {
       sheetName: 'Orders',
       moneyKeys: ['amount', 'discount'],
-      dateKeys: ['order'],
     });
   }
   public async get_status_logs(pg) {
@@ -1988,7 +2005,14 @@ export class OrderService {
       order_date,
       ...body
     } = dto;
-    const payload = { order_date, ...body };
+    const payload: typeof body & { order_date?: any; parallel?: boolean } = {
+      order_date,
+      ...body,
+    };
+    // Дараалал ⇄ зэрэгцээ солиход orders.parallel баганыг мөн шинэчилнэ.
+    if (parallel !== undefined && parallel !== null) {
+      payload.parallel = parallel === true || `${parallel}` === 'true';
+    }
     try {
       const preMethod = dto.pre_method ?? dto.method;
       const order = await this.findOne(id);
