@@ -1046,6 +1046,69 @@ export class OrderService {
       timeToDecimal(current) < timeToDecimal(earliest) ? current : earliest,
     );
   }
+  /**
+   * Нэг артистад давхцсан цагтай захиалга бүртгэхийг БҮХ role-д (admin,
+   * manager, artist, client) хориглоно. Өмнө нь admin `canPlaceOrder`-оос
+   * алгасдаг байсан тул зөвхөн DB constraint-д найдаж байсан.
+   */
+  private async assertNoArtistOverlap(input: {
+    order_date: Date | string;
+    status: number;
+    exclude_order_id?: string | null;
+    details: Array<{ user_id: string; start_time: string; end_time: string }>;
+  }) {
+    const blockingStatuses = [
+      OrderStatus.Pending,
+      OrderStatus.Active,
+      OrderStatus.Finished,
+      OrderStatus.Friend,
+    ];
+    if (!blockingStatuses.includes(+input.status)) return;
+    const date =
+      typeof input.order_date === 'string'
+        ? input.order_date.slice(0, 10)
+        : toYMD(new Date(input.order_date));
+    const details = input.details.filter((d) => d.user_id);
+
+    // Нэг захиалга дотор (зэрэгцээ) нэг артист давхцах
+    for (let i = 0; i < details.length; i++) {
+      for (let j = i + 1; j < details.length; j++) {
+        const a = details[i];
+        const b = details[j];
+        if (a.user_id !== b.user_id) continue;
+        if (
+          timeToDecimal(this.normalizeTimeValue(a.start_time)) <
+            timeToDecimal(this.normalizeTimeValue(b.end_time)) &&
+          timeToDecimal(this.normalizeTimeValue(b.start_time)) <
+            timeToDecimal(this.normalizeTimeValue(a.end_time))
+        ) {
+          throw new HttpException(
+            'Нэг артистад давхцсан цагтай үйлчилгээ сонгосон байна.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+    }
+
+    for (const d of details) {
+      const conflict = await this.dao.findArtistTimeConflict({
+        user_id: d.user_id,
+        order_date: date,
+        start_time: this.normalizeTimeValue(d.start_time),
+        end_time: this.normalizeTimeValue(d.end_time),
+        exclude_order_id: input.exclude_order_id ?? null,
+      });
+      if (conflict) {
+        const s = `${conflict.start_time ?? ''}`.slice(0, 5);
+        const e = `${conflict.end_time ?? ''}`.slice(0, 5);
+        throw new HttpException(
+          `${conflict.nickname ?? 'Артист'} ${s}-${e} цагт өөр захиалгатай байна. Цаг давхцаж болохгүй.`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+  }
+
   private async validateShiftFinishBoundaries(input: {
     branch_id?: string;
     order_date: Date | string;
@@ -1405,6 +1468,16 @@ export class OrderService {
 
         if (dto.parallel !== true) startDate = endDate;
       }
+
+      await this.assertNoArtistOverlap({
+        order_date: orderDate,
+        status: order_status,
+        details: orderDetails.map((detail) => ({
+          user_id: detail.user_id,
+          start_time: detail.start_time,
+          end_time: detail.end_time,
+        })),
+      });
 
       await this.validateShiftFinishBoundaries({
         branch_id: dto.branch_id,
@@ -2207,6 +2280,17 @@ export class OrderService {
         orderDuration,
       );
 
+      await this.assertNoArtistOverlap({
+        order_date: orderDetailDate,
+        status,
+        exclude_order_id: id,
+        details: detailPayloads.map(({ payload }) => ({
+          user_id: payload.user_id,
+          start_time: payload.start_time,
+          end_time: payload.end_time,
+        })),
+      });
+
       await this.validateShiftFinishBoundaries({
         branch_id: payload.branch_id ?? order.branch_id,
         order_date: orderDetailDate,
@@ -2768,6 +2852,47 @@ export class OrderService {
       }),
     );
   }
+  public async getReminderConfig() {
+    const config = await this.dao
+      .getConfigValues(['service_reminder_enabled', 'service_reminder_days'])
+      .catch(() => ({}));
+    const days = Number(config?.['service_reminder_days']?.value);
+    return {
+      // мөр байхгүй бол унтраалттай: dev/restore хийсэн DB-ээс жинхэнэ үйлчлүүлэгч рүү SMS явахаас сэргийлнэ
+      enabled: Number(config?.['service_reminder_enabled']?.value) === 1,
+      days: Number.isInteger(days) && days > 0 ? days : 28,
+    };
+  }
+
+  public async updateReminderConfig(dto: { enabled?: boolean; days?: number }) {
+    const current = await this.getReminderConfig();
+    const enabled = dto.enabled ?? current.enabled;
+    const days = Number(dto.days ?? current.days);
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      throw new HttpException(
+        'Хоногийн тоо 1-365 хооронд бүхэл тоо байна.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    await this.dao.upsertConfigValues([
+      { key: 'service_reminder_enabled', value: enabled ? 1 : 0 },
+      { key: 'service_reminder_days', value: days },
+    ]);
+    return { enabled, days };
+  }
+
+  /** Сүүлийн захиалгаас N хоногийн дараа өмнөх үйлчилгээг нь сануулах SMS. */
+  public async sendServiceReminders() {
+    const { enabled, days } = await this.getReminderConfig();
+    if (!enabled) return 0;
+    const targets = await this.dao.serviceReminderTargets(days);
+    // дараалан: WeSend rate limit-д орохгүй
+    for (const { mobile, services } of targets) {
+      await this.authService.sendServiceReminder(mobile, services);
+    }
+    return targets.length;
+  }
+
   public async level() {
     const keys = [
       'user_level_bronze',

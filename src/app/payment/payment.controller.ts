@@ -58,7 +58,7 @@ export class PaymentController {
     return this.service.findOne(id);
   }
 
-  @Public()
+  @Admin()
   @Get('report')
   @PQ()
   async reports(

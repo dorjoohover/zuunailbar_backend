@@ -34,7 +34,7 @@ export class VoucherController {
     return this.service.create(dto);
   }
 
-  @Public()
+  @Admin()
   @Get()
   @PQ()
   findAll(@Pagination() pg: PaginationDto) {

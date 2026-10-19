@@ -316,6 +316,43 @@ export class OrdersDao {
     return true;
   }
 
+  /**
+   * Артистын цаг давхцалыг шалгана (DB-ийн `no_artist_time_overlap`
+   * exclusion constraint-тэй ижил нөхцөл). Constraint DB дээр байхгүй
+   * болсон ч (restore г.м.) app түвшинд давхар захиалга хаагдана.
+   */
+  async findArtistTimeConflict(input: {
+    user_id: string;
+    order_date: string;
+    start_time: string;
+    end_time: string;
+    exclude_order_id?: string | null;
+  }): Promise<{
+    order_id: string;
+    start_time: string;
+    end_time: string;
+    nickname: string | null;
+  } | null> {
+    const { user_id, order_date, start_time, end_time, exclude_order_id } =
+      input;
+    const rows = await this._db.select(
+      `SELECT od.order_id, od.start_time::text AS start_time,
+              od.end_time::text AS end_time, od.nickname
+         FROM order_details od
+        WHERE od.user_id = $1
+          AND od.status = ANY(ARRAY[10, 20, 40, 70])
+          AND COALESCE(od.view_status, 10) <> 30
+          AND ($5::varchar IS NULL OR od.order_id <> $5::varchar)
+          AND tsrange(od.start_ts, od.end_ts) && tsrange(
+                $2::date + $3::time,
+                CASE WHEN $4::time > $3::time THEN $2::date + $4::time
+                     ELSE $2::date + $4::time + interval '1 day' END)
+        LIMIT 1`,
+      [user_id, order_date, start_time, end_time, exclude_order_id ?? null],
+    );
+    return rows?.[0] ?? null;
+  }
+
   async get_order_details(input: {
     date: Date[];
     artists: string[];
@@ -598,6 +635,35 @@ WHERE key = 'availability_days';`;
       );
     }
     return true;
+  }
+
+  /** Сүүлийн захиалга нь яг `days` хоногийн өмнө байсан үйлчлүүлэгч + сануулах үйлчилгээнүүд. */
+  async serviceReminderTargets(
+    days: number,
+  ): Promise<{ mobile: string; services: string }[]> {
+    const sql = `
+    WITH last_orders AS (
+      SELECT DISTINCT ON (customer_id) id, customer_id, order_date
+      FROM "${tableName}"
+      WHERE order_status IN ($2, $3) AND status <> $4
+      ORDER BY customer_id, order_date DESC, start_time DESC
+    )
+    SELECT u.mobile, string_agg(DISTINCT od.service_name, ', ') AS services
+    FROM last_orders lo
+    JOIN users u ON u.id = lo.customer_id AND u.status <> $4
+    JOIN order_details od ON od.order_id = lo.id
+      AND od.status IN ($2, $3) AND COALESCE(od.view_status, $5) <> $4
+    JOIN services s ON s.id = od.service_id AND s.reminder
+    WHERE lo.order_date = (NOW() AT TIME ZONE 'Asia/Ulaanbaatar')::date - $1::int
+    GROUP BY lo.customer_id, u.mobile
+  `;
+    return await this._db.select(sql, [
+      days,
+      OrderStatus.Active,
+      OrderStatus.Finished,
+      STATUS.Hidden,
+      STATUS.Active,
+    ]);
   }
 
   async customerCheck(customer_id: string): Promise<number> {

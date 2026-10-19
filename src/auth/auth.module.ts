@@ -11,6 +11,7 @@ import { UserModule } from 'src/app/user/user.module';
 import { ResendService } from './resend.service';
 import { MessageLogDao } from './message.log.dao';
 import { AppDbModule } from 'src/core/db/database.module';
+import { WeSendService } from './wesend.service';
 
 @Module({
   imports: [
@@ -20,13 +21,13 @@ import { AppDbModule } from 'src/core/db/database.module';
     BranchModule,
     UserModule,
     AppDbModule,
-
+    
     JwtModule.register({
       secret: jwtConstants.secret,
       signOptions: { expiresIn: '30d' },
     }),
   ],
-  providers: [AuthService, JwtStrategy, ResendService, MessageLogDao],
+  providers: [AuthService, JwtStrategy, ResendService, MessageLogDao, WeSendService],
   exports: [AuthService, MessageLogDao],
 })
 export class AuthModule {}

@@ -52,7 +52,7 @@ export class IntegrationController {
       pg as PaginationDto & { from?: string; to?: string; artist_id?: string },
     );
   }
-  @Public()
+  @Admin()
   @Get('report')
   @PQ()
   async reports(

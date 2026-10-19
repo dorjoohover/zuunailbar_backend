@@ -288,8 +288,7 @@ export class OrderController {
     return await this.orderService.report(pg, user.user.role, res);
   }
   @Get('limit/:limit')
-  // @Admin()
-  @Public()
+  @Admin()
   @ApiParam({ name: 'limit' })
   async limit(@Param('limit') limit: number) {
     return this.orderService.updateOrderLimit(limit);
@@ -439,6 +438,16 @@ export class OrderController {
   @Patch('level')
   updateLevel(@Body() dto: any) {
     return this.orderService.updateLevel(dto);
+  }
+  @Admin()
+  @Patch('reminder')
+  updateReminder(@Body() dto: { enabled?: boolean; days?: number }) {
+    return this.orderService.updateReminderConfig(dto);
+  }
+  @Admin()
+  @Get('reminder')
+  getReminder() {
+    return this.orderService.getReminderConfig();
   }
   @Admin()
   @Get('level')

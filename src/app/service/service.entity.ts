@@ -24,4 +24,6 @@ export class Service {
   // haragah daraalal
   public index?: number;
   public meta?: ServiceCategoryMeta;
+  // suuliin zahialgaas N honogiin daraa sanuulah SMS yavuulah eseh
+  public reminder?: boolean;
 }

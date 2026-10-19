@@ -57,7 +57,7 @@ export class ProductController {
     BadRequest.merchantNotFound(user.merchant, user.user.role);
     return this.productService.search(sd, user.merchant.id);
   }
-  @Public()
+  @Admin()
   @Get('report')
   @PQ()
   async reports(

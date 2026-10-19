@@ -27,6 +27,17 @@ export class TasksService {
     await this.order.confirmSalaryProcessStatus(undefined, mnDate(targetDate));
   }
 
+  /** Сүүлийн захиалгаас app_config.service_reminder_days хоногийн дараа үйлчилгээ сануулах SMS. */
+  @Cron('0 0 11 * * *', { timeZone: 'Asia/Ulaanbaatar' })
+  public async sendServiceReminders() {
+    try {
+      const sent = await this.order.sendServiceReminders();
+      this.logger.log(`Service reminder SMS: ${sent} customer(s)`);
+    } catch (error) {
+      this.logger.error('Service reminder failed', error as Error);
+    }
+  }
+
   /**
    * Артистуудын цагийн хуваарийг (schedules) app_config.availability_days-аар
    * тодорхойлогдсон цонхонд байнга бөглөгдсөн байлгана — admin шинэ долоо

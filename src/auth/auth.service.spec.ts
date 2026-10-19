@@ -120,6 +120,7 @@ describe('AuthService', () => {
       jwtService as any,
       mailer as any,
       messageLog as any,
+      { sendSMS: jest.fn(async () => true) } as any,
     );
   });
 

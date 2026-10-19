@@ -53,7 +53,7 @@ export class ProductWarehouseController {
   findOne(@Param('id') id: string) {
     return this.productWarehouseService.findOne(id);
   }
-  @Public()
+  @Admin()
   @Get('report')
   @PQ()
   async reports(

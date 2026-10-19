@@ -1044,4 +1044,36 @@ describe('OrderService', () => {
     expect(dao.clearPaidMeta).toHaveBeenCalledWith('order-1');
     expect(dao.updatePaidDate).not.toHaveBeenCalled();
   });
+
+  it('sends service reminders only when enabled, with the configured days', async () => {
+    const d = dao as any;
+    const auth = authService as any;
+    d.getConfigValues = jest.fn().mockResolvedValue({});
+    d.serviceReminderTargets = jest
+      .fn()
+      .mockResolvedValue([{ mobile: '99112233', services: 'Маникюр' }]);
+    auth.sendServiceReminder = jest.fn();
+
+    // app_config мөр байхгүй бол унтраалттай
+    expect(await service.sendServiceReminders()).toBe(0);
+    expect(d.serviceReminderTargets).not.toHaveBeenCalled();
+
+    d.getConfigValues.mockResolvedValue({
+      service_reminder_enabled: { value: 1 },
+      service_reminder_days: { value: 30 },
+    });
+    expect(await service.sendServiceReminders()).toBe(1);
+    expect(d.serviceReminderTargets).toHaveBeenCalledWith(30);
+    expect(auth.sendServiceReminder).toHaveBeenCalledWith('99112233', 'Маникюр');
+  });
+
+  it('rejects invalid reminder days', async () => {
+    const d = dao as any;
+    d.getConfigValues = jest.fn().mockResolvedValue({});
+    d.upsertConfigValues = jest.fn();
+
+    await expect(service.updateReminderConfig({ days: 0 })).rejects.toThrow();
+    expect(d.upsertConfigValues).not.toHaveBeenCalled();
+    expect(await service.getReminderConfig()).toEqual({ enabled: false, days: 28 });
+  });
 });

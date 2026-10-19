@@ -37,4 +37,10 @@ export class ServiceDto {
     example: SERVICE_VIEW.DEFAULT,
   })
   view: number;
+
+  @ApiPropertyOptional({
+    description: 'Сүүлийн захиалгаас N хоногийн дараа сануулах SMS явуулах эсэх',
+    example: true,
+  })
+  reminder?: boolean;
 }

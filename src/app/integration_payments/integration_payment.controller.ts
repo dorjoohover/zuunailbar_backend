@@ -45,7 +45,7 @@ export class IntegrationPaymentController {
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }
-  @Public()
+  @Admin()
   @Get('report')
   @PQ()
   async reports(

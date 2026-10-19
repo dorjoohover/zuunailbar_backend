@@ -9,13 +9,13 @@ import {
 } from '@nestjs/common';
 import { AdminUserService } from './admin.user.service';
 import { AdminUserDto } from './admin.user.dto';
-import { Public } from 'src/auth/guards/jwt/jwt-auth-guard';
+import { System } from 'src/auth/guards/role/role.decorator';
 
 @Controller('admin.user')
 export class AdminUserController {
   constructor(private readonly adminUserService: AdminUserService) {}
 
-  @Public()
+  @System()
   @Post()
   create(@Body() createAdminUserDto: AdminUserDto) {
     return this.adminUserService.addAdminUser(createAdminUserDto);

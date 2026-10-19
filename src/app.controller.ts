@@ -25,7 +25,7 @@ import { FirebaseService } from './base/firebase.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { FileService } from './file.service';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { createReadStream, existsSync } from 'fs';
 import * as mime from 'mime-types';
 import { Response } from 'express';
@@ -151,7 +151,8 @@ export class AppController {
   @Get('/file/:filename')
   @ApiParam({ name: 'filename' })
   async getFile(@Param('filename') filename: string, @Res() res: Response) {
-    const filePath = join(this.localPath, filename);
+    // basename: "..%2F.." гэх мэт замаар uploads-аас гадуурх файл уншихаас сэргийлнэ
+    const filePath = join(this.localPath, basename(filename));
 
     if (!existsSync(filePath)) {
       throw new NotFoundException('File not found');
@@ -175,5 +176,11 @@ export class AppController {
       skip: +page,
       limit: +limit,
     });
+  }
+
+  @Admin()
+  @Get('sms-logs/balance')
+  async getSmsBalance() {
+    return this.authService.getSmsBalance();
   }
 }

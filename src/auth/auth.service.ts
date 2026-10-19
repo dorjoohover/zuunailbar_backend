@@ -15,6 +15,8 @@ import { MobileFormat, MobileParser } from 'src/common/formatter';
 import axios from 'axios';
 import { ResendService } from './resend.service';
 import { MessageLogDao } from './message.log.dao';
+import { WeSendService } from './wesend.service';
+
 type CancelWarningPayload = {
   order_date?: string;
   time?: string;
@@ -27,6 +29,7 @@ export class AuthService {
     private jwtService: JwtService,
     private readonly mailer: ResendService,
     private readonly messageLog: MessageLogDao,
+    private readonly wesendService: WeSendService,
   ) {}
   private authError = new AuthError();
   private otps: Record<string, string> = {};
@@ -211,59 +214,26 @@ export class AuthService {
   }
 
   private async sendSms(mobile: string, text: string): Promise<boolean> {
-    let success = false;
-    // Telcocom нь илгээгч дугаар (fromNumber) тус бүрд мессежийн ТӨРЛӨӨР
-    // тохиргоо шаарддаг. Төрлийг дамжуулаагүй үед "UNKNOWN" гэж ангилаад
-    // "<дугаар> дээр UNKNOWN SMS тохиргоо олдсонгүй" гэж буцаадаг.
-    // Параметрийн нэр/утгыг env-ээр өгнө (өгөөгүй бол өмнөх зан төлөв хэвээр).
-    const smsTypeKey = process.env.TELCOCOM_SMS_TYPE_KEY ?? 'smsType';
-    const smsType = process.env.TELCOCOM_SMS_TYPE;
-    try {
-    
-      const res = await axios.get(process.env.TELCOCOM_URL!, {
-        params: {
-          tenantId: process.env.TELCOCOM,
-          fromNumber: process.env.FROM_NUMBER,
-          toNumber: MobileParser(mobile),
-          sms: `${text}`,
-          ...(smsType ? { [smsTypeKey]: smsType } : {}),
-        },
-        headers: {
-          'telco-auth-token': process.env.TELCOCOM_TOKEN,
-        },
-      });
 
-      const { result, message } = res.data ?? {};
+    const data = await this.wesendService.sendSMS(
+      MobileParser(mobile),
+      `${text}`,
+    );
 
-      if (result !== true) {
-        // Бүтэн хариуг логлоно — зөвхөн `message` нь шалтгааныг ялгахад хүрэлцдэггүй.
-        console.error('SMS илгээхэд API алдаа өглөө:', {
-          to: mobile,
-          from: process.env.FROM_NUMBER,
-          smsType: smsType ?? '(тохируулаагүй)',
-          response: res.data,
-        });
-        success = false;
-      } else {
-        success = true;
-      }
-    } catch (error) {
-      console.error('SMS илгээхэд exception гарлаа:', {
-        to: mobile,
-        status: error?.response?.status,
-        response: error?.response?.data ?? error?.message,
-      });
-      success = false;
-    }
 
-    // Мессежийн log бүртгэх
-    await this.messageLog.add({ mobile, message: text, success });
-
-    return success;
+    return data;
   }
 
   async getSmsLogs(query: { skip?: number; limit?: number } = {}) {
     return this.messageLog.list(query);
+  }
+
+  async getSmsBalance() {
+    const [balance, pricing] = await Promise.all([
+      this.wesendService.getBalance(),
+      this.wesendService.getPrice(),
+    ]);
+    return { balance, pricing };
   }
 
   async sendOtp(mobile: string): Promise<boolean> {
@@ -283,6 +253,12 @@ export class AuthService {
     const timePart = payload.time ? ` ${payload.time}` : '';
 
     const text = `Tanii ${datePart} ${timePart} zahialga uridchilgaa tulbur tulj batalgaajuulaagui tul tsutslagdlaa. Bayarlalaa`;
+    return this.sendSms(mobile, text);
+  }
+
+  async sendServiceReminder(mobile: string, services: string): Promise<boolean> {
+    // үйлчилгээний нэр кирилл тул SMS unicode (60 тэмдэгт/хэсэг) — богино байлгах
+    const text = `Tanii ${services} uilchilgeeg dahin avah hugatsaa bolloo. Tsag zahialah: 86080708. Bayarlalaa`;
     return this.sendSms(mobile, text);
   }
 

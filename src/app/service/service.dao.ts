@@ -34,6 +34,7 @@ export class ServiceDao {
       'view',
       'index',
       'meta',
+      'reminder',
     ]);
   }
 
