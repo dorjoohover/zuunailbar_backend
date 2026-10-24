@@ -258,7 +258,7 @@ export class AuthService {
 
   async sendServiceReminder(mobile: string, services: string): Promise<boolean> {
     // үйлчилгээний нэр кирилл тул SMS unicode (60 тэмдэгт/хэсэг) — богино байлгах
-    const text = `Tanii ${services} uilchilgeeg dahin avah hugatsaa bolloo. Tsag zahialah: 86080708. Bayarlalaa`;
+    const text = `Sain baina uu! Tany humsnii budag 28 honog bolloo. Humsnii budgaa shinechleh tsag boljee! https://zunailbar.mn/order`;
     return this.sendSms(mobile, text);
   }
 
